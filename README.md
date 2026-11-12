@@ -109,7 +109,29 @@ tiles for the selected period, a table view of every chart and the full scorecar
 
 Then open http://localhost:8765. The page has no dependencies, so `docs/index.html`
 also opens straight from disk and the folder can be served by GitHub Pages.
-It replays the held out test set; it is not connected to a live data feed.
+The lower part replays the held out test set.
+
+### Live forecast
+
+The top of the page is live. Every hour a GitHub Actions workflow
+(`.github/workflows/live.yml`) runs `scripts/live_forecast.py`, which
+
+1. fetches NOAA SWPC real-time solar wind (propagated from L1 to Earth), the WDC Kyoto
+   quick-look Dst and the F10.7 flux,
+2. averages them into the same hourly table layout as OMNI, dropping the hour in progress,
+3. runs the committed XGBoost and GRU models to forecast the hour in progress,
+4. hindcasts the last 6 days with the same real-time inputs and reports the RMSE against
+   persistence, so the page always shows how the models do on operational data,
+5. deploys the page with a fresh `docs/live.js`. Nothing is committed back to the repo.
+
+```bash
+.venv/bin/python scripts/live_forecast.py
+```
+
+On the first run (2026-11-12, 142 quiet hours, deepest Dst -38 nT) the real-time RMSE was
+2.63 nT for the GRU, 2.67 nT for XGBoost and 3.66 nT for persistence. One quiet week is
+not evidence for storm-time skill on real-time data; that needs a storm to pass through.
+Quick-look Dst is preliminary and gets revised, and the forecast lead time is at most one hour.
 
 Full numbers are in `reports/xgb_baseline.json` and `reports/gru_baseline.json`.
 Run the leakage tests with:
@@ -129,6 +151,9 @@ oculstorm/gru.py           GRU model definition
 scripts/train_xgb.py       train XGBoost, score against persistence
 scripts/train_gru.py       train the GRU, score against persistence and XGBoost
 scripts/build_dashboard.py export test predictions to docs/data.js
+oculstorm/live.py          NOAA real-time inputs as an OMNI-style hourly table
+scripts/live_forecast.py   live forecast and 6 day hindcast -> docs/live.js
+models/                    trained models used by the live forecast
 docs/                      static dashboard (index.html + generated data.js)
 tests/                     look-ahead leakage tests
 reports/                   metrics (tracked) and test predictions (ignored)
