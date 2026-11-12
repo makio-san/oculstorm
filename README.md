@@ -13,7 +13,13 @@ Forecasting geomagnetic storm intensity (the Dst index) one hour ahead from rece
 
 Source: [NASA SPDF OMNIWeb](https://omniweb.gsfc.nasa.gov/), low-resolution OMNI2 file
 `omni2_all_years.dat`. Raw files and the Parquet output are not tracked in git; the
-Parquet table is published as a Kaggle dataset.
+Parquet table is published as a Kaggle dataset:
+[makiosann/omni2-hourly-dst](https://www.kaggle.com/datasets/makiosann/omni2-hourly-dst)
+(559,527 hourly rows × 56 columns, 1963-01-01 to 2026-10-30).
+
+```bash
+.venv/bin/kaggle datasets download -d makiosann/omni2-hourly-dst -p data/kaggle --unzip
+```
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install pandas pyarrow kaggle
