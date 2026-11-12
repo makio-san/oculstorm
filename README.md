@@ -4,10 +4,10 @@ Forecasting geomagnetic storm intensity (the Dst index) one hour ahead from rece
 
 ## Plan
 
-1. **Data** — NASA OMNI2 hourly solar wind, IMF and geomagnetic indices (1963–2026), cleaned into a single Parquet table and hosted on Kaggle.
-2. **Models** — XGBoost baseline first, then a small GRU.
-3. **Evaluation** — every model must beat the persistence baseline ("next hour = current hour").
-4. **Product** — a space-weather dashboard showing observed vs. predicted storm intensity.
+1. **Data:** NASA OMNI2 hourly solar wind, IMF and geomagnetic indices (1963-2026), cleaned into a single Parquet table and hosted on Kaggle.
+2. **Models:** XGBoost baseline first, then a small GRU.
+3. **Evaluation:** every model must beat the persistence baseline ("next hour = current hour").
+4. **Product:** a space-weather dashboard showing observed vs. predicted storm intensity.
 
 ## Data
 
