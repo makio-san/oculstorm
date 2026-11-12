@@ -1,0 +1,280 @@
+{
+  "horizon_hours": 1,
+  "window_hours": 24,
+  "train": "1995-01-01 .. 2017-01-01 (exclusive)",
+  "validation": "2017-01-01 .. 2021-01-01 (exclusive)",
+  "test": "2021-01-01 .. 2026-10-30 13:00:00",
+  "n_channels": 18,
+  "n_parameters": 18241,
+  "hyperparameters": {
+    "hidden": 64,
+    "batch": 512,
+    "lr": 0.002,
+    "max_epochs": 40,
+    "patience": 6
+  },
+  "runs": [
+    {
+      "seed": 0,
+      "epochs": 21,
+      "best_val_rmse": 2.6403,
+      "val_rmse_history": [
+        2.7555,
+        2.696,
+        2.6818,
+        2.6637,
+        2.6662,
+        2.6582,
+        2.6869,
+        2.6671,
+        2.6532,
+        2.6516,
+        2.6558,
+        2.6758,
+        2.6524,
+        2.6416,
+        2.6403,
+        2.6418,
+        2.6522,
+        2.6474,
+        2.6435,
+        2.6431,
+        2.6506
+      ],
+      "test_rmse": 3.6077,
+      "seconds": 243
+    },
+    {
+      "seed": 1,
+      "epochs": 31,
+      "best_val_rmse": 2.6375,
+      "val_rmse_history": [
+        2.7684,
+        2.7132,
+        2.6762,
+        2.6784,
+        2.6533,
+        2.6632,
+        2.6509,
+        2.6539,
+        2.6656,
+        2.6536,
+        2.6405,
+        2.6444,
+        2.6519,
+        2.6478,
+        2.64,
+        2.6494,
+        2.6409,
+        2.6452,
+        2.6395,
+        2.6389,
+        2.6417,
+        2.6393,
+        2.6391,
+        2.6394,
+        2.6375,
+        2.6403,
+        2.6404,
+        2.641,
+        2.6398,
+        2.6397,
+        2.6396
+      ],
+      "test_rmse": 3.6417,
+      "seconds": 343
+    },
+    {
+      "seed": 2,
+      "epochs": 21,
+      "best_val_rmse": 2.6359,
+      "val_rmse_history": [
+        2.7511,
+        2.694,
+        2.6847,
+        2.6768,
+        2.6547,
+        2.6593,
+        2.6623,
+        2.649,
+        2.6753,
+        2.6464,
+        2.6453,
+        2.6546,
+        2.6628,
+        2.6516,
+        2.6359,
+        2.645,
+        2.6452,
+        2.6422,
+        2.6415,
+        2.6398,
+        2.6453
+      ],
+      "test_rmse": 3.626,
+      "seconds": 291
+    }
+  ],
+  "scores": [
+    {
+      "regime": "all",
+      "n_hours": 51086,
+      "model": "persistence",
+      "rmse": 4.8079,
+      "mae": 3.012,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "all",
+      "n_hours": 51086,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 3.6736,
+      "mae": 2.3911,
+      "skill_vs_persistence": 0.4162
+    },
+    {
+      "regime": "all",
+      "n_hours": 51086,
+      "model": "gru (single seed, median)",
+      "rmse": 3.626,
+      "mae": 2.3637,
+      "skill_vs_persistence": 0.4312
+    },
+    {
+      "regime": "all",
+      "n_hours": 51086,
+      "model": "gru (mean of 3 seeds)",
+      "rmse": 3.5819,
+      "mae": 2.3451,
+      "skill_vs_persistence": 0.445
+    },
+    {
+      "regime": "all",
+      "n_hours": 51086,
+      "model": "xgboost + gru average",
+      "rmse": 3.5719,
+      "mae": 2.3407,
+      "skill_vs_persistence": 0.4481
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48962,
+      "model": "persistence",
+      "rmse": 4.1162,
+      "mae": 2.7985,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48962,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 3.236,
+      "mae": 2.2542,
+      "skill_vs_persistence": 0.382
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48962,
+      "model": "gru (single seed, median)",
+      "rmse": 3.2015,
+      "mae": 2.2276,
+      "skill_vs_persistence": 0.3951
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48962,
+      "model": "gru (mean of 3 seeds)",
+      "rmse": 3.175,
+      "mae": 2.2129,
+      "skill_vs_persistence": 0.405
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48962,
+      "model": "xgboost + gru average",
+      "rmse": 3.1704,
+      "mae": 2.2112,
+      "skill_vs_persistence": 0.4067
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "persistence",
+      "rmse": 12.8616,
+      "mae": 7.9336,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 9.1214,
+      "mae": 5.5483,
+      "skill_vs_persistence": 0.497
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "gru (single seed, median)",
+      "rmse": 8.9425,
+      "mae": 5.5012,
+      "skill_vs_persistence": 0.5166
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "gru (mean of 3 seeds)",
+      "rmse": 8.7293,
+      "mae": 5.3914,
+      "skill_vs_persistence": 0.5394
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "xgboost + gru average",
+      "rmse": 8.6697,
+      "mae": 5.3253,
+      "skill_vs_persistence": 0.5456
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "persistence",
+      "rmse": 23.7474,
+      "mae": 15.5839,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 17.969,
+      "mae": 11.3867,
+      "skill_vs_persistence": 0.4274
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "gru (single seed, median)",
+      "rmse": 17.3939,
+      "mae": 11.0848,
+      "skill_vs_persistence": 0.4635
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "gru (mean of 3 seeds)",
+      "rmse": 17.1822,
+      "mae": 10.946,
+      "skill_vs_persistence": 0.4765
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "xgboost + gru average",
+      "rmse": 16.9807,
+      "mae": 10.7115,
+      "skill_vs_persistence": 0.4887
+    }
+  ]
+}
