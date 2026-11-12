@@ -32,11 +32,14 @@ def _coupling(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def build_features(df: pd.DataFrame, use_solar_wind: bool = True) -> tuple[pd.DataFrame, pd.Series]:
+def build_features(
+    df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True
+) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y) where y is Dst at t+HORIZON and X only looks backwards from t.
 
     With use_solar_wind=False only the Dst history and calendar terms are kept,
     which shows how much of the skill actually comes from the solar wind.
+    With require_target=False the newest hours, whose target is not known yet, are kept.
     """
     cols: dict[str, pd.Series] = {}
     dst = df["dst"]
@@ -69,5 +72,7 @@ def build_features(df: pd.DataFrame, use_solar_wind: bool = True) -> tuple[pd.Da
     X = pd.DataFrame(cols).astype("float32")
     y = dst.shift(-HORIZON).rename("dst_target")
 
-    keep = y.notna() & X["dst_lag0"].notna()
+    keep = X["dst_lag0"].notna()
+    if require_target:
+        keep &= y.notna()
     return X[keep], y[keep]
