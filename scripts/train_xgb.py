@@ -1,7 +1,7 @@
 """Train the XGBoost baseline and compare it with persistence on the held out test years.
 
 Usage: python scripts/train_xgb.py
-Writes: models/xgb_dst_1h.json, reports/xgb_baseline.json, reports/xgb_test_predictions.parquet
+Writes: models/xgb_dst_1h.ubj, reports/xgb_baseline.json, reports/xgb_test_predictions.parquet
 """
 import json
 import sys
@@ -72,7 +72,7 @@ def main() -> None:
 
     (ROOT / "models").mkdir(exist_ok=True)
     (ROOT / "reports").mkdir(exist_ok=True)
-    model.save_model(ROOT / "models" / "xgb_dst_1h.json")
+    model.save_model(ROOT / "models" / "xgb_dst_1h.ubj")
     pd.DataFrame({"dst_observed": y_te, **predictions}).to_parquet(ROOT / "reports" / "xgb_test_predictions.parquet")
     report = {
         "horizon_hours": HORIZON,

@@ -1,7 +1,7 @@
 """Train the small GRU and compare it with persistence and the XGBoost baseline.
 
 Usage: python scripts/train_gru.py
-Writes: models/gru_dst_1h_seed*.pt, reports/gru_baseline.json, reports/gru_test_predictions.parquet
+Writes: models/gru_dst_1h_seed*.pt, models/gru_channels.json, reports/gru_baseline.json, reports/gru_test_predictions.parquet
 """
 import json
 import sys
@@ -20,7 +20,7 @@ from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E4
 from oculstorm.features import HORIZON  # noqa: E402
 from oculstorm.gru import DstGRU  # noqa: E402
 from oculstorm.metrics import evaluate, rmse  # noqa: E402
-from oculstorm.sequences import WINDOW, build_windows  # noqa: E402
+from oculstorm.sequences import WINDOW, build_windows, channel_stats  # noqa: E402
 
 SEEDS = [0, 1, 2]
 HIDDEN = 64
@@ -93,6 +93,8 @@ def main() -> None:
     te_rows, lag0 = te["row"].to_numpy(), te["dst_lag0"].to_numpy()
     (ROOT / "models").mkdir(exist_ok=True)
     (ROOT / "reports").mkdir(exist_ok=True)
+    # Scaling statistics the live pipeline needs to prepare inputs without the training data.
+    (ROOT / "models" / "gru_channels.json").write_text(json.dumps(channel_stats(df), indent=2) + "\n")
 
     runs, seed_preds = [], {}
     for seed in SEEDS:
