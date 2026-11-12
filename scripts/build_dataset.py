@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "data" / "raw" / "omni2_all_years.dat"
 OUT = ROOT / "data" / "kaggle" / "omni2_hourly.parquet"
 
-# (sütun adı, eksik-veri dolgu değeri) — sıra omni2.text'teki 55 kelimeyle birebir aynı.
+# (sütun adı, eksik-veri dolgu değeri); sıra omni2.text'teki 55 kelimeyle birebir aynı.
 COLUMNS = [
     ("year", None), ("doy", None), ("hour", None),
     ("bartels_rotation", 9999),
