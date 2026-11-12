@@ -2,7 +2,7 @@
 data/raw/
 *.parquet
 .DS_Store
-models/
+docs/live.js
 __pycache__/
 .pytest_cache/
 .claude/
