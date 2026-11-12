@@ -1,0 +1,4 @@
+.venv/
+data/raw/
+*.parquet
+.DS_Store
