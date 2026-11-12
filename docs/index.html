@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>oculstorm: Dst forecast dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --observed: #0b0b0b; --gru: #2a78d6; --xgb: #eb6834; --persistence: #898781;
+    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+    --wash: rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19;
+      --text-primary: #f0efec; --text-secondary: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+      --observed: #f0efec; --gru: #3987e5; --xgb: #d95926; --persistence: #898781;
+      --wash: rgba(255,255,255,0.06);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text-primary);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+  h2 { font-size: 15px; margin: 0; font-weight: 650; }
+  p.sub, .note { color: var(--text-secondary); margin: 0; }
+  .note { font-size: 12.5px; margin-top: 8px; }
+  section { margin-top: 28px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .card + .card { margin-top: 12px; }
+  .card-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  button, select, input { font: inherit; color: var(--text-primary); background: var(--surface);
+          border: 1px solid var(--axis); border-radius: 6px; padding: 5px 9px; }
+  button { cursor: pointer; }
+  button:hover { background: var(--wash); }
+  button.ghost { font-size: 12.5px; color: var(--text-secondary); }
+  :focus-visible { outline: 2px solid var(--gru); outline-offset: 2px; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin: 12px 0; }
+  .filters label { display: grid; gap: 3px; font-size: 12px; color: var(--text-secondary); }
+
+  .tiles { display: grid; grid-template-columns: 1.5fr repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, 1fr); } .tile.hero { grid-column: 1 / -1; } }
+  .tile .label { color: var(--text-secondary); font-size: 12.5px; }
+  .tile .value { font-size: 24px; font-weight: 650; margin-top: 2px; }
+  .tile.hero .value { font-size: 48px; line-height: 1.1; }
+  .tile .unit { font-size: 0.5em; font-weight: 500; color: var(--text-secondary); margin-left: 4px; }
+  .tile .detail { color: var(--text-secondary); font-size: 12.5px; margin-top: 4px; }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-primary); }
+  .status svg { width: 14px; height: 14px; flex: none; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text-secondary); font-size: 12.5px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .key { width: 16px; height: 0; border-top: 2px solid; border-radius: 1px; display: inline-block; }
+  .plot { position: relative; }
+  .plot svg { display: block; width: 100%; overflow: visible; }
+  .plot text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+             border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+             min-width: 170px; display: none; z-index: 2; }
+  .tooltip .when { color: var(--text-secondary); margin-bottom: 4px; }
+  .tooltip .row { display: flex; align-items: center; gap: 8px; }
+  .tooltip .row b { font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
+  .tooltip .row span.name { color: var(--text-secondary); }
+
+  .table-wrap { max-height: 320px; overflow: auto; margin-top: 10px; border-top: 1px solid var(--grid); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th { color: var(--text-secondary); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
+  th:first-child, td:first-child { text-align: left; }
+  .score td.model { text-align: left; }
+  .score .bar-cell { width: 34%; min-width: 120px; text-align: left; }
+  .track { height: 8px; border-radius: 4px; background: var(--wash); }
+  .fill { height: 8px; border-radius: 4px; }
+  .score tr.regime-start td { border-top: 1px solid var(--axis); }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: baseline; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Geomagnetic storm forecast</h1>
+    <p class="sub" id="subtitle"></p>
+  </header>
+
+  <section aria-labelledby="explore-title">
+    <h2 id="explore-title">Observed and forecast Dst</h2>
+    <div class="filters">
+      <label>Period
+        <select id="preset"></select>
+      </label>
+      <label>From (UTC) <input type="date" id="from"></label>
+      <label>To (UTC) <input type="date" id="to"></label>
+      <span class="note" id="range-note" role="status"></span>
+    </div>
+
+    <div class="tiles" id="tiles"></div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-head">
+        <h2>Dst index, observed vs forecast one hour earlier (nT)</h2>
+        <button class="ghost" id="toggle-dst" aria-expanded="false">Show table</button>
+      </div>
+      <div class="legend" id="legend-dst"></div>
+      <div class="plot" id="plot-dst"></div>
+      <div class="table-wrap" id="table-dst" hidden></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Absolute forecast error (nT)</h2>
+        <button class="ghost" id="toggle-err" aria-expanded="false">Show table</button>
+      </div>
+      <div class="legend" id="legend-err"></div>
+      <div class="plot" id="plot-err"></div>
+      <div class="table-wrap" id="table-err" hidden></div>
+    </div>
+    <p class="note">Each forecast for an hour was made with data up to the previous hour. Lower (more negative) Dst means a stronger storm.
+      Hover or focus a chart and use the arrow keys to read exact values.</p>
+  </section>
+
+  <section aria-labelledby="score-title">
+    <h2 id="score-title">Scorecard over the whole test period</h2>
+    <p class="note" id="score-note" style="margin:4px 0 12px"></p>
+    <div class="card" style="overflow-x:auto"><table class="score" id="score"></table></div>
+    <p class="note">Bars show each model's RMSE relative to persistence in the same row group. Skill is the MSE skill score against persistence:
+      0 means no better than "next hour equals this hour", 1 means perfect. Results are on the cleaned OMNI science product, so real-time performance will be lower.</p>
+  </section>
+</main>
+
+<script src="data.js"></script>
+<script>
+(() => {
+  "use strict";
+  const D = window.OCULSTORM;
+  const HOUR = 3600e3, DAY = 24 * HOUR, MAX_DAYS = 120;
+  const T0 = Date.parse(D.start + "Z");
+  const T_END = T0 + (D.hours - 1) * HOUR;
+  const SERIES = {
+    observed: { name: "Observed", color: "var(--observed)" },
+    gru: { name: "GRU", color: "var(--gru)" },
+    xgb: { name: "XGBoost", color: "var(--xgb)" },
+    persistence: { name: "Persistence", color: "var(--persistence)" },
+  };
+  const MODELS = ["gru", "xgb", "persistence"];
+  const THRESHOLDS = [[-50, "moderate"], [-100, "intense"], [-250, "severe"]];
+  const SVG = "http://www.w3.org/2000/svg";
+
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, props = {}, text) => {
+    const node = document.createElement(tag);
+    Object.assign(node, props);
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  const svg = (tag, attrs = {}, text) => {
+    const node = document.createElementNS(SVG, tag);
+    for (const k in attrs) node.setAttribute(k, attrs[k]);
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  const iso = (ms) => new Date(ms).toISOString();
+  const day = (ms) => iso(ms).slice(0, 10);
+  const stamp = (ms) => iso(ms).slice(0, 16).replace("T", " ") + " UTC";
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const shortDay = (ms) => { const d = new Date(ms); return MONTHS[d.getUTCMonth()] + " " + d.getUTCDate(); };
+  const fmt = (v, digits = 1) => v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const index = (ms) => clamp(Math.round((ms - T0) / HOUR), 0, D.hours - 1);
+
+  function stormClass(dst) {
+    if (dst <= -250) return { label: "Severe storm", color: "var(--critical)", icon: "M7 1 13 12H1Z" };
+    if (dst <= -100) return { label: "Intense storm", color: "var(--serious)", icon: "M7 1 13 12H1Z" };
+    if (dst <= -50) return { label: "Moderate storm", color: "var(--warning)", icon: "M7 1 13 7 7 13 1 7Z" };
+    return { label: "Quiet", color: "var(--good)", icon: "M7 1a6 6 0 1 0 0 12A6 6 0 0 0 7 1Z" };
+  }
+
+  // ---------- state ----------
+  const state = { lo: 0, hi: 0, hover: null };
+  const charts = [];
+
+  // ---------- filters ----------
+  function buildPresets() {
+    const select = $("preset");
+    const recent = el("optgroup", { label: "Most recent data" });
+    for (const days of [7, 30, 90]) recent.append(el("option", { value: "last:" + days }, "Last " + days + " days"));
+    const storms = el("optgroup", { label: "Largest storms in the test period" });
+    for (const s of D.storms) storms.append(el("option", { value: "storm:" + s.time }, s.time.slice(0, 10) + "  (" + s.min_dst + " nT)"));
+    select.append(storms, recent, el("option", { value: "custom" }, "Custom range"));
+    select.value = "storm:" + D.storms[0].time;
+    for (const id of ["from", "to"]) { $(id).min = day(T0); $(id).max = day(T_END); }
+  }
+  function applyPreset() {
+    const [kind, arg] = $("preset").value.split(/:(.*)/);
+    if (kind === "last") setRange(T_END - arg * DAY + HOUR, T_END);
+    else if (kind === "storm") { const peak = Date.parse(arg + "Z"); setRange(peak - 2 * DAY, peak + 4 * DAY); }
+  }
+  function applyDates() {
+    const from = Date.parse($("from").value + "T00:00Z"), to = Date.parse($("to").value + "T23:00Z");
+    if (isNaN(from) || isNaN(to)) return;
+    $("preset").value = "custom";
+    setRange(from, Math.max(to, from + DAY - HOUR));
+  }
+  function setRange(from, to) {
+    let note = "";
+    if (to - from > MAX_DAYS * DAY) { to = from + MAX_DAYS * DAY - HOUR; note = "Range limited to " + MAX_DAYS + " days of hourly data."; }
+    state.lo = index(from); state.hi = index(to); state.hover = null;
+    $("from").value = day(T0 + state.lo * HOUR); $("to").value = day(T0 + state.hi * HOUR);
+    $("range-note").textContent = note;
+    render();
+  }
+
+  // ---------- window statistics ----------
+  function windowStats() {
+    const { lo, hi } = state, n = hi - lo + 1;
+    const sse = { gru: 0, xgb: 0, persistence: 0 };
+    let minDst = Infinity, minAt = lo;
+    for (let i = lo; i <= hi; i++) {
+      const y = D.observed[i];
+      if (y < minDst) { minDst = y; minAt = i; }
+      for (const m of MODELS) sse[m] += (y - D[m][i]) ** 2;
+    }
+    const rmse = {}; for (const m of MODELS) rmse[m] = Math.sqrt(sse[m] / n);
+    const skill = sse.persistence > 0 ? 1 - sse.gru / sse.persistence : 0;
+    return { n, minDst, minAt, rmse, skill };
+  }
+
+  function renderTiles() {
+    const s = windowStats(), cls = stormClass(s.minDst), box = $("tiles");
+    box.replaceChildren();
+    const tile = (label, value, unit, detail, hero) => {
+      const node = el("div", { className: "card tile" + (hero ? " hero" : "") });
+      const val = el("div", { className: "value" }, value);
+      if (unit) val.append(el("span", { className: "unit" }, unit));
+      node.append(el("div", { className: "label" }, label), val);
+      if (detail) node.append(detail);
+      box.append(node);
+      return node;
+    };
+    const status = el("div", { className: "detail" });
+    const badge = el("span", { className: "status" });
+    const icon = svg("svg", { viewBox: "0 0 14 14", "aria-hidden": "true" });
+    icon.append(svg("path", { d: cls.icon, fill: cls.color }));
+    badge.append(icon, document.createTextNode(cls.label));
+    status.append(badge, document.createTextNode("  at " + stamp(T0 + s.minAt * HOUR)));
+    tile("Deepest observed Dst in this period", String(s.minDst), "nT", status, true);
+    const detail = (text) => el("div", { className: "detail" }, text);
+    tile("GRU error (RMSE)", fmt(s.rmse.gru), "nT", detail(fmt(s.n, 0) + " hours"));
+    tile("XGBoost error (RMSE)", fmt(s.rmse.xgb), "nT", detail(fmt(s.n, 0) + " hours"));
+    tile("Persistence error (RMSE)", fmt(s.rmse.persistence), "nT", detail("naive baseline"));
+    tile("GRU skill vs persistence", fmt(s.skill, 2), "", detail(s.skill > 0 ? fmt(100 * s.skill, 0) + "% lower squared error" : "no better than persistence"));
+  }
+
+  // ---------- line chart ----------
+  function niceStep(span, target) {
+    const raw = span / target, mag = 10 ** Math.floor(Math.log10(raw));
+    return [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  }
+
+  function lineChart(host, height, keys, valueOf, opts = {}) {
+    const tooltip = el("div", { className: "tooltip" });
+    const chart = { draw, hover };
+    let geom = null;
+
+    function draw() {
+      const { lo, hi } = state, n = hi - lo + 1;
+      const W = Math.max(320, host.clientWidth), M = { l: 46, r: opts.thresholds ? 78 : 14, t: 10, b: 26 };
+      const pw = W - M.l - M.r, ph = height - M.t - M.b;
+      let ymin = Infinity, ymax = -Infinity;
+      for (const k of keys) for (let i = lo; i <= hi; i++) { const v = valueOf(k, i); if (v < ymin) ymin = v; if (v > ymax) ymax = v; }
+      ymin = Math.min(ymin, 0); ymax = Math.max(ymax, opts.thresholds ? 20 : 1);
+      const step = niceStep(ymax - ymin, 5);
+      ymin = Math.floor(ymin / step) * step; ymax = Math.ceil(ymax / step) * step;
+      const x = (i) => M.l + (n > 1 ? (i - lo) / (n - 1) : 0.5) * pw;
+      const y = (v) => M.t + (ymax - v) / (ymax - ymin) * ph;
+      geom = { lo, hi, n, M, pw, ph, x, y, W };
+
+      const root = svg("svg", { viewBox: `0 0 ${W} ${height}`, height, role: "img", tabindex: 0, "aria-label": opts.label });
+      for (let v = ymin; v <= ymax + 1e-9; v += step) {
+        root.append(svg("line", { x1: M.l, x2: M.l + pw, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
+        root.append(svg("text", { x: M.l - 8, y: y(v) + 4, "text-anchor": "end" }, fmt(v, 0)));
+      }
+      // x ticks at UTC midnights
+      const days = (hi - lo) / 24, every = Math.max(1, Math.ceil(days / Math.max(3, Math.floor(pw / 90))));
+      const firstMidnight = Math.ceil((T0 + lo * HOUR) / DAY) * DAY;
+      for (let t = firstMidnight, k = 0; t <= T0 + hi * HOUR; t += DAY, k++) {
+        if (k % every) continue;
+        const px = x((t - T0) / HOUR);
+        root.append(svg("line", { x1: px, x2: px, y1: M.t + ph, y2: M.t + ph + 4, stroke: "var(--axis)" }));
+        const label = shortDay(t) + (k === 0 || new Date(t).getUTCMonth() === 0 && new Date(t).getUTCDate() <= every ? ", " + new Date(t).getUTCFullYear() : "");
+        root.append(svg("text", { x: px, y: M.t + ph + 18, "text-anchor": px < M.l + 30 ? "start" : "middle" }, label));
+      }
+      if (opts.thresholds) for (const [level, name] of THRESHOLDS) {
+        if (level < ymin) continue;
+        root.append(svg("line", { x1: M.l, x2: M.l + pw + 6, y1: y(level), y2: y(level), stroke: "var(--axis)", "stroke-width": 1 }));
+        root.append(svg("text", { x: M.l + pw + 10, y: y(level) + 4, fill: "var(--text-secondary)" }, name));
+      }
+      for (const k of keys) {
+        let d = "";
+        for (let i = lo; i <= hi; i++) d += (i === lo ? "M" : "L") + x(i).toFixed(1) + " " + y(valueOf(k, i)).toFixed(1);
+        root.append(svg("path", { d, fill: "none", stroke: SERIES[k].color, "stroke-width": k === "persistence" ? 1.5 : 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      }
+      const cross = svg("g", { visibility: "hidden" });
+      cross.append(svg("line", { y1: M.t, y2: M.t + ph, stroke: "var(--muted)", "stroke-width": 1 }));
+      for (const k of keys) cross.append(svg("circle", { r: 4, fill: SERIES[k].color, stroke: "var(--surface)", "stroke-width": 2, "data-key": k }));
+      root.append(cross);
+      geom.cross = cross;
+
+      const hit = svg("rect", { x: M.l, y: M.t, width: pw, height: ph, fill: "transparent" });
+      const at = (ev) => { const r = root.getBoundingClientRect(); return clamp(Math.round(lo + ((ev.clientX - r.left) / r.width * W - M.l) / pw * (n - 1)), lo, hi); };
+      hit.addEventListener("pointermove", (ev) => setHover(at(ev), chart));
+      hit.addEventListener("pointerleave", () => setHover(null, chart));
+      root.addEventListener("keydown", (ev) => {
+        const stepBy = { ArrowLeft: -1, ArrowRight: 1, PageUp: -24, PageDown: 24 }[ev.key];
+        if (!stepBy) return;
+        ev.preventDefault();
+        setHover(clamp((state.hover ?? Math.round((lo + hi) / 2)) + stepBy, lo, hi), chart);
+      });
+      root.addEventListener("focus", () => { if (state.hover === null) setHover(Math.round((lo + hi) / 2), chart); });
+      root.addEventListener("blur", () => setHover(null, chart));
+      root.append(hit);
+      host.replaceChildren(root, tooltip);
+    }
+
+    function hover(i, owner) {
+      if (!geom) return;
+      const { cross, x, y, M, W } = geom;
+      if (i === null) { cross.setAttribute("visibility", "hidden"); tooltip.style.display = "none"; return; }
+      cross.setAttribute("visibility", "visible");
+      const px = x(i);
+      cross.firstChild.setAttribute("x1", px); cross.firstChild.setAttribute("x2", px);
+      for (const dot of cross.querySelectorAll("circle")) { dot.setAttribute("cx", px); dot.setAttribute("cy", y(valueOf(dot.dataset.key, i))); }
+      if (owner !== chart) { tooltip.style.display = "none"; return; }
+      tooltip.replaceChildren(el("div", { className: "when" }, stamp(T0 + i * HOUR)));
+      for (const k of Object.keys(SERIES).filter((s) => keys.includes(s))) {
+        const row = el("div", { className: "row" });
+        const key = el("span", { className: "key" }); key.style.borderColor = SERIES[k].color;
+        row.append(key, el("b", {}, fmt(valueOf(k, i), k === "observed" && opts.thresholds ? 0 : 1)), el("span", { className: "name" }, SERIES[k].name));
+        tooltip.append(row);
+      }
+      tooltip.style.display = "block";
+      const scale = host.clientWidth / W, left = px * scale;
+      tooltip.style.top = M.t + 6 + "px";
+      tooltip.style.left = (left > host.clientWidth / 2 ? left - tooltip.offsetWidth - 14 : left + 14) + "px";
+    }
+    charts.push(chart);
+    return chart;
+  }
+  function setHover(i, owner) { state.hover = i; for (const c of charts) c.hover(i, owner); }
+
+  function legend(host, keys) {
+    host.replaceChildren();
+    for (const k of keys) {
+      const item = el("span"), key = el("span", { className: "key" });
+      key.style.borderColor = SERIES[k].color;
+      item.append(key, document.createTextNode(SERIES[k].name));
+      host.append(item);
+    }
+  }
+
+  // ---------- table views ----------
+  function dataTable(host, keys, valueOf, digitsOf) {
+    const table = el("table"), head = el("tr");
+    head.append(el("th", {}, "Time (UTC)"));
+    for (const k of keys) head.append(el("th", {}, SERIES[k].name));
+    table.append(head);
+    for (let i = state.lo; i <= state.hi; i++) {
+      const row = el("tr");
+      row.append(el("td", {}, stamp(T0 + i * HOUR).replace(" UTC", "")));
+      for (const k of keys) row.append(el("td", {}, fmt(valueOf(k, i), digitsOf(k))));
+      table.append(row);
+    }
+    host.replaceChildren(table);
+  }
+  function wireToggle(buttonId, tableId, fill) {
+    const button = $(buttonId), host = $(tableId);
+    button.addEventListener("click", () => {
+      host.hidden = !host.hidden;
+      button.textContent = host.hidden ? "Show table" : "Hide table";
+      button.setAttribute("aria-expanded", String(!host.hidden));
+      if (!host.hidden) fill();
+    });
+    return () => { if (!host.hidden) fill(); };
+  }
+
+  // ---------- scorecard ----------
+  function renderScore() {
+    const table = $("score"), head = el("tr");
+    for (const h of ["Conditions", "Model", "RMSE (nT)", "", "MAE (nT)", "Skill"]) head.append(el("th", {}, h));
+    head.children[1].style.textAlign = "left";
+    table.append(head);
+    const names = { gru: "GRU", xgb: "XGBoost", persistence: "Persistence" };
+    const regimes = [...new Set(D.scores.map((s) => s.regime))];
+    for (const regime of regimes) {
+      const rows = D.scores.filter((s) => s.regime === regime);
+      const base = rows.find((s) => s.model === "persistence").rmse;
+      MODELS.forEach((m, j) => {
+        const s = rows.find((r) => r.model === m), row = el("tr", { className: j === 0 ? "regime-start" : "" });
+        row.append(el("td", {}, j === 0 ? regime.replace("<=", "≤") + ", " + fmt(s.n_hours, 0) + " h" : ""));
+        const model = el("td", { className: "model" }), swatch = el("span", { className: "swatch" });
+        swatch.style.background = SERIES[m].color;
+        model.append(swatch, document.createTextNode(names[m]));
+        const bar = el("td", { className: "bar-cell" }), track = el("div", { className: "track" }), fill = el("div", { className: "fill" });
+        fill.style.width = (100 * s.rmse / base).toFixed(1) + "%"; fill.style.background = SERIES[m].color;
+        track.append(fill); bar.append(track);
+        row.append(model, el("td", {}, fmt(s.rmse, 2)), bar, el("td", {}, fmt(s.mae, 2)), el("td", {}, m === "persistence" ? "0.00" : fmt(s.skill_vs_persistence, 2)));
+        table.append(row);
+      });
+    }
+    $("score-note").textContent = fmt(D.hours, 0) + " hourly forecasts from " + day(T0) + " to " + day(T_END) +
+      ", years the models never saw during training (trained on 1995 to 2016, tuned on 2017 to 2020).";
+  }
+
+  // ---------- wiring ----------
+  const dstKeys = ["persistence", "xgb", "gru", "observed"], errKeys = ["persistence", "xgb", "gru"];
+  const dstValue = (k, i) => D[k][i];
+  const errValue = (k, i) => Math.abs(D.observed[i] - D[k][i]);
+  const legendOrder = ["observed", "gru", "xgb", "persistence"];
+  const dstChart = lineChart($("plot-dst"), 340, dstKeys, dstValue, { thresholds: true, label: "Line chart of observed Dst and the three one hour ahead forecasts" });
+  const errChart = lineChart($("plot-err"), 220, errKeys, errValue, { label: "Line chart of absolute forecast error for each model" });
+  const refreshDst = wireToggle("toggle-dst", "table-dst", () => dataTable($("table-dst"), legendOrder, dstValue, (k) => (k === "observed" ? 0 : 1)));
+  const refreshErr = wireToggle("toggle-err", "table-err", () => dataTable($("table-err"), legendOrder.slice(1), errValue, () => 1));
+
+  function render() { renderTiles(); dstChart.draw(); errChart.draw(); refreshDst(); refreshErr(); }
+
+  $("subtitle").textContent = "One hour ahead forecasts of the Dst index from NASA OMNI solar wind data. Test data through " + stamp(T_END) + ".";
+  legend($("legend-dst"), legendOrder);
+  legend($("legend-err"), legendOrder.slice(1));
+  buildPresets();
+  renderScore();
+  $("preset").addEventListener("change", applyPreset);
+  $("from").addEventListener("change", applyDates);
+  $("to").addEventListener("change", applyDates);
+  let resizeTimer;
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { dstChart.draw(); errChart.draw(); }, 120); });
+  applyPreset();
+})();
+</script>
+</body>
+</html>
