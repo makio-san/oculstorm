@@ -93,6 +93,8 @@ Three seeds were trained; the headline GRU is their average.
 
 ## Dashboard
 
+Live: https://makio-san.github.io/oculstorm/
+
 A static page in `docs/` shows observed Dst against the GRU, XGBoost and persistence
 forecasts for any period of the test years, with the largest storms as presets, error
 tiles for the selected period, a table view of every chart and the full scorecard.
