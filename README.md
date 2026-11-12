@@ -91,6 +91,24 @@ Three seeds were trained; the headline GRU is their average.
 - Single seeds score 3.61 to 3.64 nT, still ahead of XGBoost; averaging the three seeds
   gives 3.58 nT, and averaging GRU with XGBoost gives 3.57 nT.
 
+## Dashboard
+
+A static page in `docs/` shows observed Dst against the GRU, XGBoost and persistence
+forecasts for any period of the test years, with the largest storms as presets, error
+tiles for the selected period, a table view of every chart and the full scorecard.
+
+```bash
+.venv/bin/python scripts/build_dashboard.py
+```
+
+```bash
+.venv/bin/python -m http.server 8765 --directory docs
+```
+
+Then open http://localhost:8765. The page has no dependencies, so `docs/index.html`
+also opens straight from disk and the folder can be served by GitHub Pages.
+It replays the held out test set; it is not connected to a live data feed.
+
 Full numbers are in `reports/xgb_baseline.json` and `reports/gru_baseline.json`.
 Run the leakage tests with:
 
@@ -108,6 +126,8 @@ oculstorm/sequences.py     24 hour input windows for the GRU
 oculstorm/gru.py           GRU model definition
 scripts/train_xgb.py       train XGBoost, score against persistence
 scripts/train_gru.py       train the GRU, score against persistence and XGBoost
+scripts/build_dashboard.py export test predictions to docs/data.js
+docs/                      static dashboard (index.html + generated data.js)
 tests/                     look-ahead leakage tests
 reports/                   metrics (tracked) and test predictions (ignored)
 scripts/build_dataset.py   raw OMNI2 -> data/kaggle/omni2_hourly.parquet
