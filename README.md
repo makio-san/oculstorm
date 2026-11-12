@@ -65,7 +65,34 @@ Caveats: OMNI is a cleaned, time-shifted science product and the Dst values are
 final/provisional Kyoto values, so real-time performance on raw L1 data will be lower.
 The intense-storm subset is small (322 hours), so its interval is wide (0.25 to 0.59).
 
-Full numbers are in `reports/xgb_baseline.json`. Run the leakage tests with:
+## GRU results (1 hour ahead)
+
+```bash
+.venv/bin/python scripts/train_gru.py
+```
+
+A single layer GRU (hidden size 64, 18,241 parameters) reads the last 24 hours of
+18 channels (Dst, solar wind, IMF, coupling functions, observed/missing masks, calendar)
+and predicts the same Dst change as XGBoost. Same split and same 51,086 test hours.
+Three seeds were trained; the headline GRU is their average.
+
+| Test subset | Persistence RMSE | XGBoost RMSE | GRU RMSE | GRU skill |
+|---|---|---|---|---|
+| All | 4.81 nT | 3.67 nT | 3.58 nT | 0.45 |
+| Quiet (Dst > -50) | 4.12 nT | 3.24 nT | 3.18 nT | 0.41 |
+| Storm (Dst <= -50) | 12.86 nT | 9.12 nT | 8.73 nT | 0.54 |
+| Intense (Dst <= -100) | 23.75 nT | 17.97 nT | 17.18 nT | 0.48 |
+
+- The GRU beats persistence in every regime and every test year (skill 0.36 to 0.49).
+- Against XGBoost the gain is small but consistent: 4.8% lower MSE overall
+  (95% interval 3.0% to 7.4%, paired monthly block bootstrap) and better in all six test years.
+- For intense storms the GRU vs XGBoost difference is not statistically clear
+  (interval -6.5% to +23%), so the two models should be treated as equal there.
+- Single seeds score 3.61 to 3.64 nT, still ahead of XGBoost; averaging the three seeds
+  gives 3.58 nT, and averaging GRU with XGBoost gives 3.57 nT.
+
+Full numbers are in `reports/xgb_baseline.json` and `reports/gru_baseline.json`.
+Run the leakage tests with:
 
 ```bash
 .venv/bin/python -m pytest tests
@@ -77,7 +104,10 @@ Full numbers are in `reports/xgb_baseline.json`. Run the leakage tests with:
 oculstorm/data.py          load the hourly table, chronological split
 oculstorm/features.py      backward-looking lag and coupling features
 oculstorm/metrics.py       persistence baselines, RMSE / MAE / skill by regime
+oculstorm/sequences.py     24 hour input windows for the GRU
+oculstorm/gru.py           GRU model definition
 scripts/train_xgb.py       train XGBoost, score against persistence
+scripts/train_gru.py       train the GRU, score against persistence and XGBoost
 tests/                     look-ahead leakage tests
 reports/                   metrics (tracked) and test predictions (ignored)
 scripts/build_dataset.py   raw OMNI2 -> data/kaggle/omni2_hourly.parquet
