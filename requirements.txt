@@ -1,0 +1,7 @@
+kaggle
+numpy
+pandas
+pyarrow
+pytest
+scikit-learn
+xgboost

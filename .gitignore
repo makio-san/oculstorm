@@ -2,3 +2,6 @@
 data/raw/
 *.parquet
 .DS_Store
+models/
+__pycache__/
+.pytest_cache/
