@@ -47,6 +47,8 @@
   .filters label { display: grid; gap: 3px; font-size: 12px; color: var(--text-secondary); }
 
   .tiles { display: grid; grid-template-columns: 1.5fr repeat(4, 1fr); gap: 12px; }
+  .tile dl { margin: 6px 0 0; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 12.5px; color: var(--text-secondary); }
+  .tile dd { margin: 0; text-align: right; color: var(--text-primary); font-variant-numeric: tabular-nums; }
   @media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, 1fr); } .tile.hero { grid-column: 1 / -1; } }
   .tile .label { color: var(--text-secondary); font-size: 12.5px; }
   .tile .value { font-size: 24px; font-weight: 650; margin-top: 2px; }
@@ -91,8 +93,25 @@
     <p class="sub" id="subtitle"></p>
   </header>
 
+  <section aria-labelledby="live-title" id="live" hidden>
+    <h2 id="live-title">Live forecast</h2>
+    <p class="note" id="live-note" style="margin:4px 0 12px"></p>
+    <div class="tiles" id="live-tiles"></div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-head">
+        <h2>Last 7 days on real-time data: observed vs forecast one hour earlier (nT)</h2>
+        <button class="ghost" id="toggle-live" aria-expanded="false">Show table</button>
+      </div>
+      <div class="legend" id="legend-live"></div>
+      <div class="plot" id="plot-live"></div>
+      <div class="table-wrap" id="table-live" hidden></div>
+    </div>
+    <p class="note">Inputs are NOAA SWPC real-time solar wind (propagated from L1 to Earth) and the WDC Kyoto quick-look Dst, refreshed about once an hour.
+      Quick-look Dst is preliminary and is revised later, so these numbers are not directly comparable with the scorecard below.</p>
+  </section>
+
   <section aria-labelledby="explore-title">
-    <h2 id="explore-title">Observed and forecast Dst</h2>
+    <h2 id="explore-title">Explore the test years</h2>
     <div class="filters">
       <label>Period
         <select id="preset"></select>
@@ -137,6 +156,7 @@
 </main>
 
 <script src="data.js"></script>
+<script src="live.js"></script>
 <script>
 (() => {
   "use strict";
@@ -184,8 +204,9 @@
   }
 
   // ---------- state ----------
-  const state = { lo: 0, hi: 0, hover: null };
-  const charts = [];
+  const state = { lo: 0, hi: 0 };
+  // A context is one time axis shared by a group of charts: its start, visible range and hover position.
+  const explore = { t0: T0, range: () => [state.lo, state.hi], group: [], hover: null };
 
   // ---------- filters ----------
   function buildPresets() {
@@ -212,7 +233,7 @@
   function setRange(from, to) {
     let note = "";
     if (to - from > MAX_DAYS * DAY) { to = from + MAX_DAYS * DAY - HOUR; note = "Range limited to " + MAX_DAYS + " days of hourly data."; }
-    state.lo = index(from); state.hi = index(to); state.hover = null;
+    state.lo = index(from); state.hi = index(to); explore.hover = null;
     $("from").value = day(T0 + state.lo * HOUR); $("to").value = day(T0 + state.hi * HOUR);
     $("range-note").textContent = note;
     render();
@@ -233,26 +254,30 @@
     return { n, minDst, minAt, rmse, skill };
   }
 
-  function renderTiles() {
-    const s = windowStats(), cls = stormClass(s.minDst), box = $("tiles");
-    box.replaceChildren();
-    const tile = (label, value, unit, detail, hero) => {
-      const node = el("div", { className: "card tile" + (hero ? " hero" : "") });
-      const val = el("div", { className: "value" }, value);
-      if (unit) val.append(el("span", { className: "unit" }, unit));
-      node.append(el("div", { className: "label" }, label), val);
-      if (detail) node.append(detail);
-      box.append(node);
-      return node;
-    };
-    const status = el("div", { className: "detail" });
-    const badge = el("span", { className: "status" });
+  const detail = (text) => el("div", { className: "detail" }, text);
+  const tileIn = (box) => (label, value, unit, extra, hero) => {
+    const node = el("div", { className: "card tile" + (hero ? " hero" : "") });
+    const val = el("div", { className: "value" }, value);
+    if (unit) val.append(el("span", { className: "unit" }, unit));
+    node.append(el("div", { className: "label" }, label), val);
+    if (extra) node.append(extra);
+    box.append(node);
+    return node;
+  };
+  function statusLine(dst, suffix) {
+    const cls = stormClass(dst), line = el("div", { className: "detail" }), badge = el("span", { className: "status" });
     const icon = svg("svg", { viewBox: "0 0 14 14", "aria-hidden": "true" });
     icon.append(svg("path", { d: cls.icon, fill: cls.color }));
     badge.append(icon, document.createTextNode(cls.label));
-    status.append(badge, document.createTextNode("  at " + stamp(T0 + s.minAt * HOUR)));
-    tile("Deepest observed Dst in this period", String(s.minDst), "nT", status, true);
-    const detail = (text) => el("div", { className: "detail" }, text);
+    line.append(badge, document.createTextNode(suffix || ""));
+    return line;
+  }
+
+  function renderTiles() {
+    const s = windowStats(), box = $("tiles");
+    box.replaceChildren();
+    const tile = tileIn(box);
+    tile("Deepest observed Dst in this period", String(s.minDst), "nT", statusLine(s.minDst, "  at " + stamp(T0 + s.minAt * HOUR)));
     tile("GRU error (RMSE)", fmt(s.rmse.gru), "nT", detail(fmt(s.n, 0) + " hours"));
     tile("XGBoost error (RMSE)", fmt(s.rmse.xgb), "nT", detail(fmt(s.n, 0) + " hours"));
     tile("Persistence error (RMSE)", fmt(s.rmse.persistence), "nT", detail("naive baseline"));
@@ -265,17 +290,18 @@
     return [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw);
   }
 
-  function lineChart(host, height, keys, valueOf, opts = {}) {
+  function lineChart(ctx, host, height, keys, valueOf, opts = {}) {
+    const T0 = ctx.t0;
     const tooltip = el("div", { className: "tooltip" });
     const chart = { draw, hover };
     let geom = null;
 
     function draw() {
-      const { lo, hi } = state, n = hi - lo + 1;
+      const [lo, hi] = ctx.range(), n = hi - lo + 1;
       const W = Math.max(320, host.clientWidth), M = { l: 46, r: opts.thresholds ? 78 : 14, t: 10, b: 26 };
       const pw = W - M.l - M.r, ph = height - M.t - M.b;
       let ymin = Infinity, ymax = -Infinity;
-      for (const k of keys) for (let i = lo; i <= hi; i++) { const v = valueOf(k, i); if (v < ymin) ymin = v; if (v > ymax) ymax = v; }
+      for (const k of keys) for (let i = lo; i <= hi; i++) { const v = valueOf(k, i); if (v === null) continue; if (v < ymin) ymin = v; if (v > ymax) ymax = v; }
       ymin = Math.min(ymin, 0); ymax = Math.max(ymax, opts.thresholds ? 20 : 1);
       const step = niceStep(ymax - ymin, 5);
       ymin = Math.floor(ymin / step) * step; ymax = Math.ceil(ymax / step) * step;
@@ -304,9 +330,19 @@
         root.append(svg("text", { x: M.l + pw + 10, y: y(level) + 4, fill: "var(--text-secondary)" }, name));
       }
       for (const k of keys) {
-        let d = "";
-        for (let i = lo; i <= hi; i++) d += (i === lo ? "M" : "L") + x(i).toFixed(1) + " " + y(valueOf(k, i)).toFixed(1);
+        let d = "", pen = false;
+        for (let i = lo; i <= hi; i++) {
+          const v = valueOf(k, i);
+          if (v === null) { pen = false; continue; }
+          d += (pen ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1);
+          pen = true;
+        }
         root.append(svg("path", { d, fill: "none", stroke: SERIES[k].color, "stroke-width": k === "persistence" ? 1.5 : 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      }
+      if (opts.endDot && valueOf(opts.endDot, hi) !== null) {
+        const v = valueOf(opts.endDot, hi);
+        root.append(svg("circle", { cx: x(hi), cy: y(v), r: 4.5, fill: SERIES[opts.endDot].color, stroke: "var(--surface)", "stroke-width": 2 }));
+        root.append(svg("text", { x: x(hi) - 8, y: y(v) - 10, "text-anchor": "end", fill: "var(--text-primary)", "font-weight": 600 }, fmt(v) + " nT"));
       }
       const cross = svg("g", { visibility: "hidden" });
       cross.append(svg("line", { y1: M.t, y2: M.t + ph, stroke: "var(--muted)", "stroke-width": 1 }));
@@ -322,9 +358,9 @@
         const stepBy = { ArrowLeft: -1, ArrowRight: 1, PageUp: -24, PageDown: 24 }[ev.key];
         if (!stepBy) return;
         ev.preventDefault();
-        setHover(clamp((state.hover ?? Math.round((lo + hi) / 2)) + stepBy, lo, hi), chart);
+        setHover(clamp((ctx.hover ?? Math.round((lo + hi) / 2)) + stepBy, lo, hi), chart);
       });
-      root.addEventListener("focus", () => { if (state.hover === null) setHover(Math.round((lo + hi) / 2), chart); });
+      root.addEventListener("focus", () => { if (ctx.hover === null) setHover(Math.round((lo + hi) / 2), chart); });
       root.addEventListener("blur", () => setHover(null, chart));
       root.append(hit);
       host.replaceChildren(root, tooltip);
@@ -337,13 +373,17 @@
       cross.setAttribute("visibility", "visible");
       const px = x(i);
       cross.firstChild.setAttribute("x1", px); cross.firstChild.setAttribute("x2", px);
-      for (const dot of cross.querySelectorAll("circle")) { dot.setAttribute("cx", px); dot.setAttribute("cy", y(valueOf(dot.dataset.key, i))); }
+      for (const dot of cross.querySelectorAll("circle")) {
+        const v = valueOf(dot.dataset.key, i);
+        dot.setAttribute("visibility", v === null ? "hidden" : "inherit");
+        if (v !== null) { dot.setAttribute("cx", px); dot.setAttribute("cy", y(v)); }
+      }
       if (owner !== chart) { tooltip.style.display = "none"; return; }
       tooltip.replaceChildren(el("div", { className: "when" }, stamp(T0 + i * HOUR)));
       for (const k of Object.keys(SERIES).filter((s) => keys.includes(s))) {
         const row = el("div", { className: "row" });
         const key = el("span", { className: "key" }); key.style.borderColor = SERIES[k].color;
-        row.append(key, el("b", {}, fmt(valueOf(k, i), k === "observed" && opts.thresholds ? 0 : 1)), el("span", { className: "name" }, SERIES[k].name));
+        row.append(key, el("b", {}, valueOf(k, i) === null ? "pending" : fmt(valueOf(k, i), k === "observed" && opts.thresholds ? 0 : 1)), el("span", { className: "name" }, SERIES[k].name));
         tooltip.append(row);
       }
       tooltip.style.display = "block";
@@ -351,10 +391,10 @@
       tooltip.style.top = M.t + 6 + "px";
       tooltip.style.left = (left > host.clientWidth / 2 ? left - tooltip.offsetWidth - 14 : left + 14) + "px";
     }
-    charts.push(chart);
+    function setHover(i, owner) { ctx.hover = i; for (const c of ctx.group) c.hover(i, owner); }
+    ctx.group.push(chart);
     return chart;
   }
-  function setHover(i, owner) { state.hover = i; for (const c of charts) c.hover(i, owner); }
 
   function legend(host, keys) {
     host.replaceChildren();
@@ -367,15 +407,16 @@
   }
 
   // ---------- table views ----------
-  function dataTable(host, keys, valueOf, digitsOf) {
+  function dataTable(ctx, host, keys, valueOf, digitsOf) {
+    const T0 = ctx.t0, [lo, hi] = ctx.range();
     const table = el("table"), head = el("tr");
     head.append(el("th", {}, "Time (UTC)"));
     for (const k of keys) head.append(el("th", {}, SERIES[k].name));
     table.append(head);
-    for (let i = state.lo; i <= state.hi; i++) {
+    for (let i = hi; i >= lo; i--) {
       const row = el("tr");
       row.append(el("td", {}, stamp(T0 + i * HOUR).replace(" UTC", "")));
-      for (const k of keys) row.append(el("td", {}, fmt(valueOf(k, i), digitsOf(k))));
+      for (const k of keys) row.append(el("td", {}, valueOf(k, i) === null ? "pending" : fmt(valueOf(k, i), digitsOf(k))));
       table.append(row);
     }
     host.replaceChildren(table);
@@ -419,19 +460,57 @@
       ", years the models never saw during training (trained on 1995 to 2016, tuned on 2017 to 2020).";
   }
 
+  // ---------- live forecast ----------
+  function renderLive() {
+    const L = window.OCULSTORM_LIVE;
+    if (!L || !L.hours) return;
+    $("live").hidden = false;
+    const t0 = Date.parse(L.start + "Z"), last = L.hours - 1, target = t0 + last * HOUR;
+    const hhmm = (ms) => iso(ms).slice(11, 16);
+    const ageHours = (Date.now() - Date.parse(L.generated)) / HOUR;
+    $("live-note").textContent = "Updated " + L.generated.replace("T", " ").replace("Z", " UTC") +
+      (ageHours > 3 ? ". This is " + fmt(ageHours, 0) + " hours old, so the feed may be delayed and the forecast below is no longer current." : ".");
+
+    const box = $("live-tiles"), tile = tileIn(box);
+    box.replaceChildren();
+    const gru = L.gru[last], xgb = L.xgb[last];
+    tile("GRU forecast for " + day(target) + ", " + hhmm(target) + " to " + hhmm(target + HOUR) + " UTC", fmt(gru), "nT",
+      statusLine(gru, L.target_is_future ? "  expected" : "  (already observed: " + L.observed[last] + " nT)"), true);
+    tile("XGBoost forecast, same hour", fmt(xgb), "nT", detail("models differ by " + fmt(Math.abs(gru - xgb)) + " nT"));
+    let seen = last; while (seen > 0 && L.observed[seen] === null) seen--;
+    tile("Latest observed Dst", String(L.observed[seen]), "nT", detail(hhmm(t0 + seen * HOUR) + " to " + hhmm(t0 + (seen + 1) * HOUR) + " UTC, quick-look"));
+    const inputs = tile("Solar wind, " + L.inputs_hour.slice(11) + " UTC hour", L.inputs["IMF Bz (GSM)"] === null ? "n/a" : fmt(L.inputs["IMF Bz (GSM)"]), "nT Bz");
+    const list = el("dl");
+    const units = { "Solar wind speed": [" km/s", 0], "Proton density": [" /cm\u00b3", 1], "Dynamic pressure": [" nPa", 1] };
+    for (const name in units) list.append(el("dt", {}, name), el("dd", {}, L.inputs[name] === null ? "n/a" : fmt(L.inputs[name], units[name][1]) + units[name][0]));
+    inputs.append(list);
+    const r = L.hindcast.rmse, skill = 1 - (r.gru / r.persistence) ** 2;
+    tile("GRU error on real-time data (RMSE)", fmt(r.gru, 2), "nT",
+      detail("persistence " + fmt(r.persistence, 2) + ", XGBoost " + fmt(r.xgb, 2) + " nT over the last " + L.hindcast.hours + " hours; skill " + fmt(skill, 2)));
+
+    const ctx = { t0, range: () => [0, last], group: [], hover: null };
+    const value = (k, i) => L[k][i];
+    const chart = lineChart(ctx, $("plot-live"), 300, dstKeys, value, { thresholds: true, endDot: "gru", label: "Line chart of observed quick-look Dst and one hour ahead forecasts over the last seven days" });
+    legend($("legend-live"), legendOrder);
+    wireToggle("toggle-live", "table-live", () => dataTable(ctx, $("table-live"), legendOrder, value, (k) => (k === "observed" ? 0 : 1)));
+    chart.draw();
+    liveChart = chart;
+  }
+  let liveChart = null;
+
   // ---------- wiring ----------
   const dstKeys = ["persistence", "xgb", "gru", "observed"], errKeys = ["persistence", "xgb", "gru"];
   const dstValue = (k, i) => D[k][i];
   const errValue = (k, i) => Math.abs(D.observed[i] - D[k][i]);
   const legendOrder = ["observed", "gru", "xgb", "persistence"];
-  const dstChart = lineChart($("plot-dst"), 340, dstKeys, dstValue, { thresholds: true, label: "Line chart of observed Dst and the three one hour ahead forecasts" });
-  const errChart = lineChart($("plot-err"), 220, errKeys, errValue, { label: "Line chart of absolute forecast error for each model" });
-  const refreshDst = wireToggle("toggle-dst", "table-dst", () => dataTable($("table-dst"), legendOrder, dstValue, (k) => (k === "observed" ? 0 : 1)));
-  const refreshErr = wireToggle("toggle-err", "table-err", () => dataTable($("table-err"), legendOrder.slice(1), errValue, () => 1));
+  const dstChart = lineChart(explore, $("plot-dst"), 340, dstKeys, dstValue, { thresholds: true, label: "Line chart of observed Dst and the three one hour ahead forecasts" });
+  const errChart = lineChart(explore, $("plot-err"), 220, errKeys, errValue, { label: "Line chart of absolute forecast error for each model" });
+  const refreshDst = wireToggle("toggle-dst", "table-dst", () => dataTable(explore, $("table-dst"), legendOrder, dstValue, (k) => (k === "observed" ? 0 : 1)));
+  const refreshErr = wireToggle("toggle-err", "table-err", () => dataTable(explore, $("table-err"), legendOrder.slice(1), errValue, () => 1));
 
   function render() { renderTiles(); dstChart.draw(); errChart.draw(); refreshDst(); refreshErr(); }
 
-  $("subtitle").textContent = "One hour ahead forecasts of the Dst index from NASA OMNI solar wind data. Test data through " + stamp(T_END) + ".";
+  $("subtitle").textContent = "One hour ahead forecasts of the Dst index, the standard measure of geomagnetic storm intensity, from solar wind measurements.";
   legend($("legend-dst"), legendOrder);
   legend($("legend-err"), legendOrder.slice(1));
   buildPresets();
@@ -440,8 +519,9 @@
   $("from").addEventListener("change", applyDates);
   $("to").addEventListener("change", applyDates);
   let resizeTimer;
-  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { dstChart.draw(); errChart.draw(); }, 120); });
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { dstChart.draw(); errChart.draw(); if (liveChart) liveChart.draw(); }, 120); });
   applyPreset();
+  renderLive();
 })();
 </script>
 </body>
