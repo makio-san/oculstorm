@@ -1,0 +1,55 @@
+name: Live forecast
+
+# Every hour: fetch real-time data, run both models, publish the dashboard.
+# Nothing is committed back; the generated docs/live.js only exists in the deployed site.
+on:
+  schedule:
+    - cron: "7 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "models/**"
+      - "oculstorm/**"
+      - "scripts/live_forecast.py"
+      - "requirements-live.txt"
+      - ".github/workflows/live.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-live.txt
+      - name: Install inference dependencies
+        run: pip install -r requirements-live.txt
+      - name: Forecast from real-time data
+        # If NOAA is unreachable, keep the last published forecast; the page flags stale data itself.
+        run: |
+          python scripts/live_forecast.py \
+            || curl -fsS https://makio-san.github.io/oculstorm/live.js -o docs/live.js \
+            || echo "no live data this run"
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+      - id: deploy
+        uses: actions/deploy-pages@v5
