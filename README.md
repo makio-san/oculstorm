@@ -98,6 +98,8 @@ Live: https://makio-san.github.io/oculstorm/
 A static page in `docs/` shows observed Dst against the GRU, XGBoost and persistence
 forecasts for any period of the test years, with the largest storms as presets, error
 tiles for the selected period, a table view of every chart and the full scorecard.
+The hero shows the live forecast on a storm scale (quiet, moderate, intense, severe), the
+largest storms are one click replays with sparklines, and a light/dark switch sits in the top bar.
 
 ```bash
 .venv/bin/python scripts/build_dashboard.py
