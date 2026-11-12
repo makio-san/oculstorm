@@ -4,102 +4,256 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>oculstorm: Dst forecast dashboard</title>
+<meta name="description" content="Live one hour ahead forecast of the Dst geomagnetic storm index from real-time solar wind data.">
+<script>
+  // Apply a saved theme before first paint.
+  try { const t = localStorage.getItem("oculstorm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
 <style>
   :root {
     color-scheme: light;
-    --page: #f9f9f7; --surface: #fcfcfb;
-    --text-primary: #0b0b0b; --text-secondary: #52514e; --muted: #898781;
-    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
-    --observed: #0b0b0b; --gru: #2a78d6; --xgb: #eb6834; --persistence: #898781;
+    --page: #f3f4f8; --surface: #ffffff;
+    --text-primary: #0b0d12; --text-secondary: #4d5261; --muted: #838999;
+    --grid: #e6e7ed; --axis: #c4c7d1; --border: rgba(15,20,40,0.10);
+    --observed: #0b0d12; --gru: #2a78d6; --xgb: #eb6834; --persistence: #898781;
     --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
-    --wash: rgba(11,11,11,0.05);
+    --wash: rgba(15,20,40,0.05);
+    --shadow: 0 1px 2px rgba(15,20,40,0.04), 0 10px 28px rgba(15,20,40,0.06);
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --page: #0d0d0d; --surface: #1a1a19;
-      --text-primary: #f0efec; --text-secondary: #c3c2b7; --muted: #898781;
-      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
-      --observed: #f0efec; --gru: #3987e5; --xgb: #d95926; --persistence: #898781;
+      --page: #080a10; --surface: #11141c;
+      --text-primary: #eef0f5; --text-secondary: #b4b9c6; --muted: #7f8594;
+      --grid: #222632; --axis: #363b4a; --border: rgba(255,255,255,0.10);
+      --observed: #eef0f5; --gru: #3987e5; --xgb: #d95926; --persistence: #898781;
       --wash: rgba(255,255,255,0.06);
+      --shadow: none;
     }
   }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #080a10; --surface: #11141c;
+    --text-primary: #eef0f5; --text-secondary: #b4b9c6; --muted: #7f8594;
+    --grid: #222632; --axis: #363b4a; --border: rgba(255,255,255,0.10);
+    --observed: #eef0f5; --gru: #3987e5; --xgb: #d95926; --persistence: #898781;
+    --wash: rgba(255,255,255,0.06);
+    --shadow: none;
+  }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
   body { margin: 0; background: var(--page); color: var(--text-primary);
-         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
-  h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
-  h2 { font-size: 15px; margin: 0; font-weight: 650; }
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 1160px; margin: 0 auto; padding: 0 16px 40px; }
+  h1 { font-size: clamp(28px, 4.6vw, 46px); line-height: 1.05; margin: 18px 0 8px; font-weight: 700; letter-spacing: -0.03em; }
+  h2 { font-size: 21px; margin: 2px 0 0; font-weight: 680; letter-spacing: -0.015em; }
+  h3 { font-size: 14.5px; margin: 0; font-weight: 650; }
   p.sub, .note { color: var(--text-secondary); margin: 0; }
+  p.sub { font-size: 15.5px; max-width: 620px; }
   .note { font-size: 12.5px; margin-top: 8px; }
-  section { margin-top: 28px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  section { margin-top: 44px; }
+  .kicker { font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
   .card + .card { margin-top: 12px; }
   .card-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
   button, select, input { font: inherit; color: var(--text-primary); background: var(--surface);
-          border: 1px solid var(--axis); border-radius: 6px; padding: 5px 9px; }
+          border: 1px solid var(--axis); border-radius: 8px; padding: 6px 10px; }
   button { cursor: pointer; }
   button:hover { background: var(--wash); }
   button.ghost { font-size: 12.5px; color: var(--text-secondary); }
   :focus-visible { outline: 2px solid var(--gru); outline-offset: 2px; }
 
-  .filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin: 12px 0; }
-  .filters label { display: grid; gap: 3px; font-size: 12px; color: var(--text-secondary); }
+  /* ---------- top bar ---------- */
+  .topbar { position: sticky; top: 0; z-index: 5; border-bottom: 1px solid var(--border);
+            background: color-mix(in srgb, var(--page) 78%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+  .topbar .in { max-width: 1160px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 18px; }
+  .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 700; font-size: 15.5px; letter-spacing: -0.01em; color: inherit; text-decoration: none; }
+  .brand svg { width: 24px; height: 24px; }
+  .topbar nav { display: flex; gap: 4px; margin-left: auto; }
+  .topbar nav a { color: var(--text-secondary); text-decoration: none; padding: 6px 10px; border-radius: 8px; font-size: 13.5px; }
+  .topbar nav a:hover { background: var(--wash); color: var(--text-primary); }
+  .icon-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 50%; border-color: var(--border); background: transparent; }
+  .icon-btn svg { width: 16px; height: 16px; }
+  @media (max-width: 620px) { .topbar nav a.sec { display: none; } }
 
+  /* ---------- hero (always a night sky, in both themes) ---------- */
+  .hero { position: relative; isolation: isolate; overflow: hidden; margin-top: 16px; padding: clamp(20px, 4vw, 40px);
+          border-radius: 22px; background: #060811; color: #f4f6fb; border: 1px solid rgba(255,255,255,0.08);
+          --text-primary: #f4f6fb; --text-secondary: #bcc3d3; --muted: #8b93a6;
+          --surface: rgba(255,255,255,0.07); --border: rgba(255,255,255,0.14); --wash: rgba(255,255,255,0.10);
+          --warning: #fab219; --good: #2fd27a; }
+  .hero::before { content: ""; position: absolute; inset: -35%; z-index: -2; filter: blur(36px);
+    background:
+      radial-gradient(38% 34% at 24% 32%, rgba(38,222,168,0.36), transparent 70%),
+      radial-gradient(34% 40% at 72% 22%, rgba(124,92,255,0.42), transparent 70%),
+      radial-gradient(44% 38% at 62% 84%, rgba(42,120,214,0.36), transparent 70%);
+    animation: drift 28s ease-in-out infinite alternate; }
+  .hero::after { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0.55;
+    background-image:
+      radial-gradient(1px 1px at 8% 18%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 19% 64%, #fff 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 31% 12%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 43% 78%, #fff 50%, transparent 51%),
+      radial-gradient(1px 1px at 52% 30%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 64% 58%, #fff 50%, transparent 51%),
+      radial-gradient(1px 1px at 71% 9%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 83% 41%, #fff 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 91% 72%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 96% 16%, #fff 50%, transparent 51%),
+      radial-gradient(1px 1px at 14% 88%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 37% 46%, #fff 50%, transparent 51%),
+      radial-gradient(1px 1px at 58% 92%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 78% 84%, #fff 50%, transparent 51%); }
+  @keyframes drift { from { transform: translate3d(-4%, -2%, 0) rotate(0deg); } to { transform: translate3d(5%, 3%, 0) rotate(8deg); } }
+  .hero-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 12.5px; color: var(--text-secondary); }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--border);
+          background: var(--surface); color: var(--text-primary); font-size: 11.5px; font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--good); animation: pulse 2s ease-out infinite; }
+  .pill.stale .pulse { background: var(--warning); animation: none; }
+  .pill.replay .pulse { background: var(--muted); animation: none; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(47,210,122,0.65); } 100% { box-shadow: 0 0 0 10px rgba(47,210,122,0); } }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; align-items: end; margin-top: 30px; }
+  @media (max-width: 860px) { .hero-grid { grid-template-columns: minmax(0, 1fr); } }
+  .hero .label { color: var(--text-secondary); font-size: 13.5px; }
+  .big { font-size: clamp(64px, 12vw, 116px); font-weight: 720; letter-spacing: -0.045em; line-height: 1; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
+  .big .unit { font-size: 0.26em; font-weight: 550; letter-spacing: 0; color: var(--text-secondary); margin-left: 10px; }
+  .hero-status { font-size: 15px; color: var(--text-secondary); }
+  .hero-status .status svg { width: 16px; height: 16px; }
+
+  .gauge { margin-top: 26px; max-width: 540px; }
+  .gauge-track { position: relative; display: flex; gap: 2px; }
+  .gauge-seg { flex: 1; height: 10px; opacity: 0.38; }
+  .gauge-seg.on { opacity: 1; }
+  .gauge-seg:first-child { border-radius: 5px 0 0 5px; } .gauge-seg:last-of-type { border-radius: 0 5px 5px 0; }
+  .gauge-pin { position: absolute; top: 50%; left: 0; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: #fff;
+               border: 4px solid #060811; box-shadow: 0 0 0 2px #fff, 0 0 20px rgba(255,255,255,0.75); transition: left 1100ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .gauge-labels { display: flex; gap: 2px; margin-top: 10px; font-size: 11.5px; line-height: 1.3; color: var(--muted); }
+  .gauge-labels > span { flex: 1; }
+  .gauge-labels b { display: block; font-weight: 600; color: var(--text-secondary); }
+  .gauge-labels .on b { color: var(--text-primary); }
+
+  .hero-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .glass { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px;
+           -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  @media (max-width: 420px) { .hero-tiles { grid-template-columns: minmax(0, 1fr); } }
+
+  /* ---------- tiles ---------- */
   .tiles { display: grid; grid-template-columns: 1.5fr repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, 1fr); } .tiles .tile:first-child { grid-column: 1 / -1; } }
   .tile dl { margin: 6px 0 0; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 12.5px; color: var(--text-secondary); }
   .tile dd { margin: 0; text-align: right; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-  @media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, 1fr); } .tile.hero { grid-column: 1 / -1; } }
-  .tile .label { color: var(--text-secondary); font-size: 12.5px; }
-  .tile .value { font-size: 24px; font-weight: 650; margin-top: 2px; }
-  .tile.hero .value { font-size: 48px; line-height: 1.1; }
-  .tile .unit { font-size: 0.5em; font-weight: 500; color: var(--text-secondary); margin-left: 4px; }
+  .tile .label { color: var(--text-secondary); font-size: 12.5px; display: flex; align-items: center; gap: 7px; }
+  .tile .value { font-size: 28px; font-weight: 680; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .tile .unit { font-size: 0.5em; font-weight: 500; letter-spacing: 0; color: var(--text-secondary); margin-left: 4px; }
   .tile .detail { color: var(--text-secondary); font-size: 12.5px; margin-top: 4px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .meter { height: 6px; border-radius: 3px; background: var(--wash); margin-top: 10px; overflow: hidden; }
+  .meter > i { display: block; height: 100%; border-radius: 3px; transition: width 600ms ease-out; }
   .status { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-primary); }
   .status svg { width: 14px; height: 14px; flex: none; }
 
+  /* ---------- storm picker ---------- */
+  .storms { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 12px; margin: 14px 0 0; scroll-snap-type: x proximity; }
+  .storm { flex: none; width: 152px; text-align: left; padding: 11px 12px 8px; border-radius: 12px; border: 1px solid var(--border);
+           display: grid; gap: 1px; scroll-snap-align: start; box-shadow: var(--shadow); transition: transform 150ms ease, border-color 150ms ease; }
+  .storm:hover { transform: translateY(-2px); background: var(--surface); border-color: var(--axis); }
+  .storm[aria-pressed="true"] { border-color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--text-primary), var(--shadow); }
+  .storm .d { font-size: 12px; color: var(--text-secondary); }
+  .storm .v { font-size: 19px; font-weight: 680; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .storm .status { font-size: 12px; font-weight: 550; color: var(--text-secondary); }
+  .storm .status svg { width: 11px; height: 11px; }
+  .storm svg.spark { width: 100%; height: 34px; margin-top: 6px; display: block; overflow: visible; }
+  .filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin: 6px 0 14px; }
+  .filters label { display: grid; gap: 3px; font-size: 12px; color: var(--text-secondary); }
+
+  /* ---------- charts ---------- */
   .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text-secondary); font-size: 12.5px; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .key { width: 16px; height: 0; border-top: 2px solid; border-radius: 1px; display: inline-block; }
   .plot { position: relative; }
   .plot svg { display: block; width: 100%; overflow: visible; }
   .plot text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .plot path.draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1000ms ease-out forwards; }
+  .plot path.fade { opacity: 0; animation: fade 700ms ease-out 350ms forwards; }
+  .plot circle.ring { transform-box: fill-box; transform-origin: center; animation: ring 2s ease-out infinite; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes fade { to { opacity: 1; } }
+  @keyframes ring { from { transform: scale(1); opacity: 0.55; } to { transform: scale(3.4); opacity: 0; } }
   .tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
-             border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+             border-radius: 10px; padding: 9px 11px; font-size: 12.5px; box-shadow: 0 8px 28px rgba(0,0,0,0.20);
              min-width: 170px; display: none; z-index: 2; }
   .tooltip .when { color: var(--text-secondary); margin-bottom: 4px; }
   .tooltip .row { display: flex; align-items: center; gap: 8px; }
   .tooltip .row b { font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
   .tooltip .row span.name { color: var(--text-secondary); }
 
+  /* ---------- tables ---------- */
   .table-wrap { max-height: 320px; overflow: auto; margin-top: 10px; border-top: 1px solid var(--grid); }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
-  th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th, td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; white-space: nowrap; }
   th { color: var(--text-secondary); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
   th:first-child, td:first-child { text-align: left; }
   .score td.model { text-align: left; }
   .score .bar-cell { width: 34%; min-width: 120px; text-align: left; }
-  .track { height: 8px; border-radius: 4px; background: var(--wash); }
-  .fill { height: 8px; border-radius: 4px; }
+  .score tr:last-child td { border-bottom: 0; }
+  .track { height: 10px; border-radius: 5px; background: var(--wash); }
+  .fill { height: 10px; border-radius: 5px; }
   .score tr.regime-start td { border-top: 1px solid var(--axis); }
-  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: baseline; }
+  .score tr.best td { font-weight: 650; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: baseline; }
+
+  footer { max-width: 1160px; margin: 0 auto; padding: 20px 16px 40px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--border); }
+  footer a { color: var(--text-secondary); }
   [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .hero::before, .pulse, .plot path.draw, .plot path.fade, .plot circle.ring { animation: none; }
+    .plot path.draw { stroke-dashoffset: 0; } .plot path.fade { opacity: 1; } .plot circle.ring { display: none; }
+    .gauge-pin, .meter > i, .storm { transition: none; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>Geomagnetic storm forecast</h1>
+<div class="topbar">
+  <div class="in">
+    <a class="brand" href="#top" aria-label="oculstorm, back to top">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <circle cx="12" cy="12" r="4.2" fill="var(--gru)"/>
+        <path d="M12 9.6a2.4 2.4 0 1 1-2.4 2.4" stroke="var(--surface)" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      oculstorm
+    </a>
+    <nav aria-label="Sections">
+      <a class="sec" href="#live">Live</a>
+      <a class="sec" href="#explore">Explore</a>
+      <a class="sec" href="#scorecard">Scorecard</a>
+      <a href="https://github.com/makio-san/oculstorm">GitHub</a>
+    </nav>
+    <button class="icon-btn" id="theme" type="button" aria-label="Switch between light and dark theme" title="Switch theme">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13Z" fill="currentColor"/></svg>
+    </button>
+  </div>
+</div>
+
+<main id="top">
+  <section class="hero" aria-labelledby="page-title" style="margin-top:16px">
+    <div class="hero-top">
+      <span class="pill replay" id="pill"><span class="pulse"></span><span id="pill-text">Test replay</span></span>
+      <span id="live-note" role="status"></span>
+    </div>
+    <h1 id="page-title">Geomagnetic storm forecast</h1>
     <p class="sub" id="subtitle"></p>
-  </header>
+    <div class="hero-grid">
+      <div>
+        <div class="label" id="hero-label"></div>
+        <div class="big"><span id="hero-value"></span><span class="unit">nT</span></div>
+        <div class="hero-status" id="hero-status"></div>
+        <div class="gauge" id="gauge" hidden></div>
+      </div>
+      <div class="hero-tiles" id="live-tiles"></div>
+    </div>
+  </section>
 
   <section aria-labelledby="live-title" id="live" hidden>
-    <h2 id="live-title">Live forecast</h2>
-    <p class="note" id="live-note" style="margin:4px 0 12px"></p>
-    <div class="tiles" id="live-tiles"></div>
-    <div class="card" style="margin-top:12px">
+    <div class="kicker">Real-time</div>
+    <h2 id="live-title">The last 7 days, as they happened</h2>
+    <div class="card" style="margin-top:14px">
       <div class="card-head">
-        <h2>Last 7 days on real-time data: observed vs forecast one hour earlier (nT)</h2>
+        <h3>Observed Dst vs forecast made one hour earlier (nT)</h3>
         <button class="ghost" id="toggle-live" aria-expanded="false">Show table</button>
       </div>
       <div class="legend" id="legend-live"></div>
@@ -110,8 +264,10 @@
       Quick-look Dst is preliminary and is revised later, so these numbers are not directly comparable with the scorecard below.</p>
   </section>
 
-  <section aria-labelledby="explore-title">
-    <h2 id="explore-title">Explore the test years</h2>
+  <section aria-labelledby="explore-title" id="explore">
+    <div class="kicker">Test years</div>
+    <h2 id="explore-title">Replay the biggest storms</h2>
+    <div class="storms" id="storms" role="group" aria-label="Largest storms in the test period"></div>
     <div class="filters">
       <label>Period
         <select id="preset"></select>
@@ -125,7 +281,7 @@
 
     <div class="card" style="margin-top:12px">
       <div class="card-head">
-        <h2>Dst index, observed vs forecast one hour earlier (nT)</h2>
+        <h3>Dst index, observed vs forecast one hour earlier (nT)</h3>
         <button class="ghost" id="toggle-dst" aria-expanded="false">Show table</button>
       </div>
       <div class="legend" id="legend-dst"></div>
@@ -135,25 +291,30 @@
 
     <div class="card">
       <div class="card-head">
-        <h2>Absolute forecast error (nT)</h2>
+        <h3>Absolute forecast error (nT)</h3>
         <button class="ghost" id="toggle-err" aria-expanded="false">Show table</button>
       </div>
       <div class="legend" id="legend-err"></div>
       <div class="plot" id="plot-err"></div>
       <div class="table-wrap" id="table-err" hidden></div>
     </div>
-    <p class="note">Each forecast for an hour was made with data up to the previous hour. Lower (more negative) Dst means a stronger storm.
+    <p class="note">Each forecast for an hour was made with data up to the previous hour. Lower (more negative) Dst means a stronger storm; the shaded bands mark moderate, intense and severe levels.
       Hover or focus a chart and use the arrow keys to read exact values.</p>
   </section>
 
-  <section aria-labelledby="score-title">
-    <h2 id="score-title">Scorecard over the whole test period</h2>
-    <p class="note" id="score-note" style="margin:4px 0 12px"></p>
+  <section aria-labelledby="score-title" id="scorecard">
+    <div class="kicker">Evaluation</div>
+    <h2 id="score-title">Does it beat persistence?</h2>
+    <p class="note" id="score-note" style="margin:6px 0 14px"></p>
     <div class="card" style="overflow-x:auto"><table class="score" id="score"></table></div>
     <p class="note">Bars show each model's RMSE relative to persistence in the same row group. Skill is the MSE skill score against persistence:
       0 means no better than "next hour equals this hour", 1 means perfect. Results are on the cleaned OMNI science product, so real-time performance will be lower.</p>
   </section>
 </main>
+<footer>
+  Data: NASA SPDF OMNI2, NOAA SWPC real-time solar wind, WDC Kyoto Dst. Models and code on
+  <a href="https://github.com/makio-san/oculstorm">GitHub</a>. A research demo, not an operational alert service.
+</footer>
 
 <script src="data.js"></script>
 <script src="live.js"></script>
@@ -172,7 +333,9 @@
   };
   const MODELS = ["gru", "xgb", "persistence"];
   const THRESHOLDS = [[-50, "moderate"], [-100, "intense"], [-250, "severe"]];
+  const ZONES = [[-50, -100, "var(--warning)"], [-100, -250, "var(--serious)"], [-250, -Infinity, "var(--critical)"]];
   const SVG = "http://www.w3.org/2000/svg";
+  const CALM = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const $ = (id) => document.getElementById(id);
   const el = (tag, props = {}, text) => {
@@ -197,10 +360,28 @@
   const index = (ms) => clamp(Math.round((ms - T0) / HOUR), 0, D.hours - 1);
 
   function stormClass(dst) {
-    if (dst <= -250) return { label: "Severe storm", color: "var(--critical)", icon: "M7 1 13 12H1Z" };
-    if (dst <= -100) return { label: "Intense storm", color: "var(--serious)", icon: "M7 1 13 12H1Z" };
-    if (dst <= -50) return { label: "Moderate storm", color: "var(--warning)", icon: "M7 1 13 7 7 13 1 7Z" };
-    return { label: "Quiet", color: "var(--good)", icon: "M7 1a6 6 0 1 0 0 12A6 6 0 0 0 7 1Z" };
+    if (dst <= -250) return { level: 3, label: "Severe storm", color: "var(--critical)", icon: "M7 1 13 12H1Z" };
+    if (dst <= -100) return { level: 2, label: "Intense storm", color: "var(--serious)", icon: "M7 1 13 12H1Z" };
+    if (dst <= -50) return { level: 1, label: "Moderate storm", color: "var(--warning)", icon: "M7 1 13 7 7 13 1 7Z" };
+    return { level: 0, label: "Quiet", color: "var(--good)", icon: "M7 1a6 6 0 1 0 0 12A6 6 0 0 0 7 1Z" };
+  }
+  function badge(dst) {
+    const cls = stormClass(dst), node = el("span", { className: "status" });
+    const icon = svg("svg", { viewBox: "0 0 14 14", "aria-hidden": "true" });
+    icon.append(svg("path", { d: cls.icon, fill: cls.color }));
+    node.append(icon, document.createTextNode(cls.label));
+    return node;
+  }
+  function countTo(node, value, digits) {
+    node.textContent = fmt(value, digits);
+    if (CALM || document.hidden) return;
+    const began = performance.now();
+    const tick = (now) => {
+      const p = Math.min(1, (now - began) / 900), eased = 1 - (1 - p) ** 3;
+      node.textContent = fmt(p < 1 ? value * eased : value, digits);
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 
   // ---------- state ----------
@@ -219,6 +400,27 @@
     select.value = "storm:" + D.storms[0].time;
     for (const id of ["from", "to"]) { $(id).min = day(T0); $(id).max = day(T_END); }
   }
+  function buildStorms() {
+    const box = $("storms"), W = 128, H = 34;
+    for (const s of D.storms) {
+      const at = Date.parse(s.time + "Z"), peak = index(at), lo = Math.max(0, peak - 48), hi = Math.min(D.hours - 1, peak + 96);
+      let min = Infinity, max = -Infinity;
+      for (let i = lo; i <= hi; i++) { min = Math.min(min, D.observed[i]); max = Math.max(max, D.observed[i]); }
+      max = Math.max(max, 0);
+      let d = "";
+      for (let i = lo; i <= hi; i++) d += (i === lo ? "M" : "L") + ((i - lo) / (hi - lo) * W).toFixed(1) + " " + ((max - D.observed[i]) / (max - min) * H).toFixed(1);
+      const spark = svg("svg", { class: "spark", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", "aria-hidden": "true" });
+      spark.append(svg("path", { d, fill: "none", stroke: "var(--observed)", "stroke-width": 1.5, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }));
+      const button = el("button", { className: "storm", type: "button" });
+      button.dataset.value = "storm:" + s.time;
+      button.append(el("span", { className: "d" }, shortDay(at) + ", " + new Date(at).getUTCFullYear()), el("span", { className: "v" }, s.min_dst + " nT"), badge(s.min_dst), spark);
+      button.addEventListener("click", () => { $("preset").value = button.dataset.value; applyPreset(); });
+      box.append(button);
+    }
+  }
+  function syncStorms() {
+    for (const b of $("storms").children) b.setAttribute("aria-pressed", String(b.dataset.value === $("preset").value));
+  }
   function applyPreset() {
     const [kind, arg] = $("preset").value.split(/:(.*)/);
     if (kind === "last") setRange(T_END - arg * DAY + HOUR, T_END);
@@ -236,6 +438,7 @@
     state.lo = index(from); state.hi = index(to); explore.hover = null;
     $("from").value = day(T0 + state.lo * HOUR); $("to").value = day(T0 + state.hi * HOUR);
     $("range-note").textContent = note;
+    syncStorms();
     render();
   }
 
@@ -255,33 +458,40 @@
   }
 
   const detail = (text) => el("div", { className: "detail" }, text);
-  const tileIn = (box) => (label, value, unit, extra, hero) => {
-    const node = el("div", { className: "card tile" + (hero ? " hero" : "") });
+  // A tile is a label, one big value and optional detail; "key" puts the series color mark beside the label.
+  const tileIn = (box, kind) => (label, value, unit, extra, key) => {
+    const node = el("div", { className: kind + " tile" }), head = el("div", { className: "label" });
+    if (key) { const dot = el("span", { className: "dot" }); dot.style.background = SERIES[key].color; head.append(dot); }
+    head.append(document.createTextNode(label));
     const val = el("div", { className: "value" }, value);
     if (unit) val.append(el("span", { className: "unit" }, unit));
-    node.append(el("div", { className: "label" }, label), val);
+    node.append(head, val);
     if (extra) node.append(extra);
     box.append(node);
     return node;
   };
   function statusLine(dst, suffix) {
-    const cls = stormClass(dst), line = el("div", { className: "detail" }), badge = el("span", { className: "status" });
-    const icon = svg("svg", { viewBox: "0 0 14 14", "aria-hidden": "true" });
-    icon.append(svg("path", { d: cls.icon, fill: cls.color }));
-    badge.append(icon, document.createTextNode(cls.label));
-    line.append(badge, document.createTextNode(suffix || ""));
+    const line = el("div", { className: "detail" });
+    line.append(badge(dst), document.createTextNode(suffix || ""));
     return line;
+  }
+  function meter(share, color) {
+    const track = el("div", { className: "meter" }), fill = el("i");
+    fill.style.width = clamp(100 * share, 0, 100).toFixed(1) + "%"; fill.style.background = color;
+    track.append(fill);
+    return track;
   }
 
   function renderTiles() {
     const s = windowStats(), box = $("tiles");
     box.replaceChildren();
-    const tile = tileIn(box);
+    const tile = tileIn(box, "card");
     tile("Deepest observed Dst in this period", String(s.minDst), "nT", statusLine(s.minDst, "  at " + stamp(T0 + s.minAt * HOUR)));
-    tile("GRU error (RMSE)", fmt(s.rmse.gru), "nT", detail(fmt(s.n, 0) + " hours"));
-    tile("XGBoost error (RMSE)", fmt(s.rmse.xgb), "nT", detail(fmt(s.n, 0) + " hours"));
-    tile("Persistence error (RMSE)", fmt(s.rmse.persistence), "nT", detail("naive baseline"));
-    tile("GRU skill vs persistence", fmt(s.skill, 2), "", detail(s.skill > 0 ? fmt(100 * s.skill, 0) + "% lower squared error" : "no better than persistence"));
+    tile("GRU error (RMSE)", fmt(s.rmse.gru), "nT", detail(fmt(s.n, 0) + " hours"), "gru");
+    tile("XGBoost error (RMSE)", fmt(s.rmse.xgb), "nT", detail(fmt(s.n, 0) + " hours"), "xgb");
+    tile("Persistence error (RMSE)", fmt(s.rmse.persistence), "nT", detail("naive baseline"), "persistence");
+    const skill = tile("GRU skill vs persistence", fmt(s.skill, 2), "", detail(s.skill > 0 ? fmt(100 * s.skill, 0) + "% lower squared error" : "no better than persistence"));
+    skill.append(meter(s.skill, SERIES.gru.color));
   }
 
   // ---------- line chart ----------
@@ -289,14 +499,15 @@
     const raw = span / target, mag = 10 ** Math.floor(Math.log10(raw));
     return [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw);
   }
+  let chartCount = 0;
 
   function lineChart(ctx, host, height, keys, valueOf, opts = {}) {
-    const T0 = ctx.t0;
+    const T0 = ctx.t0, gradient = "area-" + chartCount++;
     const tooltip = el("div", { className: "tooltip" });
     const chart = { draw, hover };
     let geom = null;
 
-    function draw() {
+    function draw(animate) {
       const [lo, hi] = ctx.range(), n = hi - lo + 1;
       const W = Math.max(320, host.clientWidth), M = { l: 46, r: opts.thresholds ? 78 : 14, t: 10, b: 26 };
       const pw = W - M.l - M.r, ph = height - M.t - M.b;
@@ -310,12 +521,18 @@
       geom = { lo, hi, n, M, pw, ph, x, y, W };
 
       const root = svg("svg", { viewBox: `0 0 ${W} ${height}`, height, role: "img", tabindex: 0, "aria-label": opts.label });
+      // Storm level bands: a faint tint below each threshold, as far as the axis reaches.
+      if (opts.thresholds) for (const [top, bottom, color] of ZONES) {
+        if (top <= ymin) continue;
+        const y1 = y(top), y2 = y(Math.max(bottom, ymin));
+        root.append(svg("rect", { x: M.l, y: y1, width: pw, height: y2 - y1, fill: color, opacity: 0.08 }));
+      }
       for (let v = ymin; v <= ymax + 1e-9; v += step) {
         root.append(svg("line", { x1: M.l, x2: M.l + pw, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
         root.append(svg("text", { x: M.l - 8, y: y(v) + 4, "text-anchor": "end" }, fmt(v, 0)));
       }
       // x ticks at UTC midnights
-      const days = (hi - lo) / 24, every = Math.max(1, Math.ceil(days / Math.max(3, Math.floor(pw / 90))));
+      const days = (hi - lo) / 24, every = Math.max(1, Math.ceil(days / Math.max(2, Math.floor(pw / 95))));
       const firstMidnight = Math.ceil((T0 + lo * HOUR) / DAY) * DAY;
       for (let t = firstMidnight, k = 0; t <= T0 + hi * HOUR; t += DAY, k++) {
         if (k % every) continue;
@@ -329,6 +546,23 @@
         root.append(svg("line", { x1: M.l, x2: M.l + pw + 6, y1: y(level), y2: y(level), stroke: "var(--axis)", "stroke-width": 1 }));
         root.append(svg("text", { x: M.l + pw + 10, y: y(level) + 4, fill: "var(--text-secondary)" }, name));
       }
+      // Soft fill between zero and the observed line; it gets denser the deeper the storm goes.
+      if (opts.area) {
+        const defs = svg("defs"), grad = svg("linearGradient", { id: gradient, gradientUnits: "userSpaceOnUse", x1: 0, x2: 0, y1: y(0), y2: y(ymin) });
+        grad.append(svg("stop", { offset: 0, style: "stop-color:var(--observed);stop-opacity:0.02" }), svg("stop", { offset: 1, style: "stop-color:var(--observed);stop-opacity:0.24" }));
+        defs.append(grad); root.append(defs);
+        let d = "", first = null, prev = null;
+        const close = () => { if (first !== null) d += "L" + x(prev).toFixed(1) + " " + y(0).toFixed(1) + "L" + x(first).toFixed(1) + " " + y(0).toFixed(1) + "Z"; first = null; };
+        for (let i = lo; i <= hi; i++) {
+          const v = valueOf(opts.area, i);
+          if (v === null) { close(); continue; }
+          d += (first === null ? "M" : "L") + x(i).toFixed(1) + " " + y(v).toFixed(1);
+          if (first === null) first = i;
+          prev = i;
+        }
+        close();
+        root.append(svg("path", { d, fill: `url(#${gradient})`, stroke: "none", class: animate ? "fade" : "" }));
+      }
       for (const k of keys) {
         let d = "", pen = false;
         for (let i = lo; i <= hi; i++) {
@@ -337,12 +571,15 @@
           d += (pen ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1);
           pen = true;
         }
-        root.append(svg("path", { d, fill: "none", stroke: SERIES[k].color, "stroke-width": k === "persistence" ? 1.5 : 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+        const attrs = { d, fill: "none", stroke: SERIES[k].color, "stroke-width": k === "persistence" ? 1.5 : 2, "stroke-linejoin": "round", "stroke-linecap": "round" };
+        if (animate) { attrs.pathLength = 1; attrs.class = "draw"; }
+        root.append(svg("path", attrs));
       }
       if (opts.endDot && valueOf(opts.endDot, hi) !== null) {
-        const v = valueOf(opts.endDot, hi);
-        root.append(svg("circle", { cx: x(hi), cy: y(v), r: 4.5, fill: SERIES[opts.endDot].color, stroke: "var(--surface)", "stroke-width": 2 }));
-        root.append(svg("text", { x: x(hi) - 8, y: y(v) - 10, "text-anchor": "end", fill: "var(--text-primary)", "font-weight": 600 }, fmt(v) + " nT"));
+        const v = valueOf(opts.endDot, hi), color = SERIES[opts.endDot].color;
+        root.append(svg("circle", { class: "ring", cx: x(hi), cy: y(v), r: 4.5, fill: color }));
+        root.append(svg("circle", { cx: x(hi), cy: y(v), r: 4.5, fill: color, stroke: "var(--surface)", "stroke-width": 2 }));
+        root.append(svg("text", { x: x(hi) - 10, y: y(v) - 12, "text-anchor": "end", fill: "var(--text-primary)", "font-weight": 600 }, fmt(v) + " nT forecast"));
       }
       const cross = svg("g", { visibility: "hidden" });
       cross.append(svg("line", { y1: M.t, y2: M.t + ph, stroke: "var(--muted)", "stroke-width": 1 }));
@@ -364,6 +601,8 @@
       root.addEventListener("blur", () => setHover(null, chart));
       root.append(hit);
       host.replaceChildren(root, tooltip);
+      // The entrance animation is decoration: drop it afterwards so the lines never depend on it.
+      if (animate) setTimeout(() => { for (const node of root.querySelectorAll(".draw, .fade")) node.classList.remove("draw", "fade"); }, 1500);
     }
 
     function hover(i, owner) {
@@ -433,22 +672,24 @@
   }
 
   // ---------- scorecard ----------
+  const NAMES = { gru: "GRU", xgb: "XGBoost", persistence: "Persistence" };
   function renderScore() {
     const table = $("score"), head = el("tr");
     for (const h of ["Conditions", "Model", "RMSE (nT)", "", "MAE (nT)", "Skill"]) head.append(el("th", {}, h));
     head.children[1].style.textAlign = "left";
     table.append(head);
-    const names = { gru: "GRU", xgb: "XGBoost", persistence: "Persistence" };
     const regimes = [...new Set(D.scores.map((s) => s.regime))];
     for (const regime of regimes) {
       const rows = D.scores.filter((s) => s.regime === regime);
       const base = rows.find((s) => s.model === "persistence").rmse;
+      const best = Math.min(...rows.map((s) => s.rmse));
       MODELS.forEach((m, j) => {
-        const s = rows.find((r) => r.model === m), row = el("tr", { className: j === 0 ? "regime-start" : "" });
+        const s = rows.find((r) => r.model === m);
+        const row = el("tr", { className: (j === 0 ? "regime-start " : "") + (s.rmse === best ? "best" : "") });
         row.append(el("td", {}, j === 0 ? regime.replace("<=", "≤") + ", " + fmt(s.n_hours, 0) + " h" : ""));
         const model = el("td", { className: "model" }), swatch = el("span", { className: "swatch" });
         swatch.style.background = SERIES[m].color;
-        model.append(swatch, document.createTextNode(names[m]));
+        model.append(swatch, document.createTextNode(NAMES[m]));
         const bar = el("td", { className: "bar-cell" }), track = el("div", { className: "track" }), fill = el("div", { className: "fill" });
         fill.style.width = (100 * s.rmse / base).toFixed(1) + "%"; fill.style.background = SERIES[m].color;
         track.append(fill); bar.append(track);
@@ -457,43 +698,91 @@
       });
     }
     $("score-note").textContent = fmt(D.hours, 0) + " hourly forecasts from " + day(T0) + " to " + day(T_END) +
-      ", years the models never saw during training (trained on 1995 to 2016, tuned on 2017 to 2020).";
+      ", years the models never saw during training (trained on 1995 to 2016, tuned on 2017 to 2020). The best model in each group is in bold.";
+  }
+
+  // ---------- hero ----------
+  // Storm scale: four equal steps, position interpolated inside each step.
+  const SCALE = [
+    { name: "Quiet", range: "above -50 nT", from: 30, to: -50, color: "var(--good)" },
+    { name: "Moderate", range: "-50 to -100", from: -50, to: -100, color: "var(--warning)" },
+    { name: "Intense", range: "-100 to -250", from: -100, to: -250, color: "var(--serious)" },
+    { name: "Severe", range: "below -250", from: -250, to: -500, color: "var(--critical)" },
+  ];
+  function renderGauge(dst) {
+    const host = $("gauge"), level = stormClass(dst).level, step = SCALE[level];
+    const share = (level + clamp((step.from - dst) / (step.from - step.to), 0, 1)) / SCALE.length;
+    const track = el("div", { className: "gauge-track" }), labels = el("div", { className: "gauge-labels" });
+    SCALE.forEach((s, i) => {
+      const seg = el("div", { className: "gauge-seg" + (i === level ? " on" : "") });
+      seg.style.background = s.color;
+      track.append(seg);
+      const label = el("span", { className: i === level ? "on" : "" });
+      label.append(el("b", {}, s.name), document.createTextNode(s.range));
+      labels.append(label);
+    });
+    const pin = el("div", { className: "gauge-pin" });
+    track.append(pin);
+    host.setAttribute("role", "img");
+    host.setAttribute("aria-label", "Storm scale: the forecast of " + fmt(dst) + " nT is in the " + step.name.toLowerCase() + " range");
+    host.replaceChildren(track, labels);
+    host.hidden = false;
+    setTimeout(() => { pin.style.left = (100 * share).toFixed(1) + "%"; }, 60);
+  }
+
+  // Without live data the hero falls back to the headline result on the test years.
+  function renderReplayHero() {
+    const all = D.scores.filter((s) => s.regime === D.scores[0].regime), of = (m) => all.find((s) => s.model === m);
+    $("live-note").textContent = "No live feed here; showing results on the held out test years.";
+    $("hero-label").textContent = "GRU error one hour ahead, over " + fmt(D.hours, 0) + " test hours (RMSE)";
+    countTo($("hero-value"), of("gru").rmse, 2);
+    $("hero-status").textContent = fmt(100 * of("gru").skill_vs_persistence, 0) + "% lower squared error than persistence";
+    const tile = tileIn($("live-tiles"), "glass");
+    tile("XGBoost error (RMSE)", fmt(of("xgb").rmse, 2), "nT", null, "xgb");
+    tile("Persistence error (RMSE)", fmt(of("persistence").rmse, 2), "nT", detail("naive baseline"), "persistence");
+    tile("GRU skill vs persistence", fmt(of("gru").skill_vs_persistence, 2), "", meter(of("gru").skill_vs_persistence, SERIES.gru.color), "gru");
+    tile("Test period", day(T0).slice(0, 4) + " to " + day(T_END).slice(0, 4), "", detail("never seen in training"));
   }
 
   // ---------- live forecast ----------
   function renderLive() {
     const L = window.OCULSTORM_LIVE;
-    if (!L || !L.hours) return;
+    if (!L || !L.hours) { renderReplayHero(); return; }
     $("live").hidden = false;
     const t0 = Date.parse(L.start + "Z"), last = L.hours - 1, target = t0 + last * HOUR;
     const hhmm = (ms) => iso(ms).slice(11, 16);
-    const ageHours = (Date.now() - Date.parse(L.generated)) / HOUR;
+    const ageHours = (Date.now() - Date.parse(L.generated)) / HOUR, stale = ageHours > 3;
+    $("pill").className = "pill" + (stale ? " stale" : "");
+    $("pill-text").textContent = stale ? "Delayed" : "Live";
     $("live-note").textContent = "Updated " + L.generated.replace("T", " ").replace("Z", " UTC") +
-      (ageHours > 3 ? ". This is " + fmt(ageHours, 0) + " hours old, so the feed may be delayed and the forecast below is no longer current." : ".");
+      (stale ? ". This is " + fmt(ageHours, 0) + " hours old, so the feed may be delayed and the forecast below is no longer current." : "");
 
-    const box = $("live-tiles"), tile = tileIn(box);
-    box.replaceChildren();
     const gru = L.gru[last], xgb = L.xgb[last];
-    tile("GRU forecast for " + day(target) + ", " + hhmm(target) + " to " + hhmm(target + HOUR) + " UTC", fmt(gru), "nT",
-      statusLine(gru, L.target_is_future ? "  expected" : "  (already observed: " + L.observed[last] + " nT)"), true);
-    tile("XGBoost forecast, same hour", fmt(xgb), "nT", detail("models differ by " + fmt(Math.abs(gru - xgb)) + " nT"));
+    $("hero-label").textContent = "GRU forecast for " + shortDay(target) + ", " + hhmm(target) + " to " + hhmm(target + HOUR) + " UTC";
+    countTo($("hero-value"), gru, 1);
+    $("hero-status").replaceChildren(badge(gru), document.createTextNode(L.target_is_future ? "  expected this hour" : "  (already observed: " + L.observed[last] + " nT)"));
+    renderGauge(gru);
+
+    const box = $("live-tiles"), tile = tileIn(box, "glass");
+    box.replaceChildren();
+    tile("XGBoost forecast, same hour", fmt(xgb), "nT", detail("models differ by " + fmt(Math.abs(gru - xgb)) + " nT"), "xgb");
     let seen = last; while (seen > 0 && L.observed[seen] === null) seen--;
     tile("Latest observed Dst", String(L.observed[seen]), "nT", detail(hhmm(t0 + seen * HOUR) + " to " + hhmm(t0 + (seen + 1) * HOUR) + " UTC, quick-look"));
     const inputs = tile("Solar wind, " + L.inputs_hour.slice(11) + " UTC hour", L.inputs["IMF Bz (GSM)"] === null ? "n/a" : fmt(L.inputs["IMF Bz (GSM)"]), "nT Bz");
     const list = el("dl");
-    const units = { "Solar wind speed": [" km/s", 0], "Proton density": [" /cm\u00b3", 1], "Dynamic pressure": [" nPa", 1] };
+    const units = { "Solar wind speed": [" km/s", 0], "Proton density": [" /cm³", 1], "Dynamic pressure": [" nPa", 1] };
     for (const name in units) list.append(el("dt", {}, name), el("dd", {}, L.inputs[name] === null ? "n/a" : fmt(L.inputs[name], units[name][1]) + units[name][0]));
     inputs.append(list);
     const r = L.hindcast.rmse, skill = 1 - (r.gru / r.persistence) ** 2;
     tile("GRU error on real-time data (RMSE)", fmt(r.gru, 2), "nT",
-      detail("persistence " + fmt(r.persistence, 2) + ", XGBoost " + fmt(r.xgb, 2) + " nT over the last " + L.hindcast.hours + " hours; skill " + fmt(skill, 2)));
+      detail("persistence " + fmt(r.persistence, 2) + ", XGBoost " + fmt(r.xgb, 2) + " nT over the last " + L.hindcast.hours + " hours; skill " + fmt(skill, 2)), "gru");
 
     const ctx = { t0, range: () => [0, last], group: [], hover: null };
     const value = (k, i) => L[k][i];
-    const chart = lineChart(ctx, $("plot-live"), 300, dstKeys, value, { thresholds: true, endDot: "gru", label: "Line chart of observed quick-look Dst and one hour ahead forecasts over the last seven days" });
+    const chart = lineChart(ctx, $("plot-live"), 320, dstKeys, value, { thresholds: true, area: "observed", endDot: "gru", label: "Line chart of observed quick-look Dst and one hour ahead forecasts over the last seven days" });
     legend($("legend-live"), legendOrder);
     wireToggle("toggle-live", "table-live", () => dataTable(ctx, $("table-live"), legendOrder, value, (k) => (k === "observed" ? 0 : 1)));
-    chart.draw();
+    chart.draw(true);
     liveChart = chart;
   }
   let liveChart = null;
@@ -503,23 +792,31 @@
   const dstValue = (k, i) => D[k][i];
   const errValue = (k, i) => Math.abs(D.observed[i] - D[k][i]);
   const legendOrder = ["observed", "gru", "xgb", "persistence"];
-  const dstChart = lineChart(explore, $("plot-dst"), 340, dstKeys, dstValue, { thresholds: true, label: "Line chart of observed Dst and the three one hour ahead forecasts" });
+  const dstChart = lineChart(explore, $("plot-dst"), 360, dstKeys, dstValue, { thresholds: true, area: "observed", label: "Line chart of observed Dst and the three one hour ahead forecasts" });
   const errChart = lineChart(explore, $("plot-err"), 220, errKeys, errValue, { label: "Line chart of absolute forecast error for each model" });
   const refreshDst = wireToggle("toggle-dst", "table-dst", () => dataTable(explore, $("table-dst"), legendOrder, dstValue, (k) => (k === "observed" ? 0 : 1)));
   const refreshErr = wireToggle("toggle-err", "table-err", () => dataTable(explore, $("table-err"), legendOrder.slice(1), errValue, () => 1));
 
-  function render() { renderTiles(); dstChart.draw(); errChart.draw(); refreshDst(); refreshErr(); }
+  function render() { renderTiles(); dstChart.draw(true); errChart.draw(true); refreshDst(); refreshErr(); }
 
-  $("subtitle").textContent = "One hour ahead forecasts of the Dst index, the standard measure of geomagnetic storm intensity, from solar wind measurements.";
+  $("theme").addEventListener("click", () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("oculstorm-theme", root.dataset.theme); } catch (e) {}
+  });
+
+  $("subtitle").textContent = "The Dst index measures how hard a solar storm is shaking Earth's magnetic field. Two models read the solar wind and call the next hour.";
   legend($("legend-dst"), legendOrder);
   legend($("legend-err"), legendOrder.slice(1));
   buildPresets();
+  buildStorms();
   renderScore();
   $("preset").addEventListener("change", applyPreset);
   $("from").addEventListener("change", applyDates);
   $("to").addEventListener("change", applyDates);
   let resizeTimer;
-  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { dstChart.draw(); errChart.draw(); if (liveChart) liveChart.draw(); }, 120); });
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { dstChart.draw(false); errChart.draw(false); if (liveChart) liveChart.draw(false); }, 120); });
   applyPreset();
   renderLive();
 })();
