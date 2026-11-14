@@ -1,7 +1,8 @@
 name: Live forecast
 
 # Every hour: fetch real-time data, run both models, publish the dashboard.
-# Nothing is committed back; the generated docs/live.js only exists in the deployed site.
+# Nothing is committed to main; the generated docs/live.js only exists in the deployed site.
+# The one thing that is kept is the log of issued forecasts, on the live-archive branch.
 on:
   schedule:
     - cron: "7 * * * *"
@@ -17,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write  # only to append to the live-archive branch
   pages: write
   id-token: write
 
@@ -34,6 +35,11 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
+      - name: Check out the forecast log
+        uses: actions/checkout@v7
+        with:
+          ref: live-archive
+          path: archive
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
@@ -44,9 +50,20 @@ jobs:
       - name: Forecast from real-time data
         # If NOAA is unreachable, keep the last published forecast; the page flags stale data itself.
         run: |
-          python scripts/live_forecast.py \
+          python scripts/live_forecast.py --archive archive/forecasts.csv \
             || curl -fsS https://makio-san.github.io/oculstorm/live.js -o docs/live.js \
             || echo "no live data this run"
+      - name: Save the forecast log
+        # A forecast is logged once, when issued; later runs only fill in the observed Dst.
+        run: |
+          cd archive
+          if [ -n "$(git status --porcelain forecasts.csv)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -q -m "data(archive): update forecast log at $(date -u +%Y-%m-%dT%H:%MZ)" forecasts.csv
+            git push -q
+          fi
+          cp forecasts.csv ../docs/forecasts.csv
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
