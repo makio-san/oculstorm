@@ -3,6 +3,7 @@ data/raw/
 *.parquet
 .DS_Store
 docs/live.js
+docs/forecasts.csv
 __pycache__/
 .pytest_cache/
 .claude/
