@@ -1,12 +1,16 @@
 """Fetch real-time data, forecast the hour in progress and hindcast the last week.
 
-Usage: python scripts/live_forecast.py
+Usage: python scripts/live_forecast.py [--archive forecasts.csv]
 Reads : models/xgb_dst_1h.ubj, models/gru_dst_1h_seed*.pt, models/gru_channels.json
 Writes: docs/live.js (loaded by the dashboard)
+
+With --archive the newest forecast is also appended to a log that is never rewritten,
+and the log's scores are added to live.js. That log is the honest real-time track record.
 
 The hindcast replays the same pipeline over the last ~6 days of real-time inputs,
 so the dashboard can show how the models actually do on raw operational data.
 """
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -17,6 +21,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from oculstorm import archive  # noqa: E402
 from oculstorm.features import HORIZON, build_features  # noqa: E402
 from oculstorm.live import fetch_live_table  # noqa: E402
 from oculstorm.metrics import rmse  # noqa: E402
@@ -64,6 +69,10 @@ def as_list(series: pd.Series, digits: int = 1) -> list:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--archive", type=Path, help="CSV log of forecasts issued in real time; created if missing")
+    args = parser.parse_args()
+
     now = pd.Timestamp.now("UTC").tz_localize(None)
     table = fetch_live_table(now)
     step = pd.Timedelta(hours=HORIZON)
@@ -83,6 +92,12 @@ def main() -> None:
     truth = scored["observed"].to_numpy()
     scores = {name: round(rmse(truth, scored[name].to_numpy()), 2) for name in ["gru", "xgb", "persistence"]}
 
+    record = None
+    if args.archive:
+        log = archive.update(archive.load(args.archive), now, hours[-1], forecasts.iloc[-1].to_dict(), table["dst"])
+        archive.save(log, args.archive)
+        record = archive.summary(log)
+
     latest = table.index.max()
     payload = {
         "generated": now.strftime("%Y-%m-%dT%H:%MZ"),
@@ -95,6 +110,7 @@ def main() -> None:
         "xgb": as_list(forecasts["xgb"]),
         "persistence": as_list(forecasts["persistence"]),
         "hindcast": {"hours": len(scored), "rmse": scores},
+        "archive": record,
         "inputs_hour": latest.strftime("%Y-%m-%dT%H:%M"),
         "inputs": {name: None if pd.isna(table.loc[latest, col]) else round(float(table.loc[latest, col]), 2) for col, name in INPUTS.items()},
         "solar_wind_coverage": round(float(table["flow_speed"].notna().mean()), 3),
@@ -105,6 +121,8 @@ def main() -> None:
     print(f"forecast for {hours[-1]}: GRU {forecasts['gru'].iloc[-1]:.1f} nT, XGBoost {forecasts['xgb'].iloc[-1]:.1f} nT, "
           f"persistence {forecasts['persistence'].iloc[-1]:.0f} nT")
     print(f"hindcast over {len(scored)} hours, RMSE: {scores}")
+    if record:
+        print(f"archive: {record['issued']} forecasts logged since {record['since']}, {record['all']['hours']} scored: {record['all']['rmse']}")
 
 
 if __name__ == "__main__":
