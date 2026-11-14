@@ -124,7 +124,15 @@ The top of the page is live. Every hour a GitHub Actions workflow
 3. runs the committed XGBoost and GRU models to forecast the hour in progress,
 4. hindcasts the last 6 days with the same real-time inputs and reports the RMSE against
    persistence, so the page always shows how the models do on operational data,
-5. deploys the page with a fresh `docs/live.js`. Nothing is committed back to the repo.
+5. appends the new forecast to `forecasts.csv` on the `live-archive` branch,
+6. deploys the page with a fresh `docs/live.js`. Nothing is committed to `main`.
+
+The hindcast in step 4 is recomputed every hour from whatever data is available by then.
+The log in step 5 is the stricter record: each forecast is written once, at the moment it
+is issued, and never changed; only its `observed` column is filled in when the Dst value
+arrives. The dashboard scores that log separately (all hours and storm hours), and the file
+is downloadable from https://makio-san.github.io/oculstorm/forecasts.csv. Hours when the
+workflow did not run are simply missing; they are not backfilled.
 
 ```bash
 .venv/bin/python scripts/live_forecast.py
@@ -154,10 +162,11 @@ scripts/train_xgb.py       train XGBoost, score against persistence
 scripts/train_gru.py       train the GRU, score against persistence and XGBoost
 scripts/build_dashboard.py export test predictions to docs/data.js
 oculstorm/live.py          NOAA real-time inputs as an OMNI-style hourly table
+oculstorm/archive.py       append-only log of forecasts issued in real time
 scripts/live_forecast.py   live forecast and 6 day hindcast -> docs/live.js
 models/                    trained models used by the live forecast
 docs/                      static dashboard (index.html + generated data.js)
-tests/                     look-ahead leakage tests
+tests/                     look-ahead leakage, live table and archive tests
 reports/                   metrics (tracked) and test predictions (ignored)
 scripts/build_dataset.py   raw OMNI2 -> data/kaggle/omni2_hourly.parquet
 data/raw/                  downloaded NASA files (ignored)
