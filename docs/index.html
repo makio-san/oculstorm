@@ -60,7 +60,8 @@
           border: 1px solid var(--axis); border-radius: 8px; padding: 6px 10px; }
   button { cursor: pointer; }
   button:hover { background: var(--wash); }
-  button.ghost { font-size: 12.5px; color: var(--text-secondary); }
+  button.ghost, a.ghost { font-size: 12.5px; color: var(--text-secondary); }
+  a.ghost { text-underline-offset: 3px; }
   :focus-visible { outline: 2px solid var(--gru); outline-offset: 2px; }
 
   /* ---------- top bar ---------- */
@@ -259,6 +260,14 @@
       <div class="legend" id="legend-live"></div>
       <div class="plot" id="plot-live"></div>
       <div class="table-wrap" id="table-live" hidden></div>
+    </div>
+    <div class="card" id="record" hidden style="overflow-x:auto">
+      <div class="card-head">
+        <h3>Track record: forecasts logged the moment they were issued</h3>
+        <a class="ghost" href="forecasts.csv" download>Download the log (CSV)</a>
+      </div>
+      <p class="note" id="record-note" style="margin:0 0 10px"></p>
+      <table class="score" id="record-table"></table>
     </div>
     <p class="note">Inputs are NOAA SWPC real-time solar wind (propagated from L1 to Earth) and the WDC Kyoto quick-look Dst, refreshed about once an hour.
       Quick-look Dst is preliminary and is revised later, so these numbers are not directly comparable with the scorecard below.</p>
@@ -744,6 +753,30 @@
     tile("Test period", day(T0).slice(0, 4) + " to " + day(T_END).slice(0, 4), "", detail("never seen in training"));
   }
 
+  // ---------- real-time track record ----------
+  // Unlike the 7 day chart, these forecasts were saved when issued and are never recomputed.
+  function renderRecord(A) {
+    if (!A) return;
+    $("record").hidden = false;
+    const all = A.all.hours;
+    $("record-note").textContent = fmt(A.issued, 0) + (A.issued === 1 ? " forecast" : " forecasts") + " logged since " + A.since.replace("T", " ") + " UTC, " +
+      fmt(all, 0) + " of them scored so far against quick-look Dst" + (A.deepest === null ? "." : " (deepest observed " + fmt(A.deepest, 0) + " nT).") +
+      " The chart above is recomputed every hour; this log is never rewritten.";
+    const table = $("record-table"), head = el("tr");
+    for (const h of ["Conditions", "Hours", "GRU RMSE (nT)", "XGBoost RMSE (nT)", "Persistence RMSE (nT)", "GRU skill"]) head.append(el("th", {}, h));
+    table.replaceChildren(head);
+    for (const [name, part, empty] of [["all scored hours", A.all, "waiting for the first observation"], ["storm (Dst ≤ -50)", A.storm, "no storm hours yet"]]) {
+      const row = el("tr");
+      row.append(el("td", {}, name), el("td", {}, fmt(part.hours, 0)));
+      if (!part.rmse) { const cell = el("td", { colSpan: 4 }, empty); cell.style.color = "var(--muted)"; row.append(cell); }
+      else {
+        const r = part.rmse, skill = r.persistence > 0 ? 1 - (r.gru / r.persistence) ** 2 : 0;
+        row.append(el("td", {}, fmt(r.gru, 2)), el("td", {}, fmt(r.xgb, 2)), el("td", {}, fmt(r.persistence, 2)), el("td", {}, fmt(skill, 2)));
+      }
+      table.append(row);
+    }
+  }
+
   // ---------- live forecast ----------
   function renderLive() {
     const L = window.OCULSTORM_LIVE;
@@ -784,6 +817,7 @@
     wireToggle("toggle-live", "table-live", () => dataTable(ctx, $("table-live"), legendOrder, value, (k) => (k === "observed" ? 0 : 1)));
     chart.draw(true);
     liveChart = chart;
+    renderRecord(L.archive);
   }
   let liveChart = null;
 
