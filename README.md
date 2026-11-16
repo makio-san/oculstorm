@@ -134,6 +134,22 @@ arrives. The dashboard scores that log separately (all hours and storm hours), a
 is downloadable from https://makio-san.github.io/oculstorm/forecasts.csv. Hours when the
 workflow did not run are simply missing; they are not backfilled.
 
+GitHub's own `schedule` trigger proved unreliable for this repo (about 4 runs a day instead
+of 24), so an external cron service calls the `workflow_dispatch` API every hour at minute 7
+UTC; the `schedule` trigger stays as a backup. Extra runs are harmless: a target hour that is
+already in the log is never rewritten. The service needs a fine-grained GitHub token limited to
+this repository with only the "Actions: read and write" permission; the token lives in the cron
+service, never in this repository.
+
+```
+POST https://api.github.com/repos/makio-san/oculstorm/actions/workflows/live.yml/dispatches
+Accept: application/vnd.github+json
+Authorization: Bearer <token>
+X-GitHub-Api-Version: 2022-11-28
+
+{"ref": "main"}
+```
+
 ```bash
 .venv/bin/python scripts/live_forecast.py
 ```
