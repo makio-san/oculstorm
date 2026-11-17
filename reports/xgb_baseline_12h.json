@@ -1,0 +1,166 @@
+{
+  "horizon_hours": 12,
+  "train": "1995-01-01 .. 2017-01-01 (exclusive)",
+  "validation": "2017-01-01 .. 2021-01-01 (exclusive)",
+  "test": "2021-01-01 .. 2026-10-30 02:00:00",
+  "n_features": 89,
+  "best_iteration": 895,
+  "params": {
+    "n_estimators": 3000,
+    "learning_rate": 0.03,
+    "max_depth": 6,
+    "min_child_weight": 5,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "tree_method": "hist",
+    "early_stopping_rounds": 100,
+    "random_state": 0
+  },
+  "scores": [
+    {
+      "regime": "all",
+      "n_hours": 51075,
+      "model": "persistence",
+      "rmse": 18.6853,
+      "mae": 11.1747,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "all",
+      "n_hours": 51075,
+      "model": "trend persistence",
+      "rmse": 60.8606,
+      "mae": 38.9272,
+      "skill_vs_persistence": -9.609
+    },
+    {
+      "regime": "all",
+      "n_hours": 51075,
+      "model": "xgboost (Dst history only)",
+      "rmse": 16.1407,
+      "mae": 9.9744,
+      "skill_vs_persistence": 0.2538
+    },
+    {
+      "regime": "all",
+      "n_hours": 51075,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 15.7456,
+      "mae": 9.5942,
+      "skill_vs_persistence": 0.2899
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48951,
+      "model": "persistence",
+      "rmse": 13.2321,
+      "mae": 9.6132,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48951,
+      "model": "trend persistence",
+      "rmse": 51.2011,
+      "mae": 35.8404,
+      "skill_vs_persistence": -13.9727
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48951,
+      "model": "xgboost (Dst history only)",
+      "rmse": 11.7658,
+      "mae": 8.732,
+      "skill_vs_persistence": 0.2094
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48951,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 12.1135,
+      "mae": 8.5452,
+      "skill_vs_persistence": 0.1619
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "persistence",
+      "rmse": 66.0336,
+      "mae": 47.1615,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "trend persistence",
+      "rmse": 169.2663,
+      "mae": 110.0692,
+      "skill_vs_persistence": -5.5707
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "xgboost (Dst history only)",
+      "rmse": 55.4462,
+      "mae": 38.6061,
+      "skill_vs_persistence": 0.295
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 50.7931,
+      "mae": 33.77,
+      "skill_vs_persistence": 0.4083
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "persistence",
+      "rmse": 128.8048,
+      "mae": 103.4938,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "trend persistence",
+      "rmse": 316.0545,
+      "mae": 218.2516,
+      "skill_vs_persistence": -5.0209
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "xgboost (Dst history only)",
+      "rmse": 113.3117,
+      "mae": 89.7356,
+      "skill_vs_persistence": 0.2261
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 106.6921,
+      "mae": 80.9798,
+      "skill_vs_persistence": 0.3139
+    }
+  ],
+  "top_features_gain_share": {
+    "dst_lag0": 0.1608,
+    "flow_pressure_lag0": 0.1304,
+    "dst_lag1": 0.0724,
+    "b_mag_avg_lag0": 0.0668,
+    "doy_sin": 0.0531,
+    "f107": 0.0419,
+    "dst_mean24": 0.027,
+    "doy_cos": 0.0257,
+    "by_gsm_lag0": 0.0196,
+    "bz_gsm_mean12": 0.018,
+    "dst_diff3": 0.0175,
+    "proton_temp_lag0": 0.0165,
+    "newell_lag0": 0.0156,
+    "sqrt_pressure_lag0": 0.0152,
+    "dst_min24": 0.0149
+  }
+}

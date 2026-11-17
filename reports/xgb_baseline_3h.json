@@ -1,0 +1,166 @@
+{
+  "horizon_hours": 3,
+  "train": "1995-01-01 .. 2017-01-01 (exclusive)",
+  "validation": "2017-01-01 .. 2021-01-01 (exclusive)",
+  "test": "2021-01-01 .. 2026-10-30 11:00:00",
+  "n_features": 89,
+  "best_iteration": 1830,
+  "params": {
+    "n_estimators": 3000,
+    "learning_rate": 0.03,
+    "max_depth": 6,
+    "min_child_weight": 5,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "tree_method": "hist",
+    "early_stopping_rounds": 100,
+    "random_state": 0
+  },
+  "scores": [
+    {
+      "regime": "all",
+      "n_hours": 51084,
+      "model": "persistence",
+      "rmse": 9.694,
+      "mae": 6.1179,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "all",
+      "n_hours": 51084,
+      "model": "trend persistence",
+      "rmse": 16.4724,
+      "mae": 10.6581,
+      "skill_vs_persistence": -1.8874
+    },
+    {
+      "regime": "all",
+      "n_hours": 51084,
+      "model": "xgboost (Dst history only)",
+      "rmse": 9.0571,
+      "mae": 5.8741,
+      "skill_vs_persistence": 0.1271
+    },
+    {
+      "regime": "all",
+      "n_hours": 51084,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 7.9423,
+      "mae": 5.2839,
+      "skill_vs_persistence": 0.3287
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48960,
+      "model": "persistence",
+      "rmse": 7.9433,
+      "mae": 5.6087,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48960,
+      "model": "trend persistence",
+      "rmse": 14.0531,
+      "mae": 9.8936,
+      "skill_vs_persistence": -2.13
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48960,
+      "model": "xgboost (Dst history only)",
+      "rmse": 7.5542,
+      "mae": 5.3989,
+      "skill_vs_persistence": 0.0956
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48960,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 6.938,
+      "mae": 4.962,
+      "skill_vs_persistence": 0.2371
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "persistence",
+      "rmse": 28.3849,
+      "mae": 17.8564,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "trend persistence",
+      "rmse": 44.426,
+      "mae": 28.2782,
+      "skill_vs_persistence": -1.4496
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "xgboost (Dst history only)",
+      "rmse": 25.6412,
+      "mae": 16.8288,
+      "skill_vs_persistence": 0.184
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 20.1878,
+      "mae": 12.7029,
+      "skill_vs_persistence": 0.4942
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "persistence",
+      "rmse": 54.2245,
+      "mae": 37.3385,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "trend persistence",
+      "rmse": 83.4248,
+      "mae": 55.8571,
+      "skill_vs_persistence": -1.367
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "xgboost (Dst history only)",
+      "rmse": 47.3567,
+      "mae": 34.1487,
+      "skill_vs_persistence": 0.2373
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 39.0354,
+      "mae": 26.1419,
+      "skill_vs_persistence": 0.4818
+    }
+  ],
+  "top_features_gain_share": {
+    "flow_pressure_lag0": 0.0876,
+    "dst_lag1": 0.0644,
+    "dst_lag0": 0.0632,
+    "bz_gsm_lag0": 0.0459,
+    "newell_lag0": 0.0451,
+    "b_mag_avg_lag0": 0.0417,
+    "electric_field_lag0": 0.0345,
+    "dst_mean24": 0.026,
+    "dst_diff3": 0.024,
+    "doy_sin": 0.0214,
+    "f107": 0.0197,
+    "proton_temp_lag0": 0.0178,
+    "vbs_lag0": 0.0167,
+    "doy_cos": 0.016,
+    "by_gsm_lag0": 0.0141
+  }
+}
