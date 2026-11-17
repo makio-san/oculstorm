@@ -17,6 +17,11 @@ def suffix(horizon: int) -> str:
     return "" if horizon == 1 else f"_{horizon}h"
 
 
+def weight_tag(storm_weight: float) -> str:
+    """File name tag of a storm-weighted run; the unweighted baseline has none."""
+    return "" if storm_weight == 1 else f"_sw{storm_weight:g}"
+
+
 SOLAR_WIND = [
     "bz_gsm", "by_gsm", "b_mag_avg", "flow_speed", "proton_density",
     "flow_pressure", "electric_field", "proton_temp",
