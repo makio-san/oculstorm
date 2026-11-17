@@ -12,13 +12,13 @@ REGIMES = {
 
 
 def persistence(X: pd.DataFrame) -> np.ndarray:
-    """Next hour equals the current hour."""
+    """The target hour equals the current hour, whatever the lead time."""
     return X["dst_lag0"].to_numpy()
 
 
-def trend_persistence(X: pd.DataFrame) -> np.ndarray:
-    """Next hour continues the last hourly change (linear extrapolation)."""
-    return (X["dst_lag0"] + X["dst_diff1"].fillna(0)).to_numpy()
+def trend_persistence(X: pd.DataFrame, horizon: int = 1) -> np.ndarray:
+    """The last hourly change continues for `horizon` hours (linear extrapolation)."""
+    return (X["dst_lag0"] + horizon * X["dst_diff1"].fillna(0)).to_numpy()
 
 
 def rmse(y: np.ndarray, pred: np.ndarray) -> float:

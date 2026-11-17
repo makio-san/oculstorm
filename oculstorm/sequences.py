@@ -47,12 +47,12 @@ def build_channels(df: pd.DataFrame, stats: dict | None = None) -> tuple[pd.Data
 
 
 def build_windows(
-    df: pd.DataFrame, stats: dict | None = None, require_target: bool = True
+    df: pd.DataFrame, stats: dict | None = None, require_target: bool = True, horizon: int = HORIZON
 ) -> tuple[np.ndarray, pd.DataFrame]:
     """Return (windows, meta).
 
     windows[i] has shape (WINDOW, n_channels) and covers hours t-WINDOW+1 .. t.
-    meta is indexed by t and holds dst_lag0 = Dst(t) and dst_target = Dst(t+HORIZON).
+    meta is indexed by t and holds dst_lag0 = Dst(t) and dst_target = Dst(t+horizon).
     windows is a zero-copy view, so index it per batch instead of copying it whole.
     With require_target=False the newest hours, whose target is not known yet, are kept.
     """
@@ -60,7 +60,7 @@ def build_windows(
     view = np.lib.stride_tricks.sliding_window_view(channels.to_numpy(), WINDOW, axis=0)
     windows = view.transpose(0, 2, 1)  # (n, WINDOW, channels)
 
-    meta = pd.DataFrame({"dst_lag0": dst, "dst_target": dst.shift(-HORIZON)}).iloc[WINDOW - 1 :]
+    meta = pd.DataFrame({"dst_lag0": dst, "dst_target": dst.shift(-horizon)}).iloc[WINDOW - 1 :]
     keep = meta["dst_lag0"].notna()
     if require_target:
         keep &= meta["dst_target"].notna()

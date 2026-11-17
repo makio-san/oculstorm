@@ -1,15 +1,21 @@
-"""Feature engineering for one hour ahead Dst forecasting.
+"""Feature engineering for Dst forecasting a few hours ahead.
 
 Every feature for row t uses only records at hour t or earlier. The target is
-Dst at hour t+1. Kp, ap, AE, AL, AU and PC are deliberately excluded: Kp and ap
+Dst at hour t+horizon (1 hour by default). Kp, ap, AE, AL, AU and PC are deliberately excluded: Kp and ap
 are 3 hour values that cover hours after t (leakage), and the others are
 geomagnetic responses rather than solar wind drivers.
 """
 import numpy as np
 import pandas as pd
 
-HORIZON = 1  # hours ahead
+HORIZON = 1  # default hours ahead
+HORIZONS = (1, 3, 6, 12)  # lead times the models are trained for
 N_LAGS = 6  # hours of history given to the model (lag 0 .. N_LAGS-1)
+
+def suffix(horizon: int) -> str:
+    """File name suffix for reports of a horizon; the 1 hour files keep their original names."""
+    return "" if horizon == 1 else f"_{horizon}h"
+
 
 SOLAR_WIND = [
     "bz_gsm", "by_gsm", "b_mag_avg", "flow_speed", "proton_density",
@@ -33,9 +39,11 @@ def _coupling(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_features(
-    df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True
+    df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Return (X, y) where y is Dst at t+HORIZON and X only looks backwards from t.
+    """Return (X, y) where y is Dst at t+horizon and X only looks backwards from t.
+
+    X does not depend on the horizon; only the target moves.
 
     With use_solar_wind=False only the Dst history and calendar terms are kept,
     which shows how much of the skill actually comes from the solar wind.
@@ -70,7 +78,7 @@ def build_features(
     cols["doy_cos"] = pd.Series(np.cos(2 * np.pi * doy / 365.25), index=df.index)
 
     X = pd.DataFrame(cols).astype("float32")
-    y = dst.shift(-HORIZON).rename("dst_target")
+    y = dst.shift(-horizon).rename("dst_target")
 
     keep = X["dst_lag0"].notna()
     if require_target:
