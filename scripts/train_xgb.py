@@ -1,8 +1,10 @@
 """Train the XGBoost baseline and compare it with persistence on the held out test years.
 
-Usage: python scripts/train_xgb.py
-Writes: models/xgb_dst_1h.ubj, reports/xgb_baseline.json, reports/xgb_test_predictions.parquet
+Usage: python scripts/train_xgb.py [--horizon H]
+Writes: models/xgb_dst_{H}h.ubj, reports/xgb_baseline{_Hh}.json, reports/xgb_test_predictions{_Hh}.parquet
+(the 1 hour reports keep their names without the suffix)
 """
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -15,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
-from oculstorm.features import HORIZON, build_features  # noqa: E402
+from oculstorm.features import HORIZON, HORIZONS, build_features, suffix  # noqa: E402
 from oculstorm.metrics import evaluate, persistence, trend_persistence  # noqa: E402
 
 PARAMS = dict(
@@ -34,7 +36,7 @@ PARAMS = dict(
 def fit(X: pd.DataFrame, y: pd.Series) -> tuple[xgb.XGBRegressor, np.ndarray]:
     """Fit on train, early stop on validation, return the model and test predictions.
 
-    The model learns the change Dst(t+1) - Dst(t), so an output of zero is exactly
+    The model learns the change Dst(t+h) - Dst(t), so an output of zero is exactly
     persistence and anything it learns is skill on top of it.
     """
     delta = y - X["dst_lag0"]
@@ -45,11 +47,14 @@ def fit(X: pd.DataFrame, y: pd.Series) -> tuple[xgb.XGBRegressor, np.ndarray]:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
+    h = parser.parse_args().horizon
     df = load_hourly()
-    X, y = build_features(df)
-    X_dst, _ = build_features(df, use_solar_wind=False)
+    X, y = build_features(df, horizon=h)
+    X_dst, _ = build_features(df, use_solar_wind=False, horizon=h)
     X_te, y_te = split(X)[2], split(y)[2]
-    print(f"features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}  test: {len(X_te):,}")
+    print(f"horizon: {h}h  features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}  test: {len(X_te):,}")
 
     model, pred = fit(X, y)
     model_dst, pred_dst = fit(X_dst, y)
@@ -57,7 +62,7 @@ def main() -> None:
 
     predictions = {
         "persistence": persistence(X_te),
-        "trend persistence": trend_persistence(X_te),
+        "trend persistence": trend_persistence(X_te, h),
         "xgboost (Dst history only)": pred_dst,
         "xgboost (solar wind + Dst)": pred,
     }
@@ -72,10 +77,10 @@ def main() -> None:
 
     (ROOT / "models").mkdir(exist_ok=True)
     (ROOT / "reports").mkdir(exist_ok=True)
-    model.save_model(ROOT / "models" / "xgb_dst_1h.ubj")
-    pd.DataFrame({"dst_observed": y_te, **predictions}).to_parquet(ROOT / "reports" / "xgb_test_predictions.parquet")
+    model.save_model(ROOT / "models" / f"xgb_dst_{h}h.ubj")
+    pd.DataFrame({"dst_observed": y_te, **predictions}).to_parquet(ROOT / "reports" / f"xgb_test_predictions{suffix(h)}.parquet")
     report = {
-        "horizon_hours": HORIZON,
+        "horizon_hours": h,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
         "test": f"{TEST_START} .. {y_te.index.max()}",
@@ -85,7 +90,7 @@ def main() -> None:
         "scores": json.loads(scores.round(4).to_json(orient="records")),
         "top_features_gain_share": top.round(4).to_dict(),
     }
-    (ROOT / "reports" / "xgb_baseline.json").write_text(json.dumps(report, indent=2, default=str) + "\n")
+    (ROOT / "reports" / f"xgb_baseline{suffix(h)}.json").write_text(json.dumps(report, indent=2, default=str) + "\n")
 
 
 if __name__ == "__main__":

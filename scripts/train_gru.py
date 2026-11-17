@@ -1,8 +1,10 @@
 """Train the small GRU and compare it with persistence and the XGBoost baseline.
 
-Usage: python scripts/train_gru.py
-Writes: models/gru_dst_1h_seed*.pt, models/gru_channels.json, reports/gru_baseline.json, reports/gru_test_predictions.parquet
+Usage: python scripts/train_gru.py [--horizon H]
+Writes: models/gru_dst_{H}h_seed*.pt, models/gru_channels.json, reports/gru_baseline{_Hh}.json,
+reports/gru_test_predictions{_Hh}.parquet (the 1 hour reports keep their names without the suffix)
 """
+import argparse
 import json
 import sys
 import time
@@ -17,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
-from oculstorm.features import HORIZON  # noqa: E402
+from oculstorm.features import HORIZON, HORIZONS, suffix  # noqa: E402
 from oculstorm.gru import DstGRU  # noqa: E402
 from oculstorm.metrics import evaluate, rmse  # noqa: E402
 from oculstorm.sequences import WINDOW, build_windows, channel_stats  # noqa: E402
@@ -80,13 +82,16 @@ def train_one(seed: int, windows: np.ndarray, parts: dict[str, pd.DataFrame], sc
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
+    h = parser.parse_args().horizon
     torch.set_num_threads(4)
     df = load_hourly()
-    windows, meta = build_windows(df)
+    windows, meta = build_windows(df, horizon=h)
     parts = dict(zip(["train", "val", "test"], split(meta)))
     scale = float((parts["train"]["dst_target"] - parts["train"]["dst_lag0"]).std())
     n_params = sum(p.numel() for p in DstGRU(windows.shape[2], HIDDEN).parameters())
-    print(f"channels: {windows.shape[2]}  window: {WINDOW}h  params: {n_params:,}  "
+    print(f"horizon: {h}h  channels: {windows.shape[2]}  window: {WINDOW}h  params: {n_params:,}  "
           + "  ".join(f"{k}: {len(v):,}" for k, v in parts.items()))
 
     te = parts["test"]
@@ -105,11 +110,11 @@ def main() -> None:
         info["seconds"] = round(time.time() - started)
         runs.append(info)
         torch.save({"state_dict": model.state_dict(), "scale": scale, "hidden": HIDDEN, "window": WINDOW},
-                   ROOT / "models" / f"gru_dst_1h_seed{seed}.pt")
+                   ROOT / "models" / f"gru_dst_{h}h_seed{seed}.pt")
         print({k: v for k, v in info.items() if k != "val_rmse_history"})
 
     predictions = {"persistence": lag0}
-    xgb_path = ROOT / "reports" / "xgb_test_predictions.parquet"
+    xgb_path = ROOT / "reports" / f"xgb_test_predictions{suffix(h)}.parquet"
     if xgb_path.exists():
         xgb = pd.read_parquet(xgb_path)["xgboost (solar wind + Dst)"]
         if xgb.index.equals(te.index):
@@ -126,9 +131,9 @@ def main() -> None:
     pd.set_option("display.width", 200)
     print(scores.round(3).to_string(index=False))
 
-    pd.DataFrame({"dst_observed": te["dst_target"], **predictions}).to_parquet(ROOT / "reports" / "gru_test_predictions.parquet")
+    pd.DataFrame({"dst_observed": te["dst_target"], **predictions}).to_parquet(ROOT / "reports" / f"gru_test_predictions{suffix(h)}.parquet")
     report = {
-        "horizon_hours": HORIZON,
+        "horizon_hours": h,
         "window_hours": WINDOW,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
@@ -139,7 +144,7 @@ def main() -> None:
         "runs": runs,
         "scores": json.loads(scores.round(4).to_json(orient="records")),
     }
-    (ROOT / "reports" / "gru_baseline.json").write_text(json.dumps(report, indent=2) + "\n")
+    (ROOT / "reports" / f"gru_baseline{suffix(h)}.json").write_text(json.dumps(report, indent=2) + "\n")
 
 
 if __name__ == "__main__":
