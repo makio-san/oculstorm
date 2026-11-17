@@ -1,8 +1,9 @@
 """Train the small GRU and compare it with persistence and the XGBoost baseline.
 
-Usage: python scripts/train_gru.py [--horizon H]
-Writes: models/gru_dst_{H}h_seed*.pt, models/gru_channels.json, reports/gru_baseline{_Hh}.json,
-reports/gru_test_predictions{_Hh}.parquet (the 1 hour reports keep their names without the suffix)
+Usage: python scripts/train_gru.py [--horizon H] [--storm-weight K]
+Writes: models/gru_dst_{H}h{_swK}_seed*.pt, models/gru_channels.json, reports/gru_baseline{_Hh}{_swK}.json,
+reports/gru_test_predictions{_Hh}{_swK}.parquet
+(the 1 hour reports keep their names without the suffix; _swK only when K is not 1)
 """
 import argparse
 import json
@@ -19,9 +20,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
-from oculstorm.features import HORIZON, HORIZONS, suffix  # noqa: E402
+from oculstorm.features import HORIZON, HORIZONS, suffix, weight_tag  # noqa: E402
 from oculstorm.gru import DstGRU  # noqa: E402
-from oculstorm.metrics import evaluate, rmse  # noqa: E402
+from oculstorm.metrics import evaluate, rmse, storm_weights  # noqa: E402
 from oculstorm.sequences import WINDOW, build_windows, channel_stats  # noqa: E402
 
 SEEDS = [0, 1, 2]
@@ -41,19 +42,25 @@ def predict(model: nn.Module, windows: np.ndarray, rows: np.ndarray) -> np.ndarr
     return np.concatenate(out)
 
 
-def train_one(seed: int, windows: np.ndarray, parts: dict[str, pd.DataFrame], scale: float) -> tuple[nn.Module, dict]:
-    """Train one seed with early stopping on validation RMSE. Targets are delta / scale."""
+def train_one(seed: int, windows: np.ndarray, parts: dict[str, pd.DataFrame], scale: float, peak: float = 1.0) -> tuple[nn.Module, dict]:
+    """Train one seed with early stopping on validation RMSE. Targets are delta / scale.
+
+    With `peak` > 1 storm hours weigh more, in the loss and in the validation RMSE used for
+    early stopping alike.
+    """
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
     model = DstGRU(windows.shape[2], HIDDEN)
     optimiser = torch.optim.Adam(model.parameters(), lr=LR)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=0.5, patience=2)
-    loss_fn = nn.HuberLoss(delta=3.0)  # robust to the rare, very large storm-time jumps
+    loss_fn = nn.HuberLoss(delta=3.0, reduction="none")  # robust to the rare, very large storm-time jumps
 
     tr, va = parts["train"], parts["val"]
     tr_rows = tr["row"].to_numpy()
     tr_target = ((tr["dst_target"] - tr["dst_lag0"]) / scale).to_numpy("float32")
+    tr_weight = storm_weights(tr["dst_target"], peak).astype("float32")
     va_delta = (va["dst_target"] - va["dst_lag0"]).to_numpy()
+    va_weight = storm_weights(va["dst_target"], peak)
 
     best, best_state, bad, history = np.inf, None, 0, []
     for epoch in range(1, MAX_EPOCHS + 1):
@@ -62,12 +69,14 @@ def train_one(seed: int, windows: np.ndarray, parts: dict[str, pd.DataFrame], sc
         for start in range(0, len(order), BATCH):
             idx = order[start : start + BATCH]
             x = torch.from_numpy(windows[tr_rows[idx]])
-            loss = loss_fn(model(x), torch.from_numpy(tr_target[idx]))
+            w = torch.from_numpy(tr_weight[idx])
+            loss = (loss_fn(model(x), torch.from_numpy(tr_target[idx])) * w).sum() / w.sum()
             optimiser.zero_grad()
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimiser.step()
-        val_rmse = rmse(va_delta, predict(model, windows, va["row"].to_numpy()) * scale)
+        val_error = va_delta - predict(model, windows, va["row"].to_numpy()) * scale
+        val_rmse = float(np.sqrt(np.average(val_error**2, weights=va_weight)))
         scheduler.step(val_rmse)
         history.append(round(val_rmse, 4))
         if val_rmse < best - 1e-4:
@@ -84,37 +93,43 @@ def train_one(seed: int, windows: np.ndarray, parts: dict[str, pd.DataFrame], sc
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
-    h = parser.parse_args().horizon
+    parser.add_argument("--storm-weight", type=float, default=1.0, help="loss weight at Dst <= -100 nT relative to quiet time")
+    args = parser.parse_args()
+    h, peak = args.horizon, args.storm_weight
+    tag = suffix(h) + weight_tag(peak)
     torch.set_num_threads(4)
     df = load_hourly()
     windows, meta = build_windows(df, horizon=h)
     parts = dict(zip(["train", "val", "test"], split(meta)))
     scale = float((parts["train"]["dst_target"] - parts["train"]["dst_lag0"]).std())
     n_params = sum(p.numel() for p in DstGRU(windows.shape[2], HIDDEN).parameters())
-    print(f"horizon: {h}h  channels: {windows.shape[2]}  window: {WINDOW}h  params: {n_params:,}  "
+    print(f"horizon: {h}h  storm weight: {peak:g}  channels: {windows.shape[2]}  window: {WINDOW}h  params: {n_params:,}  "
           + "  ".join(f"{k}: {len(v):,}" for k, v in parts.items()))
 
     te = parts["test"]
     te_rows, lag0 = te["row"].to_numpy(), te["dst_lag0"].to_numpy()
+    va = parts["val"]
+    va_rows, va_lag0 = va["row"].to_numpy(), va["dst_lag0"].to_numpy()
     (ROOT / "models").mkdir(exist_ok=True)
     (ROOT / "reports").mkdir(exist_ok=True)
     # Scaling statistics the live pipeline needs to prepare inputs without the training data.
     (ROOT / "models" / "gru_channels.json").write_text(json.dumps(channel_stats(df), indent=2) + "\n")
 
-    runs, seed_preds = [], {}
+    runs, seed_preds, val_preds = [], {}, []
     for seed in SEEDS:
         started = time.time()
-        model, info = train_one(seed, windows, parts, scale)
+        model, info = train_one(seed, windows, parts, scale, peak)
         seed_preds[seed] = lag0 + predict(model, windows, te_rows) * scale
+        val_preds.append(va_lag0 + predict(model, windows, va_rows) * scale)
         info["test_rmse"] = round(rmse(te["dst_target"].to_numpy(), seed_preds[seed]), 4)
         info["seconds"] = round(time.time() - started)
         runs.append(info)
         torch.save({"state_dict": model.state_dict(), "scale": scale, "hidden": HIDDEN, "window": WINDOW},
-                   ROOT / "models" / f"gru_dst_{h}h_seed{seed}.pt")
+                   ROOT / "models" / f"gru_dst_{h}h{weight_tag(peak)}_seed{seed}.pt")
         print({k: v for k, v in info.items() if k != "val_rmse_history"})
 
     predictions = {"persistence": lag0}
-    xgb_path = ROOT / "reports" / f"xgb_test_predictions{suffix(h)}.parquet"
+    xgb_path = ROOT / "reports" / f"xgb_test_predictions{tag}.parquet"
     if xgb_path.exists():
         xgb = pd.read_parquet(xgb_path)["xgboost (solar wind + Dst)"]
         if xgb.index.equals(te.index):
@@ -130,10 +145,15 @@ def main() -> None:
     scores = evaluate(te["dst_target"], predictions)
     pd.set_option("display.width", 200)
     print(scores.round(3).to_string(index=False))
+    # Choices such as the storm weight are made on these validation scores, never on test.
+    val_scores = evaluate(va["dst_target"], {"persistence": va_lag0, f"gru (mean of {len(SEEDS)} seeds)": np.mean(val_preds, axis=0)})
+    print("\nValidation:")
+    print(val_scores.round(3).to_string(index=False))
 
-    pd.DataFrame({"dst_observed": te["dst_target"], **predictions}).to_parquet(ROOT / "reports" / f"gru_test_predictions{suffix(h)}.parquet")
+    pd.DataFrame({"dst_observed": te["dst_target"], **predictions}).to_parquet(ROOT / "reports" / f"gru_test_predictions{tag}.parquet")
     report = {
         "horizon_hours": h,
+        "storm_weight": peak,
         "window_hours": WINDOW,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
@@ -143,8 +163,9 @@ def main() -> None:
         "hyperparameters": {"hidden": HIDDEN, "batch": BATCH, "lr": LR, "max_epochs": MAX_EPOCHS, "patience": PATIENCE},
         "runs": runs,
         "scores": json.loads(scores.round(4).to_json(orient="records")),
+        "validation_scores": json.loads(val_scores.round(4).to_json(orient="records")),
     }
-    (ROOT / "reports" / f"gru_baseline{suffix(h)}.json").write_text(json.dumps(report, indent=2) + "\n")
+    (ROOT / "reports" / f"gru_baseline{tag}.json").write_text(json.dumps(report, indent=2) + "\n")
 
 
 if __name__ == "__main__":
