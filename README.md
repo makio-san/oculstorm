@@ -91,12 +91,49 @@ Three seeds were trained; the headline GRU is their average.
 - Single seeds score 3.61 to 3.64 nT, still ahead of XGBoost; averaging the three seeds
   gives 3.58 nT, and averaging GRU with XGBoost gives 3.57 nT.
 
+## Longer horizons (3, 6 and 12 hours ahead)
+
+```bash
+.venv/bin/python scripts/train_xgb.py --horizon 6
+```
+
+```bash
+.venv/bin/python scripts/train_gru.py --horizon 6
+```
+
+Same inputs, same split and same models; only the target moves to Dst(t+h). Persistence
+("Dst stays where it is now") stays the reference. RMSE on the test years, in nT, with the
+MSE skill score against persistence in parentheses:
+
+| Lead time | Hours | Persistence | XGBoost | GRU | Storm hours: persistence | XGBoost | GRU |
+|---|---|---|---|---|---|---|---|
+| 1 h | 51,086 | 4.81 | 3.67 (0.42) | 3.58 (0.45) | 12.86 | 9.12 (0.50) | 8.73 (0.54) |
+| 3 h | 51,084 | 9.69 | 7.94 (0.33) | 7.78 (0.36) | 28.39 | 20.19 (0.49) | 20.24 (0.49) |
+| 6 h | 51,081 | 13.85 | 11.39 (0.32) | 11.10 (0.36) | 44.93 | 32.49 (0.48) | 34.53 (0.41) |
+| 12 h | 51,075 | 18.69 | 15.75 (0.29) | 15.02 (0.35) | 66.03 | 50.79 (0.41) | 52.45 (0.37) |
+
+- Both models beat persistence at every lead time, overall and in storms.
+- Errors grow quickly with lead time: 12 hours ahead the typical storm-time error is about
+  50 nT, so a 12 hour forecast tells you a storm is likely, not how deep it will get.
+- Overall the GRU stays ahead. From 6 hours on, XGBoost is better during storms
+  (and intense storms: 65 vs 71 nT at 6 h), while the GRU is better in quiet time.
+  These differences have no bootstrap intervals yet, so treat them as indicative.
+- Skill in storms holds up better than overall skill, because persistence fails worst
+  exactly when Dst changes fast.
+- The solar wind measured at L1 reaches Earth only 30 to 60 minutes later, so beyond about
+  one hour the models are extrapolating from the current state of the solar wind and the
+  ring current, not reading the future driver. That is the physical ceiling on these numbers.
+
+Only the 1 hour models are committed (the live forecast uses them); the others are
+reproducible with the commands above. Reports are in `reports/*_{3,6,12}h.json`.
+
 ## Dashboard
 
 Live: https://makio-san.github.io/oculstorm/
 
 A static page in `docs/` shows observed Dst against the GRU, XGBoost and persistence
-forecasts for any period of the test years, with the largest storms as presets, error
+forecasts for any period of the test years at a lead time of 1, 3, 6 or 12 hours, a chart of
+error against lead time, the largest storms as presets, error
 tiles for the selected period, a table view of every chart and the full scorecard.
 The hero shows the live forecast on a storm scale (quiet, moderate, intense, severe), the
 largest storms are one click replays with sparklines, and a light/dark switch sits in the top bar.
