@@ -7,3 +7,8 @@ docs/forecasts.csv
 __pycache__/
 .pytest_cache/
 .claude/
+
+# Only the models the live forecast uses are tracked; other horizons are reproducible from the training scripts.
+models/*
+!models/*_1h*
+!models/gru_channels.json
