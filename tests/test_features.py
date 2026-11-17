@@ -2,7 +2,9 @@
 import pandas as pd
 
 from oculstorm.data import load_hourly
-from oculstorm.features import HORIZON, build_features
+import pytest
+
+from oculstorm.features import HORIZONS, build_features
 
 CUT = pd.Timestamp("2024-05-10 12:00")
 
@@ -21,9 +23,13 @@ def test_features_do_not_depend_on_the_future():
     assert not X[X.index > CUT].head(50).equals(X_corrupted[X_corrupted.index > CUT].head(50))
 
 
-def test_target_is_dst_one_horizon_ahead():
+@pytest.mark.parametrize("horizon", HORIZONS)
+def test_target_is_dst_one_horizon_ahead(horizon):
     df = load_hourly("2024-01-01")
-    _, y = build_features(df)
-    expected = df["dst"].shift(-HORIZON).loc[y.index]
+    X, y = build_features(df, horizon=horizon)
+    expected = df["dst"].shift(-horizon).loc[y.index]
     assert (y == expected).all()
-    assert y.index.max() == df.index.max() - pd.Timedelta(hours=HORIZON)
+    assert y.index.max() == df.index.max() - pd.Timedelta(hours=horizon)
+    # The inputs are the same whatever the lead time; only the target moves.
+    X1, _ = build_features(df, horizon=1)
+    assert X.equals(X1.loc[X.index])
