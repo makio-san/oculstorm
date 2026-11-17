@@ -158,7 +158,15 @@
   .storm .status svg { width: 11px; height: 11px; }
   .storm svg.spark { width: 100%; height: 34px; margin-top: 6px; display: block; overflow: visible; }
   .filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin: 6px 0 14px; }
-  .filters label { display: grid; gap: 3px; font-size: 12px; color: var(--text-secondary); }
+  .filters label, .filters .field { display: grid; gap: 3px; font-size: 12px; color: var(--text-secondary); }
+  .seg { display: inline-flex; border: 1px solid var(--axis); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .seg button { border: 0; border-radius: 0; padding: 6px 12px; background: transparent; font-variant-numeric: tabular-nums; }
+  .seg button + button { border-left: 1px solid var(--axis); }
+  .seg button[aria-pressed="true"] { background: var(--text-primary); color: var(--surface); font-weight: 600; }
+  .seg[aria-busy="true"] { opacity: 0.6; }
+  .lead-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 28px; margin-top: 6px; }
+  @media (max-width: 720px) { .lead-grid { grid-template-columns: minmax(0, 1fr); } }
+  .lead-grid h4 { margin: 8px 0 0; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
 
   /* ---------- charts ---------- */
   .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text-secondary); font-size: 12.5px; }
@@ -278,6 +286,9 @@
     <h2 id="explore-title">Replay the biggest storms</h2>
     <div class="storms" id="storms" role="group" aria-label="Largest storms in the test period"></div>
     <div class="filters">
+      <div class="field" id="lead-field" hidden><span id="lead-label">Lead time</span>
+        <div class="seg" id="lead" role="group" aria-labelledby="lead-label"></div>
+      </div>
       <label>Period
         <select id="preset"></select>
       </label>
@@ -290,7 +301,7 @@
 
     <div class="card" style="margin-top:12px">
       <div class="card-head">
-        <h3>Dst index, observed vs forecast one hour earlier (nT)</h3>
+        <h3 id="dst-title">Dst index, observed vs forecast one hour earlier (nT)</h3>
         <button class="ghost" id="toggle-dst" aria-expanded="false">Show table</button>
       </div>
       <div class="legend" id="legend-dst"></div>
@@ -307,7 +318,7 @@
       <div class="plot" id="plot-err"></div>
       <div class="table-wrap" id="table-err" hidden></div>
     </div>
-    <p class="note">Each forecast for an hour was made with data up to the previous hour. Lower (more negative) Dst means a stronger storm; the shaded bands mark moderate, intense and severe levels.
+    <p class="note"><span id="lead-note">Each forecast for an hour was made with data up to the previous hour.</span> Lower (more negative) Dst means a stronger storm; the shaded bands mark moderate, intense and severe levels.
       Hover or focus a chart and use the arrow keys to read exact values.</p>
   </section>
 
@@ -315,7 +326,16 @@
     <div class="kicker">Evaluation</div>
     <h2 id="score-title">Does it beat persistence?</h2>
     <p class="note" id="score-note" style="margin:6px 0 14px"></p>
-    <div class="card" style="overflow-x:auto"><table class="score" id="score"></table></div>
+    <div class="card" id="lead-card" hidden>
+      <div class="card-head">
+        <h3>How far ahead does it pay off? Test error by lead time (RMSE, nT)</h3>
+        <button class="ghost" id="toggle-lead" aria-expanded="false">Show table</button>
+      </div>
+      <div class="legend" id="legend-lead"></div>
+      <div class="lead-grid" id="plot-lead"></div>
+      <div class="table-wrap" id="table-lead" hidden></div>
+    </div>
+    <div class="card" style="overflow-x:auto"><h3 id="score-title-lead" style="margin-bottom:6px"></h3><table class="score" id="score"></table></div>
     <p class="note">Bars show each model's RMSE relative to persistence in the same row group. Skill is the MSE skill score against persistence:
       0 means no better than "next hour equals this hour", 1 means perfect. Results are on the cleaned OMNI science product, so real-time performance will be lower.</p>
   </section>
@@ -330,10 +350,13 @@
 <script>
 (() => {
   "use strict";
-  const D = window.OCULSTORM;
+  // D, T0 and T_END follow the selected lead time; 1 hour is loaded with the page.
+  const BASE = window.OCULSTORM;
   const HOUR = 3600e3, DAY = 24 * HOUR, MAX_DAYS = 120;
-  const T0 = Date.parse(D.start + "Z");
-  const T_END = T0 + (D.hours - 1) * HOUR;
+  let D = BASE, horizon = 1;
+  let T0 = Date.parse(D.start + "Z");
+  let T_END = T0 + (D.hours - 1) * HOUR;
+  const leadText = (h) => (h === 1 ? "one hour" : h + " hours");
   const SERIES = {
     observed: { name: "Observed", color: "var(--observed)" },
     gru: { name: "GRU", color: "var(--gru)" },
@@ -511,13 +534,13 @@
   let chartCount = 0;
 
   function lineChart(ctx, host, height, keys, valueOf, opts = {}) {
-    const T0 = ctx.t0, gradient = "area-" + chartCount++;
+    const gradient = "area-" + chartCount++;
     const tooltip = el("div", { className: "tooltip" });
     const chart = { draw, hover };
     let geom = null;
 
     function draw(animate) {
-      const [lo, hi] = ctx.range(), n = hi - lo + 1;
+      const T0 = ctx.t0, [lo, hi] = ctx.range(), n = hi - lo + 1;
       const W = Math.max(320, host.clientWidth), M = { l: 46, r: opts.thresholds ? 78 : 14, t: 10, b: 26 };
       const pw = W - M.l - M.r, ph = height - M.t - M.b;
       let ymin = Infinity, ymax = -Infinity;
@@ -627,7 +650,7 @@
         if (v !== null) { dot.setAttribute("cx", px); dot.setAttribute("cy", y(v)); }
       }
       if (owner !== chart) { tooltip.style.display = "none"; return; }
-      tooltip.replaceChildren(el("div", { className: "when" }, stamp(T0 + i * HOUR)));
+      tooltip.replaceChildren(el("div", { className: "when" }, stamp(ctx.t0 + i * HOUR)));
       for (const k of Object.keys(SERIES).filter((s) => keys.includes(s))) {
         const row = el("div", { className: "row" });
         const key = el("span", { className: "key" }); key.style.borderColor = SERIES[k].color;
@@ -684,6 +707,8 @@
   const NAMES = { gru: "GRU", xgb: "XGBoost", persistence: "Persistence" };
   function renderScore() {
     const table = $("score"), head = el("tr");
+    table.replaceChildren();
+    $("score-title-lead").textContent = "Forecasts " + leadText(horizon) + " ahead";
     for (const h of ["Conditions", "Model", "RMSE (nT)", "", "MAE (nT)", "Skill"]) head.append(el("th", {}, h));
     head.children[1].style.textAlign = "left";
     table.append(head);
@@ -706,7 +731,7 @@
         table.append(row);
       });
     }
-    $("score-note").textContent = fmt(D.hours, 0) + " hourly forecasts from " + day(T0) + " to " + day(T_END) +
+    $("score-note").textContent = fmt(D.hours, 0) + " hourly forecasts, " + leadText(horizon) + " ahead, for " + day(T0) + " to " + day(T_END) +
       ", years the models never saw during training (trained on 1995 to 2016, tuned on 2017 to 2020). The best model in each group is in bold.";
   }
 
@@ -821,12 +846,143 @@
   }
   let liveChart = null;
 
+  // ---------- lead time ----------
+  const HORIZONS = Object.keys(BASE.horizons || { 1: 0 }).map(Number).sort((a, b) => a - b);
+  const LEAD_REGIMES = [["all", "All test hours"], ["storm (Dst <= -50)", "Storm hours (Dst ≤ -50 nT)"]];
+  const leadScore = (h, regime, m) => BASE.horizons[h].find((s) => s.regime === regime && s.model === m);
+
+  function renderLeadChart() {
+    if (HORIZONS.length < 2) return;
+    $("lead-card").hidden = false;
+    const host = $("plot-lead");
+    host.replaceChildren();
+    for (const [regime, title] of LEAD_REGIMES) {
+      const box = el("div", { className: "plot" }), tooltip = el("div", { className: "tooltip" });
+      box.append(el("h4", {}, title));
+      const W = Math.max(280, Math.floor((host.clientWidth - (host.clientWidth > 720 ? 28 : 0)) / (host.clientWidth > 720 ? 2 : 1))), H = 220;
+      const M = { l: 40, r: 64, t: 12, b: 28 }, pw = W - M.l - M.r, ph = H - M.t - M.b;
+      let ymax = 0;
+      for (const h of HORIZONS) for (const m of MODELS) ymax = Math.max(ymax, leadScore(h, regime, m).rmse);
+      const step = niceStep(ymax, 4); ymax = Math.ceil(ymax / step) * step;
+      const x = (j) => M.l + (j / (HORIZONS.length - 1)) * pw, y = (v) => M.t + (1 - v / ymax) * ph;
+      const root = svg("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", tabindex: 0,
+        "aria-label": title + ": RMSE of each model at " + HORIZONS.join(", ") + " hours ahead" });
+      for (let v = 0; v <= ymax + 1e-9; v += step) {
+        root.append(svg("line", { x1: M.l, x2: M.l + pw, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)" }));
+        root.append(svg("text", { x: M.l - 8, y: y(v) + 4, "text-anchor": "end" }, fmt(v, 0)));
+      }
+      HORIZONS.forEach((h, j) => root.append(svg("text", { x: x(j), y: H - 8, "text-anchor": "middle" }, h + " h")));
+      for (const m of [...MODELS].reverse()) {
+        const pts = HORIZONS.map((h, j) => [x(j), y(leadScore(h, regime, m).rmse)]);
+        root.append(svg("path", { d: pts.map((p, j) => (j ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(""),
+          fill: "none", stroke: SERIES[m].color, "stroke-width": m === "persistence" ? 1.5 : 2, "stroke-linejoin": "round" }));
+        for (const p of pts) root.append(svg("circle", { cx: p[0], cy: p[1], r: 4, fill: SERIES[m].color, stroke: "var(--surface)", "stroke-width": 2 }));
+      }
+      // Direct labels at the longest lead time, nudged apart when they would overlap.
+      const ends = MODELS.map((m) => ({ m, v: leadScore(HORIZONS.at(-1), regime, m).rmse })).sort((a, b) => a.v - b.v);
+      let last = Infinity;
+      for (const e of ends) {
+        const py = Math.min(y(e.v) + 4, last - 13); last = py;
+        root.append(svg("text", { x: x(HORIZONS.length - 1) + 10, y: py, fill: "var(--text-secondary)" }, NAMES[e.m]));
+      }
+      const cross = svg("line", { y1: M.t, y2: M.t + ph, stroke: "var(--muted)", visibility: "hidden" });
+      root.append(cross);
+      const show = (j) => {
+        if (j === null) { cross.setAttribute("visibility", "hidden"); tooltip.style.display = "none"; return; }
+        const h = HORIZONS[j];
+        cross.setAttribute("x1", x(j)); cross.setAttribute("x2", x(j)); cross.setAttribute("visibility", "visible");
+        tooltip.replaceChildren(el("div", { className: "when" }, h + " hours ahead, " + fmt(leadScore(h, regime, "gru").n_hours, 0) + " h"));
+        for (const m of MODELS) {
+          const s = leadScore(h, regime, m), row = el("div", { className: "row" }), key = el("span", { className: "key" });
+          key.style.borderColor = SERIES[m].color;
+          row.append(key, el("b", {}, fmt(s.rmse, 2)), el("span", { className: "name" }, NAMES[m] + (m === "persistence" ? "" : ", skill " + fmt(s.skill_vs_persistence, 2))));
+          tooltip.append(row);
+        }
+        tooltip.style.display = "block";
+        const scale = box.clientWidth / W, left = x(j) * scale;
+        tooltip.style.top = "30px";
+        tooltip.style.left = (left > box.clientWidth / 2 ? left - tooltip.offsetWidth - 14 : left + 14) + "px";
+      };
+      let current = null;
+      const hit = svg("rect", { x: 0, y: 0, width: W, height: H, fill: "transparent" });
+      hit.addEventListener("pointermove", (ev) => { const r = root.getBoundingClientRect(); current = clamp(Math.round(((ev.clientX - r.left) / r.width * W - M.l) / pw * (HORIZONS.length - 1)), 0, HORIZONS.length - 1); show(current); });
+      hit.addEventListener("pointerleave", () => { current = null; show(null); });
+      root.addEventListener("keydown", (ev) => {
+        const by = { ArrowLeft: -1, ArrowRight: 1 }[ev.key];
+        if (!by) return;
+        ev.preventDefault(); current = clamp((current ?? 0) + by, 0, HORIZONS.length - 1); show(current);
+      });
+      root.addEventListener("focus", () => { current = current ?? 0; show(current); });
+      root.addEventListener("blur", () => { current = null; show(null); });
+      root.append(hit);
+      box.append(root, tooltip);
+      host.append(box);
+    }
+  }
+  function leadTable() {
+    const table = el("table"), head = el("tr");
+    for (const h of ["Lead time", "Conditions", "GRU", "XGBoost", "Persistence", "GRU skill"]) head.append(el("th", {}, h));
+    table.append(head);
+    for (const h of HORIZONS) for (const [regime, title] of LEAD_REGIMES) {
+      const row = el("tr");
+      row.append(el("td", {}, h + " h"), el("td", {}, title));
+      for (const m of MODELS) row.append(el("td", {}, fmt(leadScore(h, regime, m).rmse, 2)));
+      row.append(el("td", {}, fmt(leadScore(h, regime, "gru").skill_vs_persistence, 2)));
+      table.append(row);
+    }
+    $("table-lead").replaceChildren(table);
+  }
+
+  const loaded = { 1: BASE };
+  function loadHorizon(h) {
+    if (loaded[h]) return Promise.resolve(loaded[h]);
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "data_" + h + "h.js";
+      script.onload = () => { loaded[h] = window.OCULSTORM_H[h]; resolve(loaded[h]); };
+      script.onerror = () => reject(new Error("could not load " + script.src));
+      document.head.append(script);
+    });
+  }
+  function syncLead() {
+    for (const b of $("lead").children) b.setAttribute("aria-pressed", String(Number(b.dataset.h) === horizon));
+    $("dst-title").textContent = "Dst index, observed vs forecast made " + leadText(horizon) + " earlier (nT)";
+    $("lead-note").textContent = horizon === 1
+      ? "Each forecast for an hour was made with data up to the previous hour."
+      : "Each forecast for an hour was made " + horizon + " hours earlier, with data up to that moment.";
+  }
+  async function setHorizon(h) {
+    if (h === horizon) return;
+    const from = T0 + state.lo * HOUR, to = T0 + state.hi * HOUR;
+    $("lead").setAttribute("aria-busy", "true");
+    try { D = await loadHorizon(h); }
+    catch (e) { $("range-note").textContent = "Could not load the " + h + " hour forecasts."; return; }
+    finally { $("lead").removeAttribute("aria-busy"); }
+    horizon = h;
+    T0 = Date.parse(D.start + "Z"); T_END = T0 + (D.hours - 1) * HOUR; explore.t0 = T0;
+    for (const id of ["from", "to"]) { $(id).min = day(T0); $(id).max = day(T_END); }
+    syncLead();
+    renderScore();
+    setRange(Math.max(from, T0), Math.min(to, T_END));
+  }
+  function buildLead() {
+    if (HORIZONS.length < 2) return;
+    $("lead-field").hidden = false;
+    for (const h of HORIZONS) {
+      const b = el("button", { type: "button" }, h + " h");
+      b.dataset.h = h;
+      b.addEventListener("click", () => setHorizon(h));
+      $("lead").append(b);
+    }
+    syncLead();
+  }
+
   // ---------- wiring ----------
   const dstKeys = ["persistence", "xgb", "gru", "observed"], errKeys = ["persistence", "xgb", "gru"];
   const dstValue = (k, i) => D[k][i];
   const errValue = (k, i) => Math.abs(D.observed[i] - D[k][i]);
   const legendOrder = ["observed", "gru", "xgb", "persistence"];
-  const dstChart = lineChart(explore, $("plot-dst"), 360, dstKeys, dstValue, { thresholds: true, area: "observed", label: "Line chart of observed Dst and the three one hour ahead forecasts" });
+  const dstChart = lineChart(explore, $("plot-dst"), 360, dstKeys, dstValue, { thresholds: true, area: "observed", label: "Line chart of observed Dst and the three forecasts for the selected lead time" });
   const errChart = lineChart(explore, $("plot-err"), 220, errKeys, errValue, { label: "Line chart of absolute forecast error for each model" });
   const refreshDst = wireToggle("toggle-dst", "table-dst", () => dataTable(explore, $("table-dst"), legendOrder, dstValue, (k) => (k === "observed" ? 0 : 1)));
   const refreshErr = wireToggle("toggle-err", "table-err", () => dataTable(explore, $("table-err"), legendOrder.slice(1), errValue, () => 1));
@@ -845,12 +1001,16 @@
   legend($("legend-err"), legendOrder.slice(1));
   buildPresets();
   buildStorms();
+  buildLead();
   renderScore();
+  renderLeadChart();
+  legend($("legend-lead"), ["gru", "xgb", "persistence"]);
+  wireToggle("toggle-lead", "table-lead", leadTable);
   $("preset").addEventListener("change", applyPreset);
   $("from").addEventListener("change", applyDates);
   $("to").addEventListener("change", applyDates);
   let resizeTimer;
-  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { dstChart.draw(false); errChart.draw(false); if (liveChart) liveChart.draw(false); }, 120); });
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { dstChart.draw(false); errChart.draw(false); if (liveChart) liveChart.draw(false); renderLeadChart(); }, 120); });
   applyPreset();
   renderLive();
 })();
