@@ -1,0 +1,233 @@
+{
+  "horizon_hours": 6,
+  "storm_weight": 10.0,
+  "train": "1995-01-01 .. 2017-01-01 (exclusive)",
+  "validation": "2017-01-01 .. 2021-01-01 (exclusive)",
+  "test": "2021-01-01 .. 2026-10-30 08:00:00",
+  "n_features": 89,
+  "best_iteration": 960,
+  "params": {
+    "n_estimators": 3000,
+    "learning_rate": 0.03,
+    "max_depth": 6,
+    "min_child_weight": 5,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "tree_method": "hist",
+    "early_stopping_rounds": 100,
+    "random_state": 0
+  },
+  "scores": [
+    {
+      "regime": "all",
+      "n_hours": 51081,
+      "model": "persistence",
+      "rmse": 13.8489,
+      "mae": 8.5018,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "all",
+      "n_hours": 51081,
+      "model": "trend persistence",
+      "rmse": 31.2323,
+      "mae": 20.1804,
+      "skill_vs_persistence": -4.086
+    },
+    {
+      "regime": "all",
+      "n_hours": 51081,
+      "model": "xgboost (Dst history only)",
+      "rmse": 13.9238,
+      "mae": 9.3456,
+      "skill_vs_persistence": -0.0108
+    },
+    {
+      "regime": "all",
+      "n_hours": 51081,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 12.122,
+      "mae": 8.0858,
+      "skill_vs_persistence": 0.2338
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48957,
+      "model": "persistence",
+      "rmse": 10.6087,
+      "mae": 7.585,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48957,
+      "model": "trend persistence",
+      "rmse": 26.1921,
+      "mae": 18.5887,
+      "skill_vs_persistence": -5.0956
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48957,
+      "model": "xgboost (Dst history only)",
+      "rmse": 11.9468,
+      "mae": 8.6918,
+      "skill_vs_persistence": -0.2682
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 48957,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 10.5468,
+      "mae": 7.5823,
+      "skill_vs_persistence": 0.0116
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "persistence",
+      "rmse": 44.927,
+      "mae": 29.6337,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "trend persistence",
+      "rmse": 87.4452,
+      "mae": 56.8682,
+      "skill_vs_persistence": -2.7884
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "xgboost (Dst history only)",
+      "rmse": 37.0509,
+      "mae": 24.4144,
+      "skill_vs_persistence": 0.3199
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 2124,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 31.1446,
+      "mae": 19.6896,
+      "skill_vs_persistence": 0.5194
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "persistence",
+      "rmse": 88.0866,
+      "mae": 65.2609,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "trend persistence",
+      "rmse": 167.3896,
+      "mae": 117.1739,
+      "skill_vs_persistence": -2.6111
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "xgboost (Dst history only)",
+      "rmse": 73.2788,
+      "mae": 54.3687,
+      "skill_vs_persistence": 0.3079
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 322,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 63.317,
+      "mae": 44.9024,
+      "skill_vs_persistence": 0.4833
+    }
+  ],
+  "validation_scores": [
+    {
+      "regime": "all",
+      "n_hours": 35064,
+      "model": "persistence",
+      "rmse": 9.1482,
+      "mae": 6.2361,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "all",
+      "n_hours": 35064,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 7.2728,
+      "mae": 5.1481,
+      "skill_vs_persistence": 0.368
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 34702,
+      "model": "persistence",
+      "rmse": 8.2836,
+      "mae": 6.0091,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 34702,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 6.7714,
+      "mae": 4.9994,
+      "skill_vs_persistence": 0.3318
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 362,
+      "model": "persistence",
+      "rmse": 39.0941,
+      "mae": 27.9972,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 362,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 26.9804,
+      "mae": 19.3993,
+      "skill_vs_persistence": 0.5237
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 35,
+      "model": "persistence",
+      "rmse": 70.4923,
+      "mae": 57.8,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 35,
+      "model": "xgboost (solar wind + Dst)",
+      "rmse": 58.716,
+      "mae": 49.2171,
+      "skill_vs_persistence": 0.3062
+    }
+  ],
+  "top_features_gain_share": {
+    "flow_pressure_lag0": 0.1078,
+    "b_mag_avg_lag0": 0.0964,
+    "dst_lag1": 0.0915,
+    "dst_lag0": 0.0738,
+    "dst_lag2": 0.0477,
+    "doy_sin": 0.035,
+    "f107": 0.0248,
+    "newell_lag0": 0.0243,
+    "bz_gsm_lag0": 0.0234,
+    "doy_cos": 0.0205,
+    "dst_min24": 0.0199,
+    "dst_diff1": 0.0199,
+    "dst_mean24": 0.0195,
+    "vbs_mean12": 0.0159,
+    "by_gsm_lag0": 0.0156
+  }
+}

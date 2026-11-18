@@ -1,0 +1,321 @@
+{
+  "horizon_hours": 6,
+  "storm_weight": 10.0,
+  "test_hours": 51081,
+  "block_hours": 168,
+  "resamples": 2000,
+  "regimes": {
+    "all": {
+      "n_hours": 51081,
+      "rmse": {
+        "persistence": {
+          "value": 13.849,
+          "ci95": [
+            12.536,
+            15.368
+          ]
+        },
+        "xgboost": {
+          "value": 11.388,
+          "ci95": [
+            10.428,
+            12.544
+          ]
+        },
+        "gru": {
+          "value": 11.104,
+          "ci95": [
+            10.007,
+            12.435
+          ]
+        },
+        "xgboost weighted": {
+          "value": 12.122,
+          "ci95": [
+            11.245,
+            13.147
+          ]
+        },
+        "gru weighted": {
+          "value": 11.994,
+          "ci95": [
+            10.978,
+            13.191
+          ]
+        }
+      },
+      "differences": {
+        "gru minus xgboost": {
+          "value": -0.284,
+          "ci95": [
+            -0.563,
+            0.001
+          ],
+          "significant": false,
+          "share_first_better": 0.975
+        },
+        "xgboost weighted minus xgboost": {
+          "value": 0.734,
+          "ci95": [
+            0.535,
+            0.911
+          ],
+          "significant": true,
+          "share_first_better": 0.0
+        },
+        "gru weighted minus gru": {
+          "value": 0.89,
+          "ci95": [
+            0.654,
+            1.145
+          ],
+          "significant": true,
+          "share_first_better": 0.0
+        },
+        "gru weighted minus xgboost weighted": {
+          "value": -0.128,
+          "ci95": [
+            -0.384,
+            0.148
+          ],
+          "significant": false,
+          "share_first_better": 0.832
+        }
+      }
+    },
+    "quiet (Dst > -50)": {
+      "n_hours": 48957,
+      "rmse": {
+        "persistence": {
+          "value": 10.609,
+          "ci95": [
+            10.289,
+            10.924
+          ]
+        },
+        "xgboost": {
+          "value": 9.462,
+          "ci95": [
+            9.063,
+            9.846
+          ]
+        },
+        "gru": {
+          "value": 8.771,
+          "ci95": [
+            8.471,
+            9.063
+          ]
+        },
+        "xgboost weighted": {
+          "value": 10.547,
+          "ci95": [
+            10.105,
+            10.974
+          ]
+        },
+        "gru weighted": {
+          "value": 10.224,
+          "ci95": [
+            9.812,
+            10.649
+          ]
+        }
+      },
+      "differences": {
+        "gru minus xgboost": {
+          "value": -0.691,
+          "ci95": [
+            -0.873,
+            -0.513
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        },
+        "xgboost weighted minus xgboost": {
+          "value": 1.085,
+          "ci95": [
+            0.962,
+            1.216
+          ],
+          "significant": true,
+          "share_first_better": 0.0
+        },
+        "gru weighted minus gru": {
+          "value": 1.453,
+          "ci95": [
+            1.265,
+            1.656
+          ],
+          "significant": true,
+          "share_first_better": 0.0
+        },
+        "gru weighted minus xgboost weighted": {
+          "value": -0.323,
+          "ci95": [
+            -0.507,
+            -0.123
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        }
+      }
+    },
+    "storm (Dst <= -50)": {
+      "n_hours": 2124,
+      "rmse": {
+        "persistence": {
+          "value": 44.927,
+          "ci95": [
+            37.281,
+            53.152
+          ]
+        },
+        "xgboost": {
+          "value": 32.486,
+          "ci95": [
+            26.469,
+            39.504
+          ]
+        },
+        "gru": {
+          "value": 34.526,
+          "ci95": [
+            27.523,
+            42.3
+          ]
+        },
+        "xgboost weighted": {
+          "value": 31.145,
+          "ci95": [
+            25.057,
+            37.66
+          ]
+        },
+        "gru weighted": {
+          "value": 32.409,
+          "ci95": [
+            25.283,
+            40.164
+          ]
+        }
+      },
+      "differences": {
+        "gru minus xgboost": {
+          "value": 2.04,
+          "ci95": [
+            0.641,
+            3.315
+          ],
+          "significant": true,
+          "share_first_better": 0.002
+        },
+        "xgboost weighted minus xgboost": {
+          "value": -1.341,
+          "ci95": [
+            -2.267,
+            -0.463
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        },
+        "gru weighted minus gru": {
+          "value": -2.117,
+          "ci95": [
+            -2.845,
+            -1.47
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        },
+        "gru weighted minus xgboost weighted": {
+          "value": 1.264,
+          "ci95": [
+            -0.341,
+            2.893
+          ],
+          "significant": false,
+          "share_first_better": 0.08
+        }
+      }
+    },
+    "intense (Dst <= -100)": {
+      "n_hours": 322,
+      "rmse": {
+        "persistence": {
+          "value": 88.087,
+          "ci95": [
+            68.162,
+            104.589
+          ]
+        },
+        "xgboost": {
+          "value": 65.331,
+          "ci95": [
+            49.25,
+            80.899
+          ]
+        },
+        "gru": {
+          "value": 70.972,
+          "ci95": [
+            52.947,
+            87.87
+          ]
+        },
+        "xgboost weighted": {
+          "value": 63.317,
+          "ci95": [
+            47.59,
+            77.529
+          ]
+        },
+        "gru weighted": {
+          "value": 67.737,
+          "ci95": [
+            49.219,
+            84.383
+          ]
+        }
+      },
+      "differences": {
+        "gru minus xgboost": {
+          "value": 5.641,
+          "ci95": [
+            1.664,
+            8.886
+          ],
+          "significant": true,
+          "share_first_better": 0.002
+        },
+        "xgboost weighted minus xgboost": {
+          "value": -2.014,
+          "ci95": [
+            -4.426,
+            0.765
+          ],
+          "significant": false,
+          "share_first_better": 0.908
+        },
+        "gru weighted minus gru": {
+          "value": -3.235,
+          "ci95": [
+            -4.961,
+            -1.78
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        },
+        "gru weighted minus xgboost weighted": {
+          "value": 4.42,
+          "ci95": [
+            -0.091,
+            7.944
+          ],
+          "significant": false,
+          "share_first_better": 0.029
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,321 @@
+{
+  "horizon_hours": 12,
+  "storm_weight": 10.0,
+  "test_hours": 51075,
+  "block_hours": 168,
+  "resamples": 2000,
+  "regimes": {
+    "all": {
+      "n_hours": 51075,
+      "rmse": {
+        "persistence": {
+          "value": 18.685,
+          "ci95": [
+            16.435,
+            21.242
+          ]
+        },
+        "xgboost": {
+          "value": 15.746,
+          "ci95": [
+            13.983,
+            17.84
+          ]
+        },
+        "gru": {
+          "value": 15.016,
+          "ci95": [
+            13.039,
+            17.314
+          ]
+        },
+        "xgboost weighted": {
+          "value": 17.357,
+          "ci95": [
+            15.751,
+            19.268
+          ]
+        },
+        "gru weighted": {
+          "value": 16.053,
+          "ci95": [
+            14.22,
+            18.221
+          ]
+        }
+      },
+      "differences": {
+        "gru minus xgboost": {
+          "value": -0.73,
+          "ci95": [
+            -1.146,
+            -0.372
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        },
+        "xgboost weighted minus xgboost": {
+          "value": 1.611,
+          "ci95": [
+            1.287,
+            1.933
+          ],
+          "significant": true,
+          "share_first_better": 0.0
+        },
+        "gru weighted minus gru": {
+          "value": 1.037,
+          "ci95": [
+            0.768,
+            1.293
+          ],
+          "significant": true,
+          "share_first_better": 0.0
+        },
+        "gru weighted minus xgboost weighted": {
+          "value": -1.304,
+          "ci95": [
+            -1.803,
+            -0.859
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        }
+      }
+    },
+    "quiet (Dst > -50)": {
+      "n_hours": 48951,
+      "rmse": {
+        "persistence": {
+          "value": 13.232,
+          "ci95": [
+            12.815,
+            13.668
+          ]
+        },
+        "xgboost": {
+          "value": 12.114,
+          "ci95": [
+            11.485,
+            12.769
+          ]
+        },
+        "gru": {
+          "value": 10.767,
+          "ci95": [
+            10.357,
+            11.161
+          ]
+        },
+        "xgboost weighted": {
+          "value": 14.647,
+          "ci95": [
+            13.908,
+            15.392
+          ]
+        },
+        "gru weighted": {
+          "value": 12.61,
+          "ci95": [
+            12.058,
+            13.093
+          ]
+        }
+      },
+      "differences": {
+        "gru minus xgboost": {
+          "value": -1.347,
+          "ci95": [
+            -1.753,
+            -0.985
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        },
+        "xgboost weighted minus xgboost": {
+          "value": 2.533,
+          "ci95": [
+            2.314,
+            2.752
+          ],
+          "significant": true,
+          "share_first_better": 0.0
+        },
+        "gru weighted minus gru": {
+          "value": 1.843,
+          "ci95": [
+            1.623,
+            2.031
+          ],
+          "significant": true,
+          "share_first_better": 0.0
+        },
+        "gru weighted minus xgboost weighted": {
+          "value": -2.037,
+          "ci95": [
+            -2.471,
+            -1.657
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        }
+      }
+    },
+    "storm (Dst <= -50)": {
+      "n_hours": 2124,
+      "rmse": {
+        "persistence": {
+          "value": 66.034,
+          "ci95": [
+            53.626,
+            79.344
+          ]
+        },
+        "xgboost": {
+          "value": 50.793,
+          "ci95": [
+            39.849,
+            62.034
+          ]
+        },
+        "gru": {
+          "value": 52.445,
+          "ci95": [
+            40.965,
+            64.347
+          ]
+        },
+        "xgboost weighted": {
+          "value": 47.958,
+          "ci95": [
+            36.382,
+            59.453
+          ]
+        },
+        "gru weighted": {
+          "value": 50.318,
+          "ci95": [
+            38.305,
+            62.575
+          ]
+        }
+      },
+      "differences": {
+        "gru minus xgboost": {
+          "value": 1.652,
+          "ci95": [
+            0.451,
+            2.705
+          ],
+          "significant": true,
+          "share_first_better": 0.002
+        },
+        "xgboost weighted minus xgboost": {
+          "value": -2.835,
+          "ci95": [
+            -3.83,
+            -2.017
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        },
+        "gru weighted minus gru": {
+          "value": -2.127,
+          "ci95": [
+            -3.292,
+            -1.354
+          ],
+          "significant": true,
+          "share_first_better": 1.0
+        },
+        "gru weighted minus xgboost weighted": {
+          "value": 2.36,
+          "ci95": [
+            0.501,
+            3.764
+          ],
+          "significant": true,
+          "share_first_better": 0.005
+        }
+      }
+    },
+    "intense (Dst <= -100)": {
+      "n_hours": 322,
+      "rmse": {
+        "persistence": {
+          "value": 128.805,
+          "ci95": [
+            95.58,
+            156.948
+          ]
+        },
+        "xgboost": {
+          "value": 106.692,
+          "ci95": [
+            78.36,
+            131.045
+          ]
+        },
+        "gru": {
+          "value": 110.847,
+          "ci95": [
+            80.831,
+            136.761
+          ]
+        },
+        "xgboost weighted": {
+          "value": 103.557,
+          "ci95": [
+            74.667,
+            127.546
+          ]
+        },
+        "gru weighted": {
+          "value": 108.552,
+          "ci95": [
+            77.119,
+            135.1
+          ]
+        }
+      },
+      "differences": {
+        "gru minus xgboost": {
+          "value": 4.155,
+          "ci95": [
+            0.403,
+            6.625
+          ],
+          "significant": true,
+          "share_first_better": 0.012
+        },
+        "xgboost weighted minus xgboost": {
+          "value": -3.135,
+          "ci95": [
+            -5.693,
+            -0.798
+          ],
+          "significant": true,
+          "share_first_better": 0.993
+        },
+        "gru weighted minus gru": {
+          "value": -2.295,
+          "ci95": [
+            -5.211,
+            -0.579
+          ],
+          "significant": true,
+          "share_first_better": 0.999
+        },
+        "gru weighted minus xgboost weighted": {
+          "value": 4.995,
+          "ci95": [
+            -0.564,
+            8.54
+          ],
+          "significant": false,
+          "share_first_better": 0.037
+        }
+      }
+    }
+  }
+}

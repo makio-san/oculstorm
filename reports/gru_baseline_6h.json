@@ -1,5 +1,6 @@
 {
   "horizon_hours": 6,
+  "storm_weight": 1.0,
   "window_hours": 24,
   "train": "1995-01-01 .. 2017-01-01 (exclusive)",
   "validation": "2017-01-01 .. 2021-01-01 (exclusive)",
@@ -21,7 +22,7 @@
       "val_rmse_history": [
         7.1864,
         7.196,
-        7.064,
+        7.0639,
         6.9803,
         7.1291,
         7.0853,
@@ -31,7 +32,7 @@
         7.0247
       ],
       "test_rmse": 11.3768,
-      "seconds": 78
+      "seconds": 96
     },
     {
       "seed": 1,
@@ -50,7 +51,7 @@
         7.1461
       ],
       "test_rmse": 11.0835,
-      "seconds": 76
+      "seconds": 96
     },
     {
       "seed": 2,
@@ -70,7 +71,7 @@
         7.0891
       ],
       "test_rmse": 11.2263,
-      "seconds": 86
+      "seconds": 92
     }
   ],
   "scores": [
@@ -233,6 +234,72 @@
       "rmse": 67.0762,
       "mae": 46.4492,
       "skill_vs_persistence": 0.4201
+    }
+  ],
+  "validation_scores": [
+    {
+      "regime": "all",
+      "n_hours": 35064,
+      "model": "persistence",
+      "rmse": 9.1482,
+      "mae": 6.2361,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "all",
+      "n_hours": 35064,
+      "model": "gru (mean of 3 seeds)",
+      "rmse": 6.9218,
+      "mae": 4.7906,
+      "skill_vs_persistence": 0.4275
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 34702,
+      "model": "persistence",
+      "rmse": 8.2836,
+      "mae": 6.0091,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "quiet (Dst > -50)",
+      "n_hours": 34702,
+      "model": "gru (mean of 3 seeds)",
+      "rmse": 6.3179,
+      "mae": 4.6245,
+      "skill_vs_persistence": 0.4183
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 362,
+      "model": "persistence",
+      "rmse": 39.0941,
+      "mae": 27.9972,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "storm (Dst <= -50)",
+      "n_hours": 362,
+      "model": "gru (mean of 3 seeds)",
+      "rmse": 28.5372,
+      "mae": 20.7134,
+      "skill_vs_persistence": 0.4672
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 35,
+      "model": "persistence",
+      "rmse": 70.4923,
+      "mae": 57.8,
+      "skill_vs_persistence": 0.0
+    },
+    {
+      "regime": "intense (Dst <= -100)",
+      "n_hours": 35,
+      "model": "gru (mean of 3 seeds)",
+      "rmse": 59.4829,
+      "mae": 49.4444,
+      "skill_vs_persistence": 0.288
     }
   ]
 }
