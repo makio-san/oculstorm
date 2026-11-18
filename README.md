@@ -117,7 +117,7 @@ MSE skill score against persistence in parentheses:
   50 nT, so a 12 hour forecast tells you a storm is likely, not how deep it will get.
 - Overall the GRU stays ahead. From 6 hours on, XGBoost is better during storms
   (and intense storms: 65 vs 71 nT at 6 h), while the GRU is better in quiet time.
-  These differences have no bootstrap intervals yet, so treat them as indicative.
+  Both differences are significant, see the bootstrap intervals below.
 - Skill in storms holds up better than overall skill, because persistence fails worst
   exactly when Dst changes fast.
 - The solar wind measured at L1 reaches Earth only 30 to 60 minutes later, so beyond about
@@ -126,6 +126,52 @@ MSE skill score against persistence in parentheses:
 
 Only the 1 hour models are committed (the live forecast uses them); the others are
 reproducible with the commands above. Reports are in `reports/*_{3,6,12}h.json`.
+
+## Storm weighting and significance
+
+```bash
+.venv/bin/python scripts/train_xgb.py --horizon 6 --storm-weight 10
+```
+
+```bash
+.venv/bin/python scripts/train_gru.py --horizon 6 --storm-weight 10
+```
+
+```bash
+.venv/bin/python scripts/compare_models.py --horizon 6 --storm-weight 10
+```
+
+Storm hours are about 4% of the record, so a plain loss is dominated by quiet time.
+`--storm-weight K` gives every training hour a weight that rises linearly from 1 at
+Dst >= 0 nT to K at Dst <= -100 nT, in the loss and in the validation score used for early
+stopping. K = 10 was picked on the validation years (XGBoost at 1 h, K = 1, 3, 10:
+validation storm RMSE 7.17, 7.13, 7.02 nT), never on test.
+
+`compare_models.py` puts a 95% interval on every RMSE and on every difference between two
+models. Test hours are resampled in one week blocks (errors an hour apart are not
+independent) and all models share the same resamples, so a difference is significant when
+its interval excludes zero. Test RMSE in nT, weighted runs after the arrow; **bold** marks a
+significant change:
+
+| Lead time | Storm hours: XGBoost | GRU | Quiet hours: XGBoost | GRU | All hours: XGBoost | GRU |
+|---|---|---|---|---|---|---|
+| 1 h | 9.12 → 8.99 | 8.73 → **8.49** | 3.24 → **3.27** | 3.17 → **3.27** | 3.67 → 3.69 | 3.58 → **3.64** |
+| 3 h | 20.19 → **19.59** | 20.24 → **19.45** | 6.94 → **7.42** | 6.73 → **7.48** | 7.94 → **8.29** | 7.78 → **8.33** |
+| 6 h | 32.49 → **31.14** | 34.53 → **32.41** | 9.46 → **10.55** | 8.77 → **10.22** | 11.39 → **12.12** | 11.10 → **11.99** |
+| 12 h | 50.79 → **47.96** | 52.45 → **50.32** | 12.11 → **14.65** | 10.77 → **12.61** | 15.75 → **17.36** | 15.02 → **16.05** |
+
+- Weighting buys storm accuracy with quiet-time accuracy, and the trade gets steeper with
+  lead time: at 12 h XGBoost gains 2.8 nT in storms and loses 2.5 nT in quiet time.
+  It is a choice of what the forecast is for, not a free improvement.
+- At 1 h the gain is small: 0.24 nT for the GRU in storms, at a cost of 0.10 nT in quiet time.
+- GRU against XGBoost (unweighted): the GRU is significantly better overall at 1, 3 and 12 h
+  and in quiet time at every lead time; XGBoost is significantly better in storms at 6 and
+  12 h (by 2.0 and 1.7 nT) and in intense storms at 6 and 12 h (by 5.6 and 4.2 nT).
+- Intervals on intense storms (322 hours, a handful of events) are wide; most differences
+  there are not significant.
+
+The live forecast keeps the unweighted 1 hour models. Reports are in
+`reports/comparison{,_3h,_6h,_12h}.json` and `reports/*_sw10.json`.
 
 ## Dashboard
 
@@ -208,18 +254,19 @@ Run the leakage tests with:
 ```
 oculstorm/data.py          load the hourly table, chronological split
 oculstorm/features.py      backward-looking lag and coupling features
-oculstorm/metrics.py       persistence baselines, RMSE / MAE / skill by regime
+oculstorm/metrics.py       persistence baselines, RMSE / MAE / skill by regime, storm weights, block bootstrap
 oculstorm/sequences.py     24 hour input windows for the GRU
 oculstorm/gru.py           GRU model definition
 scripts/train_xgb.py       train XGBoost, score against persistence
 scripts/train_gru.py       train the GRU, score against persistence and XGBoost
+scripts/compare_models.py  bootstrap intervals for RMSE differences between models
 scripts/build_dashboard.py export test predictions to docs/data.js
 oculstorm/live.py          NOAA real-time inputs as an OMNI-style hourly table
 oculstorm/archive.py       append-only log of forecasts issued in real time
 scripts/live_forecast.py   live forecast and 6 day hindcast -> docs/live.js
 models/                    trained models used by the live forecast
 docs/                      static dashboard (index.html + generated data.js)
-tests/                     look-ahead leakage, live table and archive tests
+tests/                     look-ahead leakage, live table, archive and metric tests
 reports/                   metrics (tracked) and test predictions (ignored)
 scripts/build_dataset.py   raw OMNI2 -> data/kaggle/omni2_hourly.parquet
 data/raw/                  downloaded NASA files (ignored)
