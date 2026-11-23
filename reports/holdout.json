@@ -1,0 +1,47 @@
+{
+  "cutoff": "2026-10-30T13:00",
+  "newest_omni_hour": "2026-11-16T12:00",
+  "first_target_hour": "2026-10-31T14:00",
+  "last_target_hour": "2026-11-16T12:00",
+  "horizon_hours": 1,
+  "warmup_hours": 23,
+  "hours": 383,
+  "storm_hours": 2,
+  "storm_threshold_nt": -50.0,
+  "skill": "1 - MSE_model / MSE_persistence",
+  "all": {
+    "hours": 383,
+    "persistence": {
+      "rmse": 3.648
+    },
+    "gru": {
+      "rmse": 3.323,
+      "skill": 0.1702
+    },
+    "xgb": {
+      "rmse": 3.501,
+      "skill": 0.0789
+    }
+  },
+  "storm": {
+    "hours": 2,
+    "persistence": {
+      "rmse": 8.0
+    },
+    "gru": {
+      "rmse": 7.733,
+      "skill": 0.0656
+    },
+    "xgb": {
+      "rmse": 6.335,
+      "skill": 0.3728
+    }
+  },
+  "models": {
+    "models/xgb_dst_1h.ubj": "d5dcfffe5161a1a76a8ed26499fd364b9a852d13",
+    "models/gru_channels.json": "f276800094095041ddacdfd9bc7338219984a432",
+    "models/gru_dst_1h_seed0.pt": "f92c3f730e734db343bbc3fc53ae4f22100f073e",
+    "models/gru_dst_1h_seed1.pt": "f2cd61df7938ab2174b0414d523722ec260b278f",
+    "models/gru_dst_1h_seed2.pt": "b71145b9147da4b3b1a233ccf8f7097ae2e90809"
+  }
+}
