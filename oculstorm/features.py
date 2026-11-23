@@ -11,6 +11,8 @@ import pandas as pd
 HORIZON = 1  # default hours ahead
 HORIZONS = (1, 3, 6, 12)  # lead times the models are trained for
 N_LAGS = 6  # hours of history given to the model (lag 0 .. N_LAGS-1)
+MEMORY_TAUS = (3, 8, 24)  # e-folding times (hours) of the optional decaying driver memory
+MEMORY_DRIVERS = ("vbs", "newell")
 
 def suffix(horizon: int) -> str:
     """File name suffix for reports of a horizon; the 1 hour files keep their original names."""
@@ -43,8 +45,18 @@ def _coupling(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def decaying_memory(x: pd.Series, tau: float) -> pd.Series:
+    """Causal exponentially weighted mean of `x` with e-folding time `tau` hours.
+
+    m(t) = a * x(t) + (1 - a) * m(t-1) with a = 1 - exp(-1/tau), so it uses hour t and earlier
+    only. Missing hours keep the last value and the weights of older hours decay through the gap.
+    """
+    return x.ewm(alpha=1 - np.exp(-1 / tau), adjust=False).mean()
+
+
 def build_features(
-    df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON
+    df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON,
+    memory: tuple[float, ...] = (),
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y) where y is Dst at t+horizon and X only looks backwards from t.
 
@@ -53,6 +65,9 @@ def build_features(
     With use_solar_wind=False only the Dst history and calendar terms are kept,
     which shows how much of the skill actually comes from the solar wind.
     With require_target=False the newest hours, whose target is not known yet, are kept.
+    `memory` lists time constants (hours) of decaying means of VBs and the Newell function
+    (see MEMORY_TAUS); empty, the default, adds none. They are computed on the full hourly
+    index before any row is dropped.
     """
     cols: dict[str, pd.Series] = {}
     dst = df["dst"]
@@ -72,6 +87,9 @@ def build_features(
         for name in ["vbs", "newell", "bz_gsm", "flow_speed"]:
             for window in (3, 12):
                 cols[f"{name}_mean{window}"] = drivers[name].rolling(window, min_periods=1).mean()
+        for name in MEMORY_DRIVERS:
+            for tau in memory:
+                cols[f"{name}_ewm{tau:g}"] = decaying_memory(drivers[name], tau)
         cols["f107"] = df["f107"]
 
     # Dst has a diurnal and a semiannual (Russell-McPherron) modulation.
