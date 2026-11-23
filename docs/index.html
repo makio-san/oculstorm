@@ -20,7 +20,7 @@
     --grid: #e6e7ed; --axis: #c4c7d1; --border: rgba(15,20,40,0.10);
     --observed: #0b0d12; --gru: #2a78d6; --xgb: #eb6834; --persistence: #898781;
     --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
-    --wash: rgba(15,20,40,0.05);
+    --wash: rgba(15,20,40,0.05); --band-opacity: 0.16;
     --shadow: 0 1px 2px rgba(15,20,40,0.04), 0 10px 28px rgba(15,20,40,0.06);
   }
   @media (prefers-color-scheme: dark) {
@@ -30,7 +30,7 @@
       --text-primary: #eef0f5; --text-secondary: #b4b9c6; --muted: #7f8594;
       --grid: #222632; --axis: #363b4a; --border: rgba(255,255,255,0.10);
       --observed: #eef0f5; --gru: #3987e5; --xgb: #d95926; --persistence: #898781;
-      --wash: rgba(255,255,255,0.06);
+      --wash: rgba(255,255,255,0.06); --band-opacity: 0.24;
       --shadow: none;
     }
   }
@@ -40,7 +40,7 @@
     --text-primary: #eef0f5; --text-secondary: #b4b9c6; --muted: #7f8594;
     --grid: #222632; --axis: #363b4a; --border: rgba(255,255,255,0.10);
     --observed: #eef0f5; --gru: #3987e5; --xgb: #d95926; --persistence: #898781;
-    --wash: rgba(255,255,255,0.06);
+    --wash: rgba(255,255,255,0.06); --band-opacity: 0.24;
     --shadow: none;
   }
   * { box-sizing: border-box; }
@@ -175,6 +175,8 @@
   .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text-secondary); font-size: 12.5px; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .key { width: 16px; height: 0; border-top: 2px solid; border-radius: 1px; display: inline-block; }
+  .key.band { height: 10px; border: 0; border-radius: 2px; background: var(--gru); opacity: var(--band-opacity); }
+  .plot path.band { fill: var(--gru); fill-opacity: var(--band-opacity); stroke: none; }
   .plot { position: relative; }
   .plot svg { display: block; width: 100%; overflow: visible; }
   .plot text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
@@ -271,6 +273,7 @@
       <div class="legend" id="legend-live"></div>
       <div class="plot" id="plot-live"></div>
       <div class="table-wrap" id="table-live" hidden></div>
+      <p class="note" id="band-note" hidden style="margin:10px 0 0"></p>
     </div>
     <div class="card" id="record" hidden style="overflow-x:auto">
       <div class="card-head">
@@ -365,6 +368,7 @@
     gru: { name: "GRU", color: "var(--gru)" },
     xgb: { name: "XGBoost", color: "var(--xgb)" },
     persistence: { name: "Persistence", color: "var(--persistence)" },
+    band: { name: "Typical error (80%)", color: "var(--gru)", area: true },
   };
   const MODELS = ["gru", "xgb", "persistence"];
   const THRESHOLDS = [[-50, "moderate"], [-100, "intense"], [-250, "severe"]];
@@ -548,6 +552,7 @@
       const pw = W - M.l - M.r, ph = height - M.t - M.b;
       let ymin = Infinity, ymax = -Infinity;
       for (const k of keys) for (let i = lo; i <= hi; i++) { const v = valueOf(k, i); if (v === null) continue; if (v < ymin) ymin = v; if (v > ymax) ymax = v; }
+      if (opts.band) for (let i = lo; i <= hi; i++) { const b = opts.band(i); if (b) { ymin = Math.min(ymin, b[0]); ymax = Math.max(ymax, b[1]); } }
       ymin = Math.min(ymin, 0); ymax = Math.max(ymax, opts.thresholds ? 20 : 1);
       const step = niceStep(ymax - ymin, 5);
       ymin = Math.floor(ymin / step) * step; ymax = Math.ceil(ymax / step) * step;
@@ -597,6 +602,18 @@
         }
         close();
         root.append(svg("path", { d, fill: `url(#${gradient})`, stroke: "none", class: animate ? "fade" : "" }));
+      }
+      // Error band: one closed shape per run of hours that have it, under the lines.
+      if (opts.band) {
+        let d = "", run = [];
+        const close = () => {
+          if (run.length) d += run.map((i, j) => (j ? "L" : "M") + x(i).toFixed(1) + " " + y(opts.band(i)[1]).toFixed(1)).join("") +
+            run.slice().reverse().map((i) => "L" + x(i).toFixed(1) + " " + y(opts.band(i)[0]).toFixed(1)).join("") + "Z";
+          run = [];
+        };
+        for (let i = lo; i <= hi; i++) { if (opts.band(i)) run.push(i); else close(); }
+        close();
+        root.append(svg("path", { d, class: "band" + (animate ? " fade" : "") }));
       }
       for (const k of keys) {
         let d = "", pen = false;
@@ -660,6 +677,12 @@
         row.append(key, el("b", {}, valueOf(k, i) === null ? "pending" : fmt(valueOf(k, i), k === "observed" && opts.thresholds ? 0 : 1)), el("span", { className: "name" }, SERIES[k].name));
         tooltip.append(row);
       }
+      const b = opts.band && opts.band(i);
+      if (b) {
+        const row = el("div", { className: "row" });
+        row.append(el("span", { className: "key band" }), el("b", {}, fmt(b[0]) + " to " + fmt(b[1])), el("span", { className: "name" }, SERIES.band.name));
+        tooltip.append(row);
+      }
       tooltip.style.display = "block";
       const scale = host.clientWidth / W, left = px * scale;
       tooltip.style.top = M.t + 6 + "px";
@@ -673,8 +696,8 @@
   function legend(host, keys) {
     host.replaceChildren();
     for (const k of keys) {
-      const item = el("span"), key = el("span", { className: "key" });
-      key.style.borderColor = SERIES[k].color;
+      const item = el("span"), key = el("span", { className: SERIES[k].area ? "key band" : "key" });
+      if (!SERIES[k].area) key.style.borderColor = SERIES[k].color;
       item.append(key, document.createTextNode(SERIES[k].name));
       host.append(item);
     }
@@ -690,7 +713,10 @@
     for (let i = hi; i >= lo; i--) {
       const row = el("tr");
       row.append(el("td", {}, stamp(T0 + i * HOUR).replace(" UTC", "")));
-      for (const k of keys) row.append(el("td", {}, valueOf(k, i) === null ? "pending" : fmt(valueOf(k, i), digitsOf(k))));
+      for (const k of keys) {
+        const v = valueOf(k, i);
+        row.append(el("td", {}, v === null ? "pending" : typeof v === "string" ? v : fmt(v, digitsOf(k))));
+      }
       table.append(row);
     }
     host.replaceChildren(table);
@@ -839,15 +865,39 @@
       detail("persistence " + fmt(r.persistence, 2) + ", XGBoost " + fmt(r.xgb, 2) + " nT over the last " + L.hindcast.hours + " hours; skill " + fmt(skill, 2)), "gru");
 
     const ctx = { t0, range: () => [0, last], group: [], hover: null };
-    const value = (k, i) => L[k][i];
-    const chart = lineChart(ctx, $("plot-live"), 320, dstKeys, value, { thresholds: true, area: "observed", endDot: "gru", label: "Line chart of observed quick-look Dst and one hour ahead forecasts over the last seven days" });
-    legend($("legend-live"), legendOrder);
-    wireToggle("toggle-live", "table-live", () => dataTable(ctx, $("table-live"), legendOrder, value, (k) => (k === "observed" ? 0 : 1)));
+    // Older payloads have no error band: then the chart, legend and table are as before.
+    const hasBand = Array.isArray(L.band_low) && Array.isArray(L.band_high) && L.band_low.length === L.hours;
+    const band = hasBand ? (i) => (L.band_low[i] === null || L.band_high[i] === null ? null : [L.band_low[i], L.band_high[i]]) : null;
+    const value = (k, i) => {
+      if (k !== "band") return L[k][i];
+      const b = band(i);
+      return b ? fmt(b[0]) + " to " + fmt(b[1]) : null;
+    };
+    const liveKeys = hasBand ? [...legendOrder.slice(0, 2), "band", ...legendOrder.slice(2)] : legendOrder;
+    const chart = lineChart(ctx, $("plot-live"), 320, dstKeys, value, { thresholds: true, area: "observed", endDot: "gru", band,
+      label: "Line chart of observed quick-look Dst and one hour ahead forecasts over the last seven days" + (hasBand ? ", with the typical GRU error range shaded" : "") });
+    legend($("legend-live"), liveKeys);
+    wireToggle("toggle-live", "table-live", () => dataTable(ctx, $("table-live"), liveKeys, value, (k) => (k === "observed" ? 0 : 1)));
+    renderBandNote(L, hasBand);
     chart.draw(true);
     liveChart = chart;
     renderRecord(L.archive);
   }
   let liveChart = null;
+
+  function renderBandNote(L, hasBand) {
+    const note = $("band-note"), info = L.error_band;
+    note.hidden = !(hasBand && info && info.regimes);
+    if (note.hidden) return;
+    const last = L.hours - 1, name = L.band_regime && L.band_regime[last];
+    const r = info.regimes.find((g) => g.name === name);
+    const years = info.period.slice(0, 4) + " to " + info.period.slice(-10, -6);
+    note.textContent = "Shaded: the range that held 80% of the GRU's one hour errors in " + years +
+      " (validation years, never the test years), taken for the Dst regime the forecast was issued in." +
+      (r ? " With " + r.label.replace(/<=/g, "≤") + " now (" + r.name + "), the hour ahead typically lands between " + fmt(L.band_low[last]) + " and " + fmt(L.band_high[last]) +
+        " nT; this regime's band rests on " + fmt(r.hours, 0) + " hours" + (r.hours < 100 ? ", few, so it is rough" : "") + "." : "") +
+      " Separate from how much the models disagree.";
+  }
 
   // ---------- lead time ----------
   const HORIZONS = Object.keys(BASE.horizons || { 1: 0 }).map(Number).sort((a, b) => a - b);
