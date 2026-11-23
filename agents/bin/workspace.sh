@@ -14,6 +14,7 @@ AGENT="${1:?usage: workspace.sh <agent>}"
 ROOT="${OCULSTORM_AGENTS_ROOT:-/Users/esma/Projects/oculstorm-agents}"
 BASE="$ROOT/base"
 WORK="$ROOT/work/$AGENT"
+REF="origin/${OCULSTORM_REF:-main}"  # another branch only when testing agents before a merge
 
 mkdir -p "$ROOT/work" "$ROOT/logs"
 if [ ! -d "$BASE/.git" ]; then
@@ -23,11 +24,11 @@ git -C "$BASE" fetch -q --prune origin
 git -C "$BASE" worktree prune
 
 if [ ! -e "$WORK/.git" ]; then
-  git -C "$BASE" worktree add -q --detach "$WORK" origin/main
+  git -C "$BASE" worktree add -q --detach "$WORK" "$REF"
 fi
 
 cd "$WORK"
-git checkout -q -f --detach origin/main
-git reset -q --hard origin/main
+git checkout -q -f --detach "$REF"
+git reset -q --hard "$REF"
 git clean -fdq
 echo "$WORK"
