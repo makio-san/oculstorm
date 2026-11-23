@@ -4,7 +4,7 @@
 # Usage: bash agents/bin/workspace.sh <agent>
 # Prints the worktree path: $OCULSTORM_AGENTS_ROOT/work/<agent>
 # (OCULSTORM_AGENTS_ROOT defaults to /Users/esma/Projects/oculstorm-agents; the orchestra
-# sets it to /Users/esma/Projects/oculstorm_orchestra)
+# sets it to /Users/esma/Projects/oculstorm_orchestra_work)
 #
 # Every run starts from the newest origin/main with no local changes. Ignored files
 # (a downloaded parquet, data/raw) survive so a run that crashed can still clean them up.
