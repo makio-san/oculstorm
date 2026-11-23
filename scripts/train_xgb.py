@@ -1,9 +1,10 @@
 """Train the XGBoost baseline and compare it with persistence on the held out test years.
 
-Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K]
+Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-current]
 Writes: models/xgb_dst_{H}h{_swK}.ubj, reports/xgb_baseline{_Hh}{_swK}.json,
 reports/xgb_test_predictions{_Hh}{_swK}.parquet
-(the 1 hour reports keep their names without the suffix; _swK only when K is not 1)
+(the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
+--ring-current adds the O'Brien and McPherron terms and the tag _rc to every file name)
 """
 import argparse
 import json
@@ -53,14 +54,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
     parser.add_argument("--storm-weight", type=float, default=1.0, help="loss weight at Dst <= -100 nT relative to quiet time")
+    parser.add_argument("--ring-current", action="store_true", help="add the O'Brien and McPherron (2000) ring current terms")
     args = parser.parse_args()
     h, peak = args.horizon, args.storm_weight
-    tag = suffix(h) + weight_tag(peak)
+    rc = "_rc" if args.ring_current else ""
+    tag = suffix(h) + weight_tag(peak) + rc
     df = load_hourly()
-    X, y = build_features(df, horizon=h)
+    X, y = build_features(df, horizon=h, ring_current=args.ring_current)
     X_dst, _ = build_features(df, use_solar_wind=False, horizon=h)
     (_, X_va, X_te), (_, y_va, y_te) = split(X), split(y)
-    print(f"horizon: {h}h  storm weight: {peak:g}  features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}  test: {len(X_te):,}")
+    print(f"horizon: {h}h  storm weight: {peak:g}  ring current: {args.ring_current}  features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}  test: {len(X_te):,}")
 
     model, val_pred, pred = fit(X, y, peak)
     model_dst, _, pred_dst = fit(X_dst, y, peak)
@@ -87,11 +90,12 @@ def main() -> None:
 
     (ROOT / "models").mkdir(exist_ok=True)
     (ROOT / "reports").mkdir(exist_ok=True)
-    model.save_model(ROOT / "models" / f"xgb_dst_{h}h{weight_tag(peak)}.ubj")
+    model.save_model(ROOT / "models" / f"xgb_dst_{h}h{weight_tag(peak)}{rc}.ubj")
     pd.DataFrame({"dst_observed": y_te, **predictions}).to_parquet(ROOT / "reports" / f"xgb_test_predictions{tag}.parquet")
     report = {
         "horizon_hours": h,
         "storm_weight": peak,
+        "ring_current": args.ring_current,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
         "test": f"{TEST_START} .. {y_te.index.max()}",

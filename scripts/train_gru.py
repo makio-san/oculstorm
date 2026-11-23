@@ -1,9 +1,10 @@
 """Train the small GRU and compare it with persistence and the XGBoost baseline.
 
-Usage: python scripts/train_gru.py [--horizon H] [--storm-weight K]
+Usage: python scripts/train_gru.py [--horizon H] [--storm-weight K] [--ring-current]
 Writes: models/gru_dst_{H}h{_swK}_seed*.pt, models/gru_channels.json, reports/gru_baseline{_Hh}{_swK}.json,
 reports/gru_test_predictions{_Hh}{_swK}.parquet
-(the 1 hour reports keep their names without the suffix; _swK only when K is not 1)
+(the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
+--ring-current adds the Dst* and Burton step channels and the tag _rc to every file name)
 """
 import argparse
 import json
@@ -94,12 +95,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
     parser.add_argument("--storm-weight", type=float, default=1.0, help="loss weight at Dst <= -100 nT relative to quiet time")
+    parser.add_argument("--ring-current", action="store_true", help="add the O'Brien and McPherron (2000) Dst* and Burton step channels")
     args = parser.parse_args()
     h, peak = args.horizon, args.storm_weight
-    tag = suffix(h) + weight_tag(peak)
+    rc = "_rc" if args.ring_current else ""
+    tag = suffix(h) + weight_tag(peak) + rc
     torch.set_num_threads(4)
     df = load_hourly()
-    windows, meta = build_windows(df, horizon=h)
+    windows, meta = build_windows(df, horizon=h, ring_current=args.ring_current)
     parts = dict(zip(["train", "val", "test"], split(meta)))
     scale = float((parts["train"]["dst_target"] - parts["train"]["dst_lag0"]).std())
     n_params = sum(p.numel() for p in DstGRU(windows.shape[2], HIDDEN).parameters())
@@ -113,7 +116,7 @@ def main() -> None:
     (ROOT / "models").mkdir(exist_ok=True)
     (ROOT / "reports").mkdir(exist_ok=True)
     # Scaling statistics the live pipeline needs to prepare inputs without the training data.
-    (ROOT / "models" / "gru_channels.json").write_text(json.dumps(channel_stats(df), indent=2) + "\n")
+    (ROOT / "models" / f"gru_channels{rc}.json").write_text(json.dumps(channel_stats(df, args.ring_current), indent=2) + "\n")
 
     runs, seed_preds, val_preds = [], {}, []
     for seed in SEEDS:
@@ -125,7 +128,7 @@ def main() -> None:
         info["seconds"] = round(time.time() - started)
         runs.append(info)
         torch.save({"state_dict": model.state_dict(), "scale": scale, "hidden": HIDDEN, "window": WINDOW},
-                   ROOT / "models" / f"gru_dst_{h}h{weight_tag(peak)}_seed{seed}.pt")
+                   ROOT / "models" / f"gru_dst_{h}h{weight_tag(peak)}{rc}_seed{seed}.pt")
         print({k: v for k, v in info.items() if k != "val_rmse_history"})
 
     predictions = {"persistence": lag0}
@@ -154,6 +157,7 @@ def main() -> None:
     report = {
         "horizon_hours": h,
         "storm_weight": peak,
+        "ring_current": args.ring_current,
         "window_hours": WINDOW,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
