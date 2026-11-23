@@ -1,0 +1,1157 @@
+{
+  "model": "xgboost",
+  "horizon_hours": 1,
+  "storm_weight": 1.0,
+  "date": "2026-11-23",
+  "agent": "tuner",
+  "split": {
+    "train": "1995-01-01 .. 2017-01-01 (exclusive)",
+    "validation": "2017-01-01 .. 2021-01-01 (exclusive)",
+    "test": "not used"
+  },
+  "note": "Early stopping uses the validation set, as in scripts/train_xgb.py, so validation RMSE is slightly optimistic for every configuration alike. Sampling: Latin hypercube around the current values, seed 20261123; configuration 0 is the current production configuration.",
+  "fixed": {
+    "n_estimators": 3000,
+    "tree_method": "hist",
+    "early_stopping_rounds": 100,
+    "random_state": 0,
+    "n_jobs": 3
+  },
+  "search_space": {
+    "max_depth": "4..8",
+    "min_child_weight": "1..20 log",
+    "learning_rate": "0.02..0.06 log",
+    "subsample": "0.6..1.0",
+    "colsample_bytree": "0.5..1.0",
+    "n_lags": "3..12"
+  },
+  "n_configurations": 24,
+  "wall_seconds": 2882.9,
+  "configurations": [
+    {
+      "id": 0,
+      "current": true,
+      "params": {
+        "max_depth": 6,
+        "min_child_weight": 5.0,
+        "learning_rate": 0.03,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "n_lags": 6
+      },
+      "n_features": 89,
+      "best_iteration": 2151,
+      "hit_tree_cap": false,
+      "fit_seconds": 74.9,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6565,
+          "mse": 7.0568,
+          "skill_vs_persistence": 0.3788
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5678,
+          "mse": 6.5937,
+          "skill_vs_persistence": 0.3703
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1727,
+          "mse": 51.448,
+          "skill_vs_persistence": 0.4671
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.6867,
+          "mse": 136.5794,
+          "skill_vs_persistence": 0.4635
+        }
+      }
+    },
+    {
+      "id": 1,
+      "current": false,
+      "params": {
+        "max_depth": 6,
+        "min_child_weight": 1.116,
+        "learning_rate": 0.0514,
+        "subsample": 0.777,
+        "colsample_bytree": 0.561,
+        "n_lags": 9
+      },
+      "n_features": 125,
+      "best_iteration": 1093,
+      "hit_tree_cap": false,
+      "fit_seconds": 58.1,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6628,
+          "mse": 7.0905,
+          "skill_vs_persistence": 0.3758
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5743,
+          "mse": 6.6271,
+          "skill_vs_persistence": 0.3671
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1772,
+          "mse": 51.512,
+          "skill_vs_persistence": 0.4664
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.2079,
+          "mse": 125.6168,
+          "skill_vs_persistence": 0.5066
+        }
+      }
+    },
+    {
+      "id": 2,
+      "current": false,
+      "params": {
+        "max_depth": 6,
+        "min_child_weight": 4.332,
+        "learning_rate": 0.0488,
+        "subsample": 0.924,
+        "colsample_bytree": 0.884,
+        "n_lags": 7
+      },
+      "n_features": 101,
+      "best_iteration": 1318,
+      "hit_tree_cap": false,
+      "fit_seconds": 79.9,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6656,
+          "mse": 7.1053,
+          "skill_vs_persistence": 0.3745
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5755,
+          "mse": 6.6332,
+          "skill_vs_persistence": 0.3665
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.2366,
+          "mse": 52.3681,
+          "skill_vs_persistence": 0.4575
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.5999,
+          "mse": 134.5584,
+          "skill_vs_persistence": 0.4714
+        }
+      }
+    },
+    {
+      "id": 3,
+      "current": false,
+      "params": {
+        "max_depth": 7,
+        "min_child_weight": 6.162,
+        "learning_rate": 0.033,
+        "subsample": 0.706,
+        "colsample_bytree": 0.84,
+        "n_lags": 4
+      },
+      "n_features": 65,
+      "best_iteration": 1311,
+      "hit_tree_cap": false,
+      "fit_seconds": 73.7,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6652,
+          "mse": 7.1032,
+          "skill_vs_persistence": 0.3747
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.578,
+          "mse": 6.6459,
+          "skill_vs_persistence": 0.3653
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1377,
+          "mse": 50.9468,
+          "skill_vs_persistence": 0.4723
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.0489,
+          "mse": 122.0786,
+          "skill_vs_persistence": 0.5205
+        }
+      }
+    },
+    {
+      "id": 4,
+      "current": false,
+      "params": {
+        "max_depth": 6,
+        "min_child_weight": 11.857,
+        "learning_rate": 0.0243,
+        "subsample": 0.615,
+        "colsample_bytree": 0.929,
+        "n_lags": 9
+      },
+      "n_features": 125,
+      "best_iteration": 2554,
+      "hit_tree_cap": false,
+      "fit_seconds": 183.3,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.659,
+          "mse": 7.07,
+          "skill_vs_persistence": 0.3776
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5688,
+          "mse": 6.5988,
+          "skill_vs_persistence": 0.3698
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.2278,
+          "mse": 52.2405,
+          "skill_vs_persistence": 0.4588
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.8261,
+          "mse": 139.8563,
+          "skill_vs_persistence": 0.4506
+        }
+      }
+    },
+    {
+      "id": 5,
+      "current": false,
+      "params": {
+        "max_depth": 4,
+        "min_child_weight": 2.542,
+        "learning_rate": 0.0563,
+        "subsample": 0.757,
+        "colsample_bytree": 0.726,
+        "n_lags": 6
+      },
+      "n_features": 89,
+      "best_iteration": 1658,
+      "hit_tree_cap": false,
+      "fit_seconds": 71.9,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6709,
+          "mse": 7.1335,
+          "skill_vs_persistence": 0.372
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5842,
+          "mse": 6.6783,
+          "skill_vs_persistence": 0.3622
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1254,
+          "mse": 50.772,
+          "skill_vs_persistence": 0.4741
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.7536,
+          "mse": 138.1469,
+          "skill_vs_persistence": 0.4573
+        }
+      }
+    },
+    {
+      "id": 6,
+      "current": false,
+      "params": {
+        "max_depth": 5,
+        "min_child_weight": 3.805,
+        "learning_rate": 0.0233,
+        "subsample": 0.936,
+        "colsample_bytree": 0.581,
+        "n_lags": 11
+      },
+      "n_features": 149,
+      "best_iteration": 2813,
+      "hit_tree_cap": false,
+      "fit_seconds": 227.1,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6576,
+          "mse": 7.0627,
+          "skill_vs_persistence": 0.3783
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5703,
+          "mse": 6.6064,
+          "skill_vs_persistence": 0.3691
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1276,
+          "mse": 50.8028,
+          "skill_vs_persistence": 0.4737
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.433,
+          "mse": 130.7134,
+          "skill_vs_persistence": 0.4865
+        }
+      }
+    },
+    {
+      "id": 7,
+      "current": false,
+      "params": {
+        "max_depth": 4,
+        "min_child_weight": 1.356,
+        "learning_rate": 0.0459,
+        "subsample": 0.695,
+        "colsample_bytree": 0.704,
+        "n_lags": 7
+      },
+      "n_features": 101,
+      "best_iteration": 2557,
+      "hit_tree_cap": false,
+      "fit_seconds": 135.9,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6624,
+          "mse": 7.0883,
+          "skill_vs_persistence": 0.376
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5754,
+          "mse": 6.6327,
+          "skill_vs_persistence": 0.3666
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1247,
+          "mse": 50.762,
+          "skill_vs_persistence": 0.4742
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.1322,
+          "mse": 123.9261,
+          "skill_vs_persistence": 0.5132
+        }
+      }
+    },
+    {
+      "id": 8,
+      "current": false,
+      "params": {
+        "max_depth": 7,
+        "min_child_weight": 3.033,
+        "learning_rate": 0.0434,
+        "subsample": 0.898,
+        "colsample_bytree": 0.811,
+        "n_lags": 12
+      },
+      "n_features": 161,
+      "best_iteration": 862,
+      "hit_tree_cap": false,
+      "fit_seconds": 115.1,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6643,
+          "mse": 7.0985,
+          "skill_vs_persistence": 0.3751
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5718,
+          "mse": 6.6142,
+          "skill_vs_persistence": 0.3683
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.3163,
+          "mse": 53.5277,
+          "skill_vs_persistence": 0.4455
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 12.492,
+          "mse": 156.0489,
+          "skill_vs_persistence": 0.387
+        }
+      }
+    },
+    {
+      "id": 9,
+      "current": false,
+      "params": {
+        "max_depth": 8,
+        "min_child_weight": 5.223,
+        "learning_rate": 0.0318,
+        "subsample": 0.679,
+        "colsample_bytree": 0.637,
+        "n_lags": 3
+      },
+      "n_features": 53,
+      "best_iteration": 918,
+      "hit_tree_cap": false,
+      "fit_seconds": 37.0,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6665,
+          "mse": 7.1103,
+          "skill_vs_persistence": 0.3741
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5792,
+          "mse": 6.652,
+          "skill_vs_persistence": 0.3647
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1445,
+          "mse": 51.0439,
+          "skill_vs_persistence": 0.4712
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 10.7275,
+          "mse": 115.0803,
+          "skill_vs_persistence": 0.5479
+        }
+      }
+    },
+    {
+      "id": 10,
+      "current": false,
+      "params": {
+        "max_depth": 7,
+        "min_child_weight": 6.49,
+        "learning_rate": 0.0262,
+        "subsample": 0.628,
+        "colsample_bytree": 0.982,
+        "n_lags": 3
+      },
+      "n_features": 53,
+      "best_iteration": 1498,
+      "hit_tree_cap": false,
+      "fit_seconds": 53.7,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6619,
+          "mse": 7.0857,
+          "skill_vs_persistence": 0.3762
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5766,
+          "mse": 6.6391,
+          "skill_vs_persistence": 0.366
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0643,
+          "mse": 49.9046,
+          "skill_vs_persistence": 0.483
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 10.6121,
+          "mse": 112.6158,
+          "skill_vs_persistence": 0.5576
+        }
+      }
+    },
+    {
+      "id": 11,
+      "current": false,
+      "params": {
+        "max_depth": 7,
+        "min_child_weight": 8.002,
+        "learning_rate": 0.0521,
+        "subsample": 0.826,
+        "colsample_bytree": 0.653,
+        "n_lags": 8
+      },
+      "n_features": 113,
+      "best_iteration": 793,
+      "hit_tree_cap": false,
+      "fit_seconds": 63.5,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6585,
+          "mse": 7.0677,
+          "skill_vs_persistence": 0.3778
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5738,
+          "mse": 6.6247,
+          "skill_vs_persistence": 0.3673
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0379,
+          "mse": 49.532,
+          "skill_vs_persistence": 0.4869
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.5411,
+          "mse": 133.1979,
+          "skill_vs_persistence": 0.4768
+        }
+      }
+    },
+    {
+      "id": 12,
+      "current": false,
+      "params": {
+        "max_depth": 8,
+        "min_child_weight": 8.303,
+        "learning_rate": 0.0268,
+        "subsample": 0.752,
+        "colsample_bytree": 0.772,
+        "n_lags": 9
+      },
+      "n_features": 125,
+      "best_iteration": 1336,
+      "hit_tree_cap": false,
+      "fit_seconds": 141.2,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.661,
+          "mse": 7.0808,
+          "skill_vs_persistence": 0.3767
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5699,
+          "mse": 6.6042,
+          "skill_vs_persistence": 0.3693
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.2646,
+          "mse": 52.7747,
+          "skill_vs_persistence": 0.4533
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.596,
+          "mse": 134.4672,
+          "skill_vs_persistence": 0.4718
+        }
+      }
+    },
+    {
+      "id": 13,
+      "current": false,
+      "params": {
+        "max_depth": 8,
+        "min_child_weight": 2.383,
+        "learning_rate": 0.0388,
+        "subsample": 0.735,
+        "colsample_bytree": 0.954,
+        "n_lags": 6
+      },
+      "n_features": 89,
+      "best_iteration": 876,
+      "hit_tree_cap": false,
+      "fit_seconds": 140.2,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6689,
+          "mse": 7.123,
+          "skill_vs_persistence": 0.373
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5744,
+          "mse": 6.6274,
+          "skill_vs_persistence": 0.3671
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.3911,
+          "mse": 54.6285,
+          "skill_vs_persistence": 0.4341
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.8969,
+          "mse": 141.5366,
+          "skill_vs_persistence": 0.444
+        }
+      }
+    },
+    {
+      "id": 14,
+      "current": false,
+      "params": {
+        "max_depth": 5,
+        "min_child_weight": 10.279,
+        "learning_rate": 0.0353,
+        "subsample": 0.882,
+        "colsample_bytree": 0.789,
+        "n_lags": 3
+      },
+      "n_features": 53,
+      "best_iteration": 2102,
+      "hit_tree_cap": false,
+      "fit_seconds": 52.0,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6635,
+          "mse": 7.094,
+          "skill_vs_persistence": 0.3755
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5827,
+          "mse": 6.6702,
+          "skill_vs_persistence": 0.363
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 6.9078,
+          "mse": 47.7171,
+          "skill_vs_persistence": 0.5057
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 9.619,
+          "mse": 92.5253,
+          "skill_vs_persistence": 0.6365
+        }
+      }
+    },
+    {
+      "id": 15,
+      "current": false,
+      "params": {
+        "max_depth": 6,
+        "min_child_weight": 1.221,
+        "learning_rate": 0.0225,
+        "subsample": 0.873,
+        "colsample_bytree": 0.598,
+        "n_lags": 6
+      },
+      "n_features": 89,
+      "best_iteration": 2754,
+      "hit_tree_cap": false,
+      "fit_seconds": 146.8,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6574,
+          "mse": 7.0619,
+          "skill_vs_persistence": 0.3783
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5665,
+          "mse": 6.5867,
+          "skill_vs_persistence": 0.371
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.2534,
+          "mse": 52.6113,
+          "skill_vs_persistence": 0.455
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.8635,
+          "mse": 140.7415,
+          "skill_vs_persistence": 0.4471
+        }
+      }
+    },
+    {
+      "id": 16,
+      "current": false,
+      "params": {
+        "max_depth": 5,
+        "min_child_weight": 16.824,
+        "learning_rate": 0.0297,
+        "subsample": 0.802,
+        "colsample_bytree": 0.977,
+        "n_lags": 12
+      },
+      "n_features": 161,
+      "best_iteration": 3000,
+      "hit_tree_cap": true,
+      "fit_seconds": 221.5,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6635,
+          "mse": 7.0941,
+          "skill_vs_persistence": 0.3755
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5736,
+          "mse": 6.6236,
+          "skill_vs_persistence": 0.3674
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.2241,
+          "mse": 52.1881,
+          "skill_vs_persistence": 0.4594
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.8425,
+          "mse": 140.2448,
+          "skill_vs_persistence": 0.4491
+        }
+      }
+    },
+    {
+      "id": 17,
+      "current": false,
+      "params": {
+        "max_depth": 8,
+        "min_child_weight": 1.928,
+        "learning_rate": 0.0573,
+        "subsample": 0.833,
+        "colsample_bytree": 0.62,
+        "n_lags": 11
+      },
+      "n_features": 149,
+      "best_iteration": 554,
+      "hit_tree_cap": false,
+      "fit_seconds": 69.8,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6704,
+          "mse": 7.131,
+          "skill_vs_persistence": 0.3723
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5769,
+          "mse": 6.6402,
+          "skill_vs_persistence": 0.3659
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.3608,
+          "mse": 54.181,
+          "skill_vs_persistence": 0.4387
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 12.1981,
+          "mse": 148.7946,
+          "skill_vs_persistence": 0.4155
+        }
+      }
+    },
+    {
+      "id": 18,
+      "current": false,
+      "params": {
+        "max_depth": 4,
+        "min_child_weight": 19.731,
+        "learning_rate": 0.0409,
+        "subsample": 0.649,
+        "colsample_bytree": 0.747,
+        "n_lags": 8
+      },
+      "n_features": 113,
+      "best_iteration": 2970,
+      "hit_tree_cap": true,
+      "fit_seconds": 136.7,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6715,
+          "mse": 7.1369,
+          "skill_vs_persistence": 0.3717
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5801,
+          "mse": 6.6569,
+          "skill_vs_persistence": 0.3643
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.2904,
+          "mse": 53.1492,
+          "skill_vs_persistence": 0.4494
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 12.2498,
+          "mse": 150.0576,
+          "skill_vs_persistence": 0.4105
+        }
+      }
+    },
+    {
+      "id": 19,
+      "current": false,
+      "params": {
+        "max_depth": 4,
+        "min_child_weight": 1.73,
+        "learning_rate": 0.0359,
+        "subsample": 0.85,
+        "colsample_bytree": 0.851,
+        "n_lags": 11
+      },
+      "n_features": 149,
+      "best_iteration": 2919,
+      "hit_tree_cap": true,
+      "fit_seconds": 230.5,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6632,
+          "mse": 7.0924,
+          "skill_vs_persistence": 0.3757
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5763,
+          "mse": 6.6375,
+          "skill_vs_persistence": 0.3661
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1203,
+          "mse": 50.6981,
+          "skill_vs_persistence": 0.4748
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.7189,
+          "mse": 137.3328,
+          "skill_vs_persistence": 0.4605
+        }
+      }
+    },
+    {
+      "id": 20,
+      "current": false,
+      "params": {
+        "max_depth": 6,
+        "min_child_weight": 13.234,
+        "learning_rate": 0.0202,
+        "subsample": 0.991,
+        "colsample_bytree": 0.687,
+        "n_lags": 5
+      },
+      "n_features": 77,
+      "best_iteration": 2987,
+      "hit_tree_cap": true,
+      "fit_seconds": 123.0,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6586,
+          "mse": 7.0682,
+          "skill_vs_persistence": 0.3778
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.573,
+          "mse": 6.6203,
+          "skill_vs_persistence": 0.3678
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0711,
+          "mse": 50.0002,
+          "skill_vs_persistence": 0.4821
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.0726,
+          "mse": 122.6029,
+          "skill_vs_persistence": 0.5184
+        }
+      }
+    },
+    {
+      "id": 21,
+      "current": false,
+      "params": {
+        "max_depth": 4,
+        "min_child_weight": 13.842,
+        "learning_rate": 0.042,
+        "subsample": 0.959,
+        "colsample_bytree": 0.912,
+        "n_lags": 10
+      },
+      "n_features": 137,
+      "best_iteration": 2934,
+      "hit_tree_cap": true,
+      "fit_seconds": 187.4,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6597,
+          "mse": 7.0738,
+          "skill_vs_persistence": 0.3773
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5766,
+          "mse": 6.6391,
+          "skill_vs_persistence": 0.366
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 6.982,
+          "mse": 48.748,
+          "skill_vs_persistence": 0.495
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.1927,
+          "mse": 125.2756,
+          "skill_vs_persistence": 0.5079
+        }
+      }
+    },
+    {
+      "id": 22,
+      "current": false,
+      "params": {
+        "max_depth": 5,
+        "min_child_weight": 3.238,
+        "learning_rate": 0.0283,
+        "subsample": 0.663,
+        "colsample_bytree": 0.516,
+        "n_lags": 5
+      },
+      "n_features": 77,
+      "best_iteration": 2966,
+      "hit_tree_cap": true,
+      "fit_seconds": 144.8,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.658,
+          "mse": 7.0649,
+          "skill_vs_persistence": 0.3781
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5704,
+          "mse": 6.607,
+          "skill_vs_persistence": 0.369
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1386,
+          "mse": 50.9597,
+          "skill_vs_persistence": 0.4721
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.367,
+          "mse": 129.2087,
+          "skill_vs_persistence": 0.4924
+        }
+      }
+    },
+    {
+      "id": 23,
+      "current": false,
+      "params": {
+        "max_depth": 8,
+        "min_child_weight": 1.534,
+        "learning_rate": 0.0216,
+        "subsample": 0.968,
+        "colsample_bytree": 0.525,
+        "n_lags": 5
+      },
+      "n_features": 77,
+      "best_iteration": 1668,
+      "hit_tree_cap": false,
+      "fit_seconds": 112.3,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6598,
+          "mse": 7.0748,
+          "skill_vs_persistence": 0.3772
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5683,
+          "mse": 6.596,
+          "skill_vs_persistence": 0.3701
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.278,
+          "mse": 52.9686,
+          "skill_vs_persistence": 0.4513
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.5084,
+          "mse": 132.4442,
+          "skill_vs_persistence": 0.4797
+        }
+      }
+    }
+  ],
+  "best_overall": {
+    "id": 0,
+    "params": {
+      "max_depth": 6,
+      "min_child_weight": 5.0,
+      "learning_rate": 0.03,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "n_lags": 6
+    },
+    "bootstrap_vs_current": {
+      "n_hours_common": 35064,
+      "block_hours": 168,
+      "n_boot": 2000,
+      "all": {
+        "mse_change": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "storm (Dst <= -50)": {
+        "mse_change": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ]
+      }
+    }
+  },
+  "best_storm_id": 14,
+  "promising": true,
+  "storm_candidates_vs_current": {
+    "block_hours": 168,
+    "n_boot": 2000,
+    "candidates": [
+      {
+        "id": 14,
+        "params": {
+          "max_depth": 5,
+          "min_child_weight": 10.279,
+          "learning_rate": 0.0353,
+          "subsample": 0.882,
+          "colsample_bytree": 0.789,
+          "n_lags": 3
+        },
+        "all": {
+          "mse_change": 0.0053,
+          "ci95": [
+            -0.0059,
+            0.0143
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0725,
+          "ci95": [
+            -0.1494,
+            0.0363
+          ]
+        },
+        "meets_storm_bar": false
+      },
+      {
+        "id": 21,
+        "params": {
+          "max_depth": 4,
+          "min_child_weight": 13.842,
+          "learning_rate": 0.042,
+          "subsample": 0.959,
+          "colsample_bytree": 0.912,
+          "n_lags": 10
+        },
+        "all": {
+          "mse_change": 0.0024,
+          "ci95": [
+            -0.0028,
+            0.0075
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0525,
+          "ci95": [
+            -0.0834,
+            -0.0138
+          ]
+        },
+        "meets_storm_bar": true
+      },
+      {
+        "id": 11,
+        "params": {
+          "max_depth": 7,
+          "min_child_weight": 8.002,
+          "learning_rate": 0.0521,
+          "subsample": 0.826,
+          "colsample_bytree": 0.653,
+          "n_lags": 8
+        },
+        "all": {
+          "mse_change": 0.0015,
+          "ci95": [
+            -0.0037,
+            0.0074
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0372,
+          "ci95": [
+            -0.0824,
+            0.0036
+          ]
+        },
+        "meets_storm_bar": false
+      }
+    ],
+    "note": "The three configurations with the lowest storm hour validation MSE, refitted with the same seed."
+  }
+}
