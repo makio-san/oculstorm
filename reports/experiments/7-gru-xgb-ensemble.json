@@ -1,0 +1,1245 @@
+{
+  "issue": 7,
+  "experiment": "GRU plus XGBoost ensemble, pred = w * gru + (1 - w) * xgb",
+  "horizon_hours": 1,
+  "models": "production models/xgb_dst_1h.ubj and the mean of models/gru_dst_1h_seed*.pt, not retrained",
+  "data": "validation 2017-01-01 00:00:00 .. 2020-12-31 22:00:00, table cut before 2021-01-01, test years not used",
+  "weight_grid": [
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0
+  ],
+  "bands": [
+    "intense (dst_lag0 <= -100)",
+    "storm (-100 < dst_lag0 <= -50)",
+    "quiet (dst_lag0 > -50)"
+  ],
+  "min_band_hours": 24,
+  "scoring_regimes": "by the observed target Dst, as in oculstorm.metrics.REGIMES",
+  "bootstrap": {
+    "block_hours": 168,
+    "resamples": 2000,
+    "seed": 0
+  },
+  "folds": {
+    "fit 2017-2018, score 2019-2020": {
+      "gru_weight_global": 0.75,
+      "gru_weight_by_band": {
+        "intense (dst_lag0 <= -100)": 1.0,
+        "storm (-100 < dst_lag0 <= -50)": 0.6,
+        "quiet (dst_lag0 > -50)": 0.75
+      },
+      "fit_hours_by_band": {
+        "quiet (dst_lag0 > -50)": 17208,
+        "storm (-100 < dst_lag0 <= -50)": 277,
+        "intense (dst_lag0 <= -100)": 35
+      },
+      "n_hours_scored": 17543,
+      "scores": {
+        "all": {
+          "n_hours": 17543,
+          "rmse": {
+            "persistence": {
+              "value": 2.8751,
+              "ci95": [
+                2.763,
+                2.983
+              ]
+            },
+            "gru": {
+              "value": 2.2438,
+              "ci95": [
+                2.169,
+                2.32
+              ]
+            },
+            "xgboost": {
+              "value": 2.2674,
+              "ci95": [
+                2.192,
+                2.343
+              ]
+            },
+            "mean 50/50": {
+              "value": 2.2418,
+              "ci95": [
+                2.168,
+                2.317
+              ]
+            },
+            "global weight": {
+              "value": 2.2393,
+              "ci95": [
+                2.166,
+                2.315
+              ]
+            },
+            "band weights": {
+              "value": 2.2391,
+              "ci95": [
+                2.165,
+                2.314
+              ]
+            }
+          },
+          "differences": {
+            "xgboost minus gru": {
+              "rmse_value": 0.0235,
+              "rmse_ci95": [
+                0.014,
+                0.033
+              ],
+              "mse_change_percent": 2.11,
+              "mse_change_percent_ci95": [
+                1.22,
+                2.95
+              ],
+              "significant": true,
+              "share_first_better": 0.0
+            },
+            "mean 50/50 minus gru": {
+              "rmse_value": -0.0021,
+              "rmse_ci95": [
+                -0.007,
+                0.003
+              ],
+              "mse_change_percent": -0.18,
+              "mse_change_percent_ci95": [
+                -0.64,
+                0.26
+              ],
+              "significant": false,
+              "share_first_better": 0.794
+            },
+            "global weight minus gru": {
+              "rmse_value": -0.0045,
+              "rmse_ci95": [
+                -0.007,
+                -0.002
+              ],
+              "mse_change_percent": -0.4,
+              "mse_change_percent_ci95": [
+                -0.63,
+                -0.17
+              ],
+              "significant": true,
+              "share_first_better": 1.0
+            },
+            "band weights minus gru": {
+              "rmse_value": -0.0047,
+              "rmse_ci95": [
+                -0.007,
+                -0.002
+              ],
+              "mse_change_percent": -0.42,
+              "mse_change_percent_ci95": [
+                -0.65,
+                -0.18
+              ],
+              "significant": true,
+              "share_first_better": 1.0
+            }
+          }
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 17493,
+          "rmse": {
+            "persistence": {
+              "value": 2.854,
+              "ci95": [
+                2.75,
+                2.955
+              ]
+            },
+            "gru": {
+              "value": 2.2348,
+              "ci95": [
+                2.163,
+                2.31
+              ]
+            },
+            "xgboost": {
+              "value": 2.26,
+              "ci95": [
+                2.187,
+                2.335
+              ]
+            },
+            "mean 50/50": {
+              "value": 2.2339,
+              "ci95": [
+                2.162,
+                2.308
+              ]
+            },
+            "global weight": {
+              "value": 2.231,
+              "ci95": [
+                2.159,
+                2.305
+              ]
+            },
+            "band weights": {
+              "value": 2.2309,
+              "ci95": [
+                2.159,
+                2.305
+              ]
+            }
+          },
+          "differences": {
+            "xgboost minus gru": {
+              "rmse_value": 0.0253,
+              "rmse_ci95": [
+                0.016,
+                0.035
+              ],
+              "mse_change_percent": 2.27,
+              "mse_change_percent_ci95": [
+                1.42,
+                3.15
+              ],
+              "significant": true,
+              "share_first_better": 0.0
+            },
+            "mean 50/50 minus gru": {
+              "rmse_value": -0.0008,
+              "rmse_ci95": [
+                -0.006,
+                0.004
+              ],
+              "mse_change_percent": -0.07,
+              "mse_change_percent_ci95": [
+                -0.51,
+                0.38
+              ],
+              "significant": false,
+              "share_first_better": 0.621
+            },
+            "global weight minus gru": {
+              "rmse_value": -0.0038,
+              "rmse_ci95": [
+                -0.006,
+                -0.001
+              ],
+              "mse_change_percent": -0.34,
+              "mse_change_percent_ci95": [
+                -0.56,
+                -0.11
+              ],
+              "significant": true,
+              "share_first_better": 0.998
+            },
+            "band weights minus gru": {
+              "rmse_value": -0.0039,
+              "rmse_ci95": [
+                -0.006,
+                -0.001
+              ],
+              "mse_change_percent": -0.34,
+              "mse_change_percent_ci95": [
+                -0.57,
+                -0.11
+              ],
+              "significant": true,
+              "share_first_better": 0.998
+            }
+          }
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 50,
+          "rmse": {
+            "persistence": {
+              "value": 7.1106,
+              "ci95": [
+                5.736,
+                8.799
+              ]
+            },
+            "gru": {
+              "value": 4.3879,
+              "ci95": [
+                3.436,
+                5.519
+              ]
+            },
+            "xgboost": {
+              "value": 4.0995,
+              "ci95": [
+                3.273,
+                4.966
+              ]
+            },
+            "mean 50/50": {
+              "value": 4.1572,
+              "ci95": [
+                3.347,
+                5.083
+              ]
+            },
+            "global weight": {
+              "value": 4.2522,
+              "ci95": [
+                3.378,
+                5.262
+              ]
+            },
+            "band weights": {
+              "value": 4.2277,
+              "ci95": [
+                3.384,
+                5.234
+              ]
+            }
+          },
+          "differences": {
+            "xgboost minus gru": {
+              "rmse_value": -0.2885,
+              "rmse_ci95": [
+                -1.057,
+                0.26
+              ],
+              "mse_change_percent": -12.72,
+              "mse_change_percent_ci95": [
+                -38.46,
+                13.93
+              ],
+              "significant": false,
+              "share_first_better": 0.857
+            },
+            "mean 50/50 minus gru": {
+              "rmse_value": -0.2307,
+              "rmse_ci95": [
+                -0.651,
+                0.064
+              ],
+              "mse_change_percent": -10.24,
+              "mse_change_percent_ci95": [
+                -25.2,
+                3.27
+              ],
+              "significant": false,
+              "share_first_better": 0.944
+            },
+            "global weight minus gru": {
+              "rmse_value": -0.1357,
+              "rmse_ci95": [
+                -0.353,
+                0.013
+              ],
+              "mse_change_percent": -6.09,
+              "mse_change_percent_ci95": [
+                -14.22,
+                0.64
+              ],
+              "significant": false,
+              "share_first_better": 0.963
+            },
+            "band weights minus gru": {
+              "rmse_value": -0.1602,
+              "rmse_ci95": [
+                -0.471,
+                0.05
+              ],
+              "mse_change_percent": -7.17,
+              "mse_change_percent_ci95": [
+                -19.07,
+                2.66
+              ],
+              "significant": false,
+              "share_first_better": 0.938
+            }
+          }
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 0
+        }
+      }
+    },
+    "fit 2019-2020, score 2017-2018": {
+      "gru_weight_global": 0.7,
+      "gru_weight_by_band": {
+        "intense (dst_lag0 <= -100)": 0.7,
+        "storm (-100 < dst_lag0 <= -50)": 0.4,
+        "quiet (dst_lag0 > -50)": 0.75
+      },
+      "fit_hours_by_band": {
+        "quiet (dst_lag0 > -50)": 17493,
+        "storm (-100 < dst_lag0 <= -50)": 50
+      },
+      "n_hours_scored": 17520,
+      "scores": {
+        "all": {
+          "n_hours": 17520,
+          "rmse": {
+            "persistence": {
+              "value": 3.8023,
+              "ci95": [
+                3.547,
+                4.083
+              ]
+            },
+            "gru": {
+              "value": 2.9499,
+              "ci95": [
+                2.777,
+                3.135
+              ]
+            },
+            "xgboost": {
+              "value": 2.9959,
+              "ci95": [
+                2.816,
+                3.195
+              ]
+            },
+            "mean 50/50": {
+              "value": 2.9495,
+              "ci95": [
+                2.776,
+                3.136
+              ]
+            },
+            "global weight": {
+              "value": 2.944,
+              "ci95": [
+                2.772,
+                3.129
+              ]
+            },
+            "band weights": {
+              "value": 2.9444,
+              "ci95": [
+                2.771,
+                3.131
+              ]
+            }
+          },
+          "differences": {
+            "xgboost minus gru": {
+              "rmse_value": 0.046,
+              "rmse_ci95": [
+                0.027,
+                0.066
+              ],
+              "mse_change_percent": 3.14,
+              "mse_change_percent_ci95": [
+                1.91,
+                4.47
+              ],
+              "significant": true,
+              "share_first_better": 0.0
+            },
+            "mean 50/50 minus gru": {
+              "rmse_value": -0.0004,
+              "rmse_ci95": [
+                -0.009,
+                0.009
+              ],
+              "mse_change_percent": -0.03,
+              "mse_change_percent_ci95": [
+                -0.64,
+                0.61
+              ],
+              "significant": false,
+              "share_first_better": 0.534
+            },
+            "global weight minus gru": {
+              "rmse_value": -0.0059,
+              "rmse_ci95": [
+                -0.012,
+                -0.0
+              ],
+              "mse_change_percent": -0.4,
+              "mse_change_percent_ci95": [
+                -0.79,
+                -0.0
+              ],
+              "significant": false,
+              "share_first_better": 0.975
+            },
+            "band weights minus gru": {
+              "rmse_value": -0.0055,
+              "rmse_ci95": [
+                -0.012,
+                0.001
+              ],
+              "mse_change_percent": -0.37,
+              "mse_change_percent_ci95": [
+                -0.8,
+                0.05
+              ],
+              "significant": false,
+              "share_first_better": 0.956
+            }
+          }
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 17208,
+          "rmse": {
+            "persistence": {
+              "value": 3.5827,
+              "ci95": [
+                3.39,
+                3.782
+              ]
+            },
+            "gru": {
+              "value": 2.8029,
+              "ci95": [
+                2.667,
+                2.946
+              ]
+            },
+            "xgboost": {
+              "value": 2.8469,
+              "ci95": [
+                2.706,
+                2.994
+              ]
+            },
+            "mean 50/50": {
+              "value": 2.8053,
+              "ci95": [
+                2.668,
+                2.949
+              ]
+            },
+            "global weight": {
+              "value": 2.7996,
+              "ci95": [
+                2.664,
+                2.943
+              ]
+            },
+            "band weights": {
+              "value": 2.7988,
+              "ci95": [
+                2.663,
+                2.942
+              ]
+            }
+          },
+          "differences": {
+            "xgboost minus gru": {
+              "rmse_value": 0.044,
+              "rmse_ci95": [
+                0.029,
+                0.062
+              ],
+              "mse_change_percent": 3.16,
+              "mse_change_percent_ci95": [
+                2.09,
+                4.39
+              ],
+              "significant": true,
+              "share_first_better": 0.0
+            },
+            "mean 50/50 minus gru": {
+              "rmse_value": 0.0024,
+              "rmse_ci95": [
+                -0.005,
+                0.011
+              ],
+              "mse_change_percent": 0.17,
+              "mse_change_percent_ci95": [
+                -0.35,
+                0.77
+              ],
+              "significant": false,
+              "share_first_better": 0.282
+            },
+            "global weight minus gru": {
+              "rmse_value": -0.0033,
+              "rmse_ci95": [
+                -0.008,
+                0.002
+              ],
+              "mse_change_percent": -0.24,
+              "mse_change_percent_ci95": [
+                -0.56,
+                0.13
+              ],
+              "significant": false,
+              "share_first_better": 0.91
+            },
+            "band weights minus gru": {
+              "rmse_value": -0.0042,
+              "rmse_ci95": [
+                -0.008,
+                0.0
+              ],
+              "mse_change_percent": -0.3,
+              "mse_change_percent_ci95": [
+                -0.58,
+                0.02
+              ],
+              "significant": false,
+              "share_first_better": 0.968
+            }
+          }
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 312,
+          "rmse": {
+            "persistence": {
+              "value": 10.1933,
+              "ci95": [
+                8.696,
+                11.5
+              ]
+            },
+            "gru": {
+              "value": 7.4398,
+              "ci95": [
+                6.68,
+                8.279
+              ]
+            },
+            "xgboost": {
+              "value": 7.5498,
+              "ci95": [
+                6.784,
+                8.295
+              ]
+            },
+            "mean 50/50": {
+              "value": 7.3806,
+              "ci95": [
+                6.664,
+                8.16
+              ]
+            },
+            "global weight": {
+              "value": 7.3767,
+              "ci95": [
+                6.652,
+                8.168
+              ]
+            },
+            "band weights": {
+              "value": 7.4039,
+              "ci95": [
+                6.656,
+                8.219
+              ]
+            }
+          },
+          "differences": {
+            "xgboost minus gru": {
+              "rmse_value": 0.1101,
+              "rmse_ci95": [
+                -0.24,
+                0.387
+              ],
+              "mse_change_percent": 2.98,
+              "mse_change_percent_ci95": [
+                -5.93,
+                11.02
+              ],
+              "significant": false,
+              "share_first_better": 0.26
+            },
+            "mean 50/50 minus gru": {
+              "rmse_value": -0.0591,
+              "rmse_ci95": [
+                -0.216,
+                0.085
+              ],
+              "mse_change_percent": -1.58,
+              "mse_change_percent_ci95": [
+                -5.53,
+                2.41
+              ],
+              "significant": false,
+              "share_first_better": 0.806
+            },
+            "global weight minus gru": {
+              "rmse_value": -0.063,
+              "rmse_ci95": [
+                -0.155,
+                0.026
+              ],
+              "mse_change_percent": -1.69,
+              "mse_change_percent_ci95": [
+                -4.01,
+                0.74
+              ],
+              "significant": false,
+              "share_first_better": 0.918
+            },
+            "band weights minus gru": {
+              "rmse_value": -0.0358,
+              "rmse_ci95": [
+                -0.168,
+                0.078
+              ],
+              "mse_change_percent": -0.96,
+              "mse_change_percent_ci95": [
+                -4.47,
+                2.22
+              ],
+              "significant": false,
+              "share_first_better": 0.737
+            }
+          }
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": {
+            "persistence": {
+              "value": 15.9553,
+              "ci95": [
+                12.895,
+                18.32
+              ]
+            },
+            "gru": {
+              "value": 10.5678,
+              "ci95": [
+                9.319,
+                11.712
+              ]
+            },
+            "xgboost": {
+              "value": 11.6867,
+              "ci95": [
+                8.804,
+                13.939
+              ]
+            },
+            "mean 50/50": {
+              "value": 10.8185,
+              "ci95": [
+                8.895,
+                12.703
+              ]
+            },
+            "global weight": {
+              "value": 10.6393,
+              "ci95": [
+                9.026,
+                12.273
+              ]
+            },
+            "band weights": {
+              "value": 10.7742,
+              "ci95": [
+                9.004,
+                12.293
+              ]
+            }
+          },
+          "differences": {
+            "xgboost minus gru": {
+              "rmse_value": 1.1189,
+              "rmse_ci95": [
+                -0.514,
+                2.227
+              ],
+              "mse_change_percent": 22.3,
+              "mse_change_percent_ci95": [
+                -10.74,
+                43.13
+              ],
+              "significant": false,
+              "share_first_better": 0.095
+            },
+            "mean 50/50 minus gru": {
+              "rmse_value": 0.2507,
+              "rmse_ci95": [
+                -0.424,
+                0.99
+              ],
+              "mse_change_percent": 4.8,
+              "mse_change_percent_ci95": [
+                -8.89,
+                17.63
+              ],
+              "significant": false,
+              "share_first_better": 0.297
+            },
+            "global weight minus gru": {
+              "rmse_value": 0.0715,
+              "rmse_ci95": [
+                -0.292,
+                0.561
+              ],
+              "mse_change_percent": 1.36,
+              "mse_change_percent_ci95": [
+                -6.18,
+                9.81
+              ],
+              "significant": false,
+              "share_first_better": 0.392
+            },
+            "band weights minus gru": {
+              "rmse_value": 0.2064,
+              "rmse_ci95": [
+                -0.315,
+                0.585
+              ],
+              "mse_change_percent": 3.94,
+              "mse_change_percent_ci95": [
+                -6.65,
+                11.14
+              ],
+              "significant": false,
+              "share_first_better": 0.173
+            }
+          }
+        }
+      }
+    }
+  },
+  "pooled_out_of_sample": {
+    "n_hours": 35063,
+    "scores": {
+      "all": {
+        "n_hours": 35063,
+        "rmse": {
+          "persistence": {
+            "value": 3.3704,
+            "ci95": [
+              3.21,
+              3.544
+            ]
+          },
+          "gru": {
+            "value": 2.6205,
+            "ci95": [
+              2.509,
+              2.738
+            ]
+          },
+          "xgboost": {
+            "value": 2.6565,
+            "ci95": [
+              2.541,
+              2.778
+            ]
+          },
+          "mean 50/50": {
+            "value": 2.6194,
+            "ci95": [
+              2.508,
+              2.736
+            ]
+          },
+          "global weight": {
+            "value": 2.6153,
+            "ci95": [
+              2.504,
+              2.732
+            ]
+          },
+          "band weights": {
+            "value": 2.6154,
+            "ci95": [
+              2.504,
+              2.733
+            ]
+          }
+        },
+        "differences": {
+          "xgboost minus gru": {
+            "rmse_value": 0.036,
+            "rmse_ci95": [
+              0.024,
+              0.047
+            ],
+            "mse_change_percent": 2.76,
+            "mse_change_percent_ci95": [
+              1.89,
+              3.6
+            ],
+            "significant": true,
+            "share_first_better": 0.0
+          },
+          "mean 50/50 minus gru": {
+            "rmse_value": -0.0011,
+            "rmse_ci95": [
+              -0.007,
+              0.004
+            ],
+            "mse_change_percent": -0.09,
+            "mse_change_percent_ci95": [
+              -0.51,
+              0.31
+            ],
+            "significant": false,
+            "share_first_better": 0.667
+          },
+          "global weight minus gru": {
+            "rmse_value": -0.0053,
+            "rmse_ci95": [
+              -0.009,
+              -0.002
+            ],
+            "mse_change_percent": -0.4,
+            "mse_change_percent_ci95": [
+              -0.67,
+              -0.15
+            ],
+            "significant": true,
+            "share_first_better": 1.0
+          },
+          "band weights minus gru": {
+            "rmse_value": -0.0051,
+            "rmse_ci95": [
+              -0.009,
+              -0.002
+            ],
+            "mse_change_percent": -0.39,
+            "mse_change_percent_ci95": [
+              -0.67,
+              -0.12
+            ],
+            "significant": true,
+            "share_first_better": 0.998
+          }
+        }
+      },
+      "quiet (Dst > -50)": {
+        "n_hours": 34701,
+        "rmse": {
+          "persistence": {
+            "value": 3.2359,
+            "ci95": [
+              3.113,
+              3.363
+            ]
+          },
+          "gru": {
+            "value": 2.5325,
+            "ci95": [
+              2.443,
+              2.624
+            ]
+          },
+          "xgboost": {
+            "value": 2.5679,
+            "ci95": [
+              2.476,
+              2.663
+            ]
+          },
+          "mean 50/50": {
+            "value": 2.5334,
+            "ci95": [
+              2.442,
+              2.627
+            ]
+          },
+          "global weight": {
+            "value": 2.529,
+            "ci95": [
+              2.439,
+              2.622
+            ]
+          },
+          "band weights": {
+            "value": 2.5285,
+            "ci95": [
+              2.439,
+              2.621
+            ]
+          }
+        },
+        "differences": {
+          "xgboost minus gru": {
+            "rmse_value": 0.0354,
+            "rmse_ci95": [
+              0.026,
+              0.046
+            ],
+            "mse_change_percent": 2.81,
+            "mse_change_percent_ci95": [
+              2.05,
+              3.6
+            ],
+            "significant": true,
+            "share_first_better": 0.0
+          },
+          "mean 50/50 minus gru": {
+            "rmse_value": 0.0009,
+            "rmse_ci95": [
+              -0.004,
+              0.006
+            ],
+            "mse_change_percent": 0.07,
+            "mse_change_percent_ci95": [
+              -0.3,
+              0.46
+            ],
+            "significant": false,
+            "share_first_better": 0.361
+          },
+          "global weight minus gru": {
+            "rmse_value": -0.0035,
+            "rmse_ci95": [
+              -0.006,
+              -0.001
+            ],
+            "mse_change_percent": -0.28,
+            "mse_change_percent_ci95": [
+              -0.49,
+              -0.05
+            ],
+            "significant": true,
+            "share_first_better": 0.992
+          },
+          "band weights minus gru": {
+            "rmse_value": -0.004,
+            "rmse_ci95": [
+              -0.006,
+              -0.001
+            ],
+            "mse_change_percent": -0.32,
+            "mse_change_percent_ci95": [
+              -0.51,
+              -0.11
+            ],
+            "significant": true,
+            "share_first_better": 1.0
+          }
+        }
+      },
+      "storm (Dst <= -50)": {
+        "n_hours": 362,
+        "rmse": {
+          "persistence": {
+            "value": 9.8253,
+            "ci95": [
+              8.406,
+              11.053
+            ]
+          },
+          "gru": {
+            "value": 7.0968,
+            "ci95": [
+              6.279,
+              7.852
+            ]
+          },
+          "xgboost": {
+            "value": 7.1727,
+            "ci95": [
+              6.337,
+              7.924
+            ]
+          },
+          "mean 50/50": {
+            "value": 7.024,
+            "ci95": [
+              6.242,
+              7.755
+            ]
+          },
+          "global weight": {
+            "value": 7.0283,
+            "ci95": [
+              6.231,
+              7.758
+            ]
+          },
+          "band weights": {
+            "value": 7.0509,
+            "ci95": [
+              6.244,
+              7.803
+            ]
+          }
+        },
+        "differences": {
+          "xgboost minus gru": {
+            "rmse_value": 0.0759,
+            "rmse_ci95": [
+              -0.249,
+              0.329
+            ],
+            "mse_change_percent": 2.15,
+            "mse_change_percent_ci95": [
+              -6.67,
+              9.72
+            ],
+            "significant": false,
+            "share_first_better": 0.342
+          },
+          "mean 50/50 minus gru": {
+            "rmse_value": -0.0728,
+            "rmse_ci95": [
+              -0.221,
+              0.059
+            ],
+            "mse_change_percent": -2.04,
+            "mse_change_percent_ci95": [
+              -6.01,
+              1.78
+            ],
+            "significant": false,
+            "share_first_better": 0.86
+          },
+          "global weight minus gru": {
+            "rmse_value": -0.0685,
+            "rmse_ci95": [
+              -0.153,
+              0.016
+            ],
+            "mse_change_percent": -1.92,
+            "mse_change_percent_ci95": [
+              -4.17,
+              0.47
+            ],
+            "significant": false,
+            "share_first_better": 0.951
+          },
+          "band weights minus gru": {
+            "rmse_value": -0.0459,
+            "rmse_ci95": [
+              -0.167,
+              0.054
+            ],
+            "mse_change_percent": -1.29,
+            "mse_change_percent_ci95": [
+              -4.51,
+              1.58
+            ],
+            "significant": false,
+            "share_first_better": 0.826
+          }
+        }
+      },
+      "intense (Dst <= -100)": {
+        "n_hours": 35,
+        "rmse": {
+          "persistence": {
+            "value": 15.9553,
+            "ci95": [
+              12.895,
+              18.319
+            ]
+          },
+          "gru": {
+            "value": 10.5678,
+            "ci95": [
+              9.319,
+              11.712
+            ]
+          },
+          "xgboost": {
+            "value": 11.6867,
+            "ci95": [
+              8.804,
+              13.939
+            ]
+          },
+          "mean 50/50": {
+            "value": 10.8185,
+            "ci95": [
+              8.895,
+              12.703
+            ]
+          },
+          "global weight": {
+            "value": 10.6393,
+            "ci95": [
+              9.026,
+              12.273
+            ]
+          },
+          "band weights": {
+            "value": 10.7742,
+            "ci95": [
+              9.004,
+              12.293
+            ]
+          }
+        },
+        "differences": {
+          "xgboost minus gru": {
+            "rmse_value": 1.1189,
+            "rmse_ci95": [
+              -0.514,
+              2.227
+            ],
+            "mse_change_percent": 22.3,
+            "mse_change_percent_ci95": [
+              -10.74,
+              41.64
+            ],
+            "significant": false,
+            "share_first_better": 0.098
+          },
+          "mean 50/50 minus gru": {
+            "rmse_value": 0.2507,
+            "rmse_ci95": [
+              -0.424,
+              0.99
+            ],
+            "mse_change_percent": 4.8,
+            "mse_change_percent_ci95": [
+              -8.89,
+              17.63
+            ],
+            "significant": false,
+            "share_first_better": 0.288
+          },
+          "global weight minus gru": {
+            "rmse_value": 0.0715,
+            "rmse_ci95": [
+              -0.292,
+              0.561
+            ],
+            "mse_change_percent": 1.36,
+            "mse_change_percent_ci95": [
+              -6.18,
+              9.81
+            ],
+            "significant": false,
+            "share_first_better": 0.375
+          },
+          "band weights minus gru": {
+            "rmse_value": 0.2064,
+            "rmse_ci95": [
+              -0.315,
+              0.58
+            ],
+            "mse_change_percent": 3.94,
+            "mse_change_percent_ci95": [
+              -6.66,
+              10.16
+            ],
+            "significant": false,
+            "share_first_better": 0.164
+          }
+        }
+      }
+    }
+  },
+  "promising_bar": "retrain policy on the pooled out of sample hours: overall MSE at least 2% lower, or storm MSE at least 3% lower with overall at most 1% higher, intervals excluding zero",
+  "promising": {
+    "mean 50/50": false,
+    "global weight": false,
+    "band weights": false
+  },
+  "seconds": 20
+}
