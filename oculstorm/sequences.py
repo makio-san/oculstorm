@@ -3,36 +3,54 @@ import numpy as np
 import pandas as pd
 
 from .data import VAL_START
-from .features import HORIZON, SOLAR_WIND, _coupling
+from .features import HORIZON, MEMORY_DRIVERS, SOLAR_WIND, _coupling, decaying_memory
 
 WINDOW = 24  # hours of history per sample
 MAX_FFILL = 3  # hours a missing solar wind value may be carried forward
 LOG_COLUMNS = ["proton_temp", "proton_density", "flow_pressure", "vbs", "newell"]
 
 
-def _raw_channels(df: pd.DataFrame) -> pd.DataFrame:
+def _raw_channels(df: pd.DataFrame, memory: tuple[float, ...] = ()) -> pd.DataFrame:
     raw = pd.concat([df[["dst"]], df[SOLAR_WIND], _coupling(df)], axis=1).astype("float64")
-    raw[LOG_COLUMNS] = np.log1p(raw[LOG_COLUMNS].clip(lower=0))
+    # Optional decaying driver memory, computed causally on the full hourly index.
+    names = []
+    for name in MEMORY_DRIVERS:
+        for tau in memory:
+            raw[f"{name}_ewm{tau:g}"] = decaying_memory(raw[name], tau)
+            names.append(f"{name}_ewm{tau:g}")
+    log_columns = LOG_COLUMNS + names
+    raw[log_columns] = np.log1p(raw[log_columns].clip(lower=0))
     return raw
 
 
-def channel_stats(df: pd.DataFrame) -> dict[str, dict[str, float]]:
+def _memory_in(stats: dict) -> tuple[float, ...]:
+    """Time constants of the driver memory channels that saved `stats` were made with."""
+    prefix = f"{MEMORY_DRIVERS[0]}_ewm"
+    return tuple(float(k[len(prefix):]) for k in stats["mean"] if k.startswith(prefix))
+
+
+def channel_stats(df: pd.DataFrame, memory: tuple[float, ...] = ()) -> dict[str, dict[str, float]]:
     """Mean and standard deviation of every scaled channel over the training years only."""
-    train = _raw_channels(df)
+    train = _raw_channels(df, memory)
     train = train[train.index < VAL_START]
     return {"mean": train.mean().to_dict(), "std": train.std().to_dict()}
 
 
-def build_channels(df: pd.DataFrame, stats: dict | None = None) -> tuple[pd.DataFrame, pd.Series]:
+def build_channels(
+    df: pd.DataFrame, stats: dict | None = None, memory: tuple[float, ...] = ()
+) -> tuple[pd.DataFrame, pd.Series]:
     """Return per-hour input channels (standardised, no NaN) and the Dst series.
 
     Scaling statistics come from the training years only; pass the saved `stats`
     when `df` does not contain them (live data). Gaps are forward filled for at
     most MAX_FFILL hours (never backward), then set to the training mean, and two
     mask channels tell the network which values were actually observed.
+    `memory` adds decaying means of VBs and Newell (off by default); with saved `stats`
+    the time constants they were made with are used.
     """
-    raw = _raw_channels(df)
-    stats = stats or channel_stats(df)
+    memory = _memory_in(stats) if stats else memory
+    raw = _raw_channels(df, memory)
+    stats = stats or channel_stats(df, memory)
     scaled = (raw - pd.Series(stats["mean"])[raw.columns]) / pd.Series(stats["std"])[raw.columns]
     filled = scaled.ffill(limit=MAX_FFILL).fillna(0.0)
 
@@ -47,7 +65,8 @@ def build_channels(df: pd.DataFrame, stats: dict | None = None) -> tuple[pd.Data
 
 
 def build_windows(
-    df: pd.DataFrame, stats: dict | None = None, require_target: bool = True, horizon: int = HORIZON
+    df: pd.DataFrame, stats: dict | None = None, require_target: bool = True, horizon: int = HORIZON,
+    memory: tuple[float, ...] = (),
 ) -> tuple[np.ndarray, pd.DataFrame]:
     """Return (windows, meta).
 
@@ -56,7 +75,7 @@ def build_windows(
     windows is a zero-copy view, so index it per batch instead of copying it whole.
     With require_target=False the newest hours, whose target is not known yet, are kept.
     """
-    channels, dst = build_channels(df, stats)
+    channels, dst = build_channels(df, stats, memory)
     view = np.lib.stride_tricks.sliding_window_view(channels.to_numpy(), WINDOW, axis=0)
     windows = view.transpose(0, 2, 1)  # (n, WINDOW, channels)
 
