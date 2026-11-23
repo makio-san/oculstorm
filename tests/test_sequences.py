@@ -41,3 +41,19 @@ def test_window_ends_at_t_and_target_is_one_horizon_ahead(horizon):
     # so it has to move in step with the raw Dst over the window.
     raw = df["dst"].loc[t - pd.Timedelta(hours=WINDOW - 1) : t].to_numpy()
     assert np.corrcoef(windows[row][:, 0], raw)[0, 1] > 0.9999
+
+
+def test_ring_current_windows_do_not_depend_on_the_future():
+    df = load_hourly()
+    windows, meta = build_windows(df, ring_current=True)
+    base, _ = build_windows(df)
+    assert windows.shape[2] == base.shape[2] + 2
+
+    corrupted = df.copy()
+    floats = corrupted.select_dtypes("float").columns
+    corrupted.loc[corrupted.index > CUT, floats] = -1234.0
+    windows_corrupted, _ = build_windows(corrupted, ring_current=True)
+
+    past = meta.loc[meta.index <= CUT, "row"].to_numpy()[-500:]
+    assert np.array_equal(windows[past], windows_corrupted[past])
+    assert not np.isnan(windows[meta["row"].to_numpy()[-1000:]]).any()

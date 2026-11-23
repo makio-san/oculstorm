@@ -3,36 +3,43 @@ import numpy as np
 import pandas as pd
 
 from .data import VAL_START
-from .features import HORIZON, SOLAR_WIND, _coupling
+from .features import HORIZON, SOLAR_WIND, _coupling, _ring_current
 
 WINDOW = 24  # hours of history per sample
 MAX_FFILL = 3  # hours a missing solar wind value may be carried forward
 LOG_COLUMNS = ["proton_temp", "proton_density", "flow_pressure", "vbs", "newell"]
+RING_CURRENT_CHANNELS = ["dst_star", "om_step"]  # appended last, so channel 0 stays Dst
 
 
-def _raw_channels(df: pd.DataFrame) -> pd.DataFrame:
-    raw = pd.concat([df[["dst"]], df[SOLAR_WIND], _coupling(df)], axis=1).astype("float64")
+def _raw_channels(df: pd.DataFrame, ring_current: bool = False) -> pd.DataFrame:
+    parts = [df[["dst"]], df[SOLAR_WIND], _coupling(df)]
+    if ring_current:
+        parts.append(_ring_current(df)[RING_CURRENT_CHANNELS])
+    raw = pd.concat(parts, axis=1).astype("float64")
     raw[LOG_COLUMNS] = np.log1p(raw[LOG_COLUMNS].clip(lower=0))
     return raw
 
 
-def channel_stats(df: pd.DataFrame) -> dict[str, dict[str, float]]:
+def channel_stats(df: pd.DataFrame, ring_current: bool = False) -> dict[str, dict[str, float]]:
     """Mean and standard deviation of every scaled channel over the training years only."""
-    train = _raw_channels(df)
+    train = _raw_channels(df, ring_current)
     train = train[train.index < VAL_START]
     return {"mean": train.mean().to_dict(), "std": train.std().to_dict()}
 
 
-def build_channels(df: pd.DataFrame, stats: dict | None = None) -> tuple[pd.DataFrame, pd.Series]:
+def build_channels(
+    df: pd.DataFrame, stats: dict | None = None, ring_current: bool = False
+) -> tuple[pd.DataFrame, pd.Series]:
     """Return per-hour input channels (standardised, no NaN) and the Dst series.
 
     Scaling statistics come from the training years only; pass the saved `stats`
     when `df` does not contain them (live data). Gaps are forward filled for at
     most MAX_FFILL hours (never backward), then set to the training mean, and two
     mask channels tell the network which values were actually observed.
+    With ring_current=True the O'Brien and McPherron (2000) Dst* and Burton step are added.
     """
-    raw = _raw_channels(df)
-    stats = stats or channel_stats(df)
+    raw = _raw_channels(df, ring_current)
+    stats = stats or channel_stats(df, ring_current)
     scaled = (raw - pd.Series(stats["mean"])[raw.columns]) / pd.Series(stats["std"])[raw.columns]
     filled = scaled.ffill(limit=MAX_FFILL).fillna(0.0)
 
@@ -47,7 +54,8 @@ def build_channels(df: pd.DataFrame, stats: dict | None = None) -> tuple[pd.Data
 
 
 def build_windows(
-    df: pd.DataFrame, stats: dict | None = None, require_target: bool = True, horizon: int = HORIZON
+    df: pd.DataFrame, stats: dict | None = None, require_target: bool = True, horizon: int = HORIZON,
+    ring_current: bool = False,
 ) -> tuple[np.ndarray, pd.DataFrame]:
     """Return (windows, meta).
 
@@ -56,7 +64,7 @@ def build_windows(
     windows is a zero-copy view, so index it per batch instead of copying it whole.
     With require_target=False the newest hours, whose target is not known yet, are kept.
     """
-    channels, dst = build_channels(df, stats)
+    channels, dst = build_channels(df, stats, ring_current)
     view = np.lib.stride_tricks.sliding_window_view(channels.to_numpy(), WINDOW, axis=0)
     windows = view.transpose(0, 2, 1)  # (n, WINDOW, channels)
 
