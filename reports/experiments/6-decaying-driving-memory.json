@@ -1,0 +1,471 @@
+{
+  "issue": 6,
+  "title": "Exponentially decaying memory of VBs and the Newell coupling function",
+  "date": "2026-11-23",
+  "split": "train 1995-01-01 .. 2017-01-01 (exclusive), validation 2017-01-01 .. 2021-01-01 (exclusive); rows from 2021 onwards dropped before fitting, test years not used",
+  "option": {
+    "features": "oculstorm.features.build_features(memory=MEMORY_TAUS), MEMORY_TAUS = (3, 8, 24)",
+    "definition": "m(t) = a*x(t) + (1-a)*m(t-1), a = 1 - exp(-1/tau), pandas ewm(adjust=False) on the full hourly index, x in {vbs, newell}",
+    "xgboost": "scripts/train_xgb.py --driver-memory (raw values as columns)",
+    "gru": "scripts/train_gru.py --driver-memory (log1p, standardised channels in the 24 h window)",
+    "default": "off; default features and channels are unchanged (tests/test_features.py, tests/test_sequences.py)"
+  },
+  "baseline": "current configuration retrained in this run; validation RMSE equals validation_scores in reports/xgb_baseline.json, reports/xgb_baseline_6h.json and reports/gru_baseline.json",
+  "bootstrap": {
+    "function": "oculstorm.metrics.block_bootstrap_rmse",
+    "n_boot": 2000,
+    "block_hours": 168,
+    "seed": 0,
+    "statistic": "MSE change of candidate vs baseline in percent (negative is better), paired resamples, 95% percentile interval"
+  },
+  "xgboost": {
+    "1h": {
+      "runs": {
+        "base": {
+          "taus": [],
+          "n_features": 89,
+          "best_iteration": 2151,
+          "seconds": 130,
+          "memory_gain_share": {},
+          "memory_gain_rank": {}
+        },
+        "mem3-8-24": {
+          "taus": [
+            3.0,
+            8.0,
+            24.0
+          ],
+          "n_features": 95,
+          "best_iteration": 2305,
+          "seconds": 154,
+          "memory_gain_share": {
+            "vbs_ewm3": 0.0067,
+            "vbs_ewm8": 0.0033,
+            "vbs_ewm24": 0.0032,
+            "newell_ewm3": 0.0029,
+            "newell_ewm8": 0.0029,
+            "newell_ewm24": 0.0033
+          },
+          "memory_gain_rank": {
+            "vbs_ewm3": 33,
+            "vbs_ewm8": 74,
+            "vbs_ewm24": 78,
+            "newell_ewm3": 84,
+            "newell_ewm8": 85,
+            "newell_ewm24": 75
+          }
+        },
+        "mem8-24": {
+          "taus": [
+            8.0,
+            24.0
+          ],
+          "n_features": 93,
+          "best_iteration": 2569,
+          "seconds": 195,
+          "memory_gain_share": {
+            "vbs_ewm8": 0.0044,
+            "vbs_ewm24": 0.0034,
+            "newell_ewm8": 0.0033,
+            "newell_ewm24": 0.0039
+          },
+          "memory_gain_rank": {
+            "vbs_ewm8": 67,
+            "vbs_ewm24": 77,
+            "newell_ewm8": 78,
+            "newell_ewm24": 74
+          }
+        }
+      },
+      "vs_baseline": {
+        "mem3-8-24": {
+          "all": {
+            "n_hours": 35064,
+            "rmse_persistence": 3.3704,
+            "rmse_baseline": 2.6565,
+            "rmse_candidate": 2.6562,
+            "skill_baseline": 0.3788,
+            "skill_candidate": 0.3789,
+            "mse_change_pct": -0.02,
+            "mse_change_pct_ci95": [
+              -0.36,
+              0.29
+            ]
+          },
+          "quiet (Dst > -50)": {
+            "n_hours": 34702,
+            "rmse_persistence": 3.2359,
+            "rmse_baseline": 2.5678,
+            "rmse_candidate": 2.5656,
+            "skill_baseline": 0.3703,
+            "skill_candidate": 0.3714,
+            "mse_change_pct": -0.17,
+            "mse_change_pct_ci95": [
+              -0.5,
+              0.16
+            ]
+          },
+          "storm (Dst <= -50)": {
+            "n_hours": 362,
+            "rmse_persistence": 9.8253,
+            "rmse_baseline": 7.1727,
+            "rmse_candidate": 7.2367,
+            "skill_baseline": 0.4671,
+            "skill_candidate": 0.4575,
+            "mse_change_pct": 1.79,
+            "mse_change_pct_ci95": [
+              -0.9,
+              4.47
+            ]
+          },
+          "intense (Dst <= -100)": {
+            "n_hours": 35,
+            "rmse_persistence": 15.9553,
+            "rmse_baseline": 11.6867,
+            "rmse_candidate": 11.8588,
+            "skill_baseline": 0.4635,
+            "skill_candidate": 0.4476,
+            "mse_change_pct": 2.97,
+            "mse_change_pct_ci95": [
+              0.82,
+              7.46
+            ]
+          }
+        },
+        "mem8-24": {
+          "all": {
+            "n_hours": 35064,
+            "rmse_persistence": 3.3704,
+            "rmse_baseline": 2.6565,
+            "rmse_candidate": 2.655,
+            "skill_baseline": 0.3788,
+            "skill_candidate": 0.3795,
+            "mse_change_pct": -0.11,
+            "mse_change_pct_ci95": [
+              -0.57,
+              0.3
+            ]
+          },
+          "quiet (Dst > -50)": {
+            "n_hours": 34702,
+            "rmse_persistence": 3.2359,
+            "rmse_baseline": 2.5678,
+            "rmse_candidate": 2.562,
+            "skill_baseline": 0.3703,
+            "skill_candidate": 0.3732,
+            "mse_change_pct": -0.46,
+            "mse_change_pct_ci95": [
+              -0.85,
+              -0.08
+            ]
+          },
+          "storm (Dst <= -50)": {
+            "n_hours": 362,
+            "rmse_persistence": 9.8253,
+            "rmse_baseline": 7.1727,
+            "rmse_candidate": 7.3195,
+            "skill_baseline": 0.4671,
+            "skill_candidate": 0.445,
+            "mse_change_pct": 4.14,
+            "mse_change_pct_ci95": [
+              0.76,
+              8.43
+            ]
+          },
+          "intense (Dst <= -100)": {
+            "n_hours": 35,
+            "rmse_persistence": 15.9553,
+            "rmse_baseline": 11.6867,
+            "rmse_candidate": 11.991,
+            "skill_baseline": 0.4635,
+            "skill_candidate": 0.4352,
+            "mse_change_pct": 5.27,
+            "mse_change_pct_ci95": [
+              2.74,
+              9.48
+            ]
+          }
+        }
+      }
+    },
+    "6h": {
+      "runs": {
+        "base": {
+          "taus": [],
+          "n_features": 89,
+          "best_iteration": 1381,
+          "seconds": 110,
+          "memory_gain_share": {},
+          "memory_gain_rank": {}
+        },
+        "mem3-8-24": {
+          "taus": [
+            3.0,
+            8.0,
+            24.0
+          ],
+          "n_features": 95,
+          "best_iteration": 1284,
+          "seconds": 114,
+          "memory_gain_share": {
+            "vbs_ewm3": 0.003,
+            "vbs_ewm8": 0.0042,
+            "vbs_ewm24": 0.006,
+            "newell_ewm3": 0.0018,
+            "newell_ewm8": 0.0032,
+            "newell_ewm24": 0.0065
+          },
+          "memory_gain_rank": {
+            "vbs_ewm3": 75,
+            "vbs_ewm8": 57,
+            "vbs_ewm24": 40,
+            "newell_ewm3": 83,
+            "newell_ewm8": 69,
+            "newell_ewm24": 35
+          }
+        },
+        "mem8-24": {
+          "taus": [
+            8.0,
+            24.0
+          ],
+          "n_features": 93,
+          "best_iteration": 1598,
+          "seconds": 140,
+          "memory_gain_share": {
+            "vbs_ewm8": 0.0054,
+            "vbs_ewm24": 0.0073,
+            "newell_ewm8": 0.0034,
+            "newell_ewm24": 0.0071
+          },
+          "memory_gain_rank": {
+            "vbs_ewm8": 46,
+            "vbs_ewm24": 35,
+            "newell_ewm8": 70,
+            "newell_ewm24": 36
+          }
+        }
+      },
+      "vs_baseline": {
+        "mem3-8-24": {
+          "all": {
+            "n_hours": 35064,
+            "rmse_persistence": 9.1482,
+            "rmse_baseline": 7.0363,
+            "rmse_candidate": 7.0359,
+            "skill_baseline": 0.4084,
+            "skill_candidate": 0.4085,
+            "mse_change_pct": -0.01,
+            "mse_change_pct_ci95": [
+              -0.57,
+              0.56
+            ]
+          },
+          "quiet (Dst > -50)": {
+            "n_hours": 34702,
+            "rmse_persistence": 8.2836,
+            "rmse_baseline": 6.4175,
+            "rmse_candidate": 6.4124,
+            "skill_baseline": 0.3998,
+            "skill_candidate": 0.4008,
+            "mse_change_pct": -0.16,
+            "mse_change_pct_ci95": [
+              -0.67,
+              0.32
+            ]
+          },
+          "storm (Dst <= -50)": {
+            "n_hours": 362,
+            "rmse_persistence": 39.0941,
+            "rmse_baseline": 29.1131,
+            "rmse_candidate": 29.2112,
+            "skill_baseline": 0.4454,
+            "skill_candidate": 0.4417,
+            "mse_change_pct": 0.67,
+            "mse_change_pct_ci95": [
+              -1.34,
+              2.61
+            ]
+          },
+          "intense (Dst <= -100)": {
+            "n_hours": 35,
+            "rmse_persistence": 70.4923,
+            "rmse_baseline": 61.7624,
+            "rmse_candidate": 62.2298,
+            "skill_baseline": 0.2323,
+            "skill_candidate": 0.2207,
+            "mse_change_pct": 1.52,
+            "mse_change_pct_ci95": [
+              0.61,
+              5.39
+            ]
+          }
+        },
+        "mem8-24": {
+          "all": {
+            "n_hours": 35064,
+            "rmse_persistence": 9.1482,
+            "rmse_baseline": 7.0363,
+            "rmse_candidate": 7.0299,
+            "skill_baseline": 0.4084,
+            "skill_candidate": 0.4095,
+            "mse_change_pct": -0.18,
+            "mse_change_pct_ci95": [
+              -0.71,
+              0.36
+            ]
+          },
+          "quiet (Dst > -50)": {
+            "n_hours": 34702,
+            "rmse_persistence": 8.2836,
+            "rmse_baseline": 6.4175,
+            "rmse_candidate": 6.4021,
+            "skill_baseline": 0.3998,
+            "skill_candidate": 0.4027,
+            "mse_change_pct": -0.48,
+            "mse_change_pct_ci95": [
+              -0.96,
+              0.01
+            ]
+          },
+          "storm (Dst <= -50)": {
+            "n_hours": 362,
+            "rmse_persistence": 39.0941,
+            "rmse_baseline": 29.1131,
+            "rmse_candidate": 29.2866,
+            "skill_baseline": 0.4454,
+            "skill_candidate": 0.4388,
+            "mse_change_pct": 1.2,
+            "mse_change_pct_ci95": [
+              -0.66,
+              3.49
+            ]
+          },
+          "intense (Dst <= -100)": {
+            "n_hours": 35,
+            "rmse_persistence": 70.4923,
+            "rmse_baseline": 61.7624,
+            "rmse_candidate": 62.4947,
+            "skill_baseline": 0.2323,
+            "skill_candidate": 0.214,
+            "mse_change_pct": 2.39,
+            "mse_change_pct_ci95": [
+              0.31,
+              11.62
+            ]
+          }
+        }
+      }
+    }
+  },
+  "gru_1h_3_seeds": {
+    "runs": {
+      "base": [
+        {
+          "seed": 0,
+          "epochs": 21,
+          "best_val_rmse": 2.6403,
+          "seconds": 408
+        },
+        {
+          "seed": 1,
+          "epochs": 31,
+          "best_val_rmse": 2.6375,
+          "seconds": 498
+        },
+        {
+          "seed": 2,
+          "epochs": 21,
+          "best_val_rmse": 2.6359,
+          "seconds": 309
+        }
+      ],
+      "mem3-8-24": [
+        {
+          "seed": 0,
+          "epochs": 26,
+          "best_val_rmse": 2.6312,
+          "seconds": 415
+        },
+        {
+          "seed": 1,
+          "epochs": 20,
+          "best_val_rmse": 2.6349,
+          "seconds": 172
+        },
+        {
+          "seed": 2,
+          "epochs": 21,
+          "best_val_rmse": 2.6357,
+          "seconds": 472
+        }
+      ]
+    },
+    "n_channels": {
+      "base": 18,
+      "mem3-8-24": 24
+    },
+    "vs_baseline": {
+      "mem3-8-24": {
+        "all": {
+          "n_hours": 35064,
+          "rmse_persistence": 3.3704,
+          "rmse_baseline": 2.6205,
+          "rmse_candidate": 2.611,
+          "skill_baseline": 0.3955,
+          "skill_candidate": 0.3999,
+          "mse_change_pct": -0.73,
+          "mse_change_pct_ci95": [
+            -1.32,
+            -0.17
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse_persistence": 3.2359,
+          "rmse_baseline": 2.5324,
+          "rmse_candidate": 2.5253,
+          "skill_baseline": 0.3875,
+          "skill_candidate": 0.391,
+          "mse_change_pct": -0.56,
+          "mse_change_pct_ci95": [
+            -1.02,
+            -0.14
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse_persistence": 9.8253,
+          "rmse_baseline": 7.0968,
+          "rmse_candidate": 6.9995,
+          "skill_baseline": 0.4783,
+          "skill_candidate": 0.4925,
+          "mse_change_pct": -2.72,
+          "mse_change_pct_ci95": [
+            -6.81,
+            0.77
+          ]
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse_persistence": 15.9553,
+          "rmse_baseline": 10.5678,
+          "rmse_candidate": 10.5904,
+          "skill_baseline": 0.5613,
+          "skill_candidate": 0.5594,
+          "mse_change_pct": 0.43,
+          "mse_change_pct_ci95": [
+            -12.1,
+            8.1
+          ]
+        }
+      }
+    }
+  },
+  "run_time_minutes": {
+    "xgboost_6_fits": 14.1,
+    "gru_6_seeds": 37.9
+  },
+  "result": "no-gain",
+  "conclusion": "No configuration meets the retrain policy bar (overall MSE at least 2% lower, or storm MSE at least 3% lower with overall at most 1% higher, intervals excluding zero). XGBoost: overall unchanged at 1 h and 6 h, storm and intense hours slightly worse (intense 1 h +3.0% [0.8, 7.5] for taus 3, 8, 24). The new columns rank 33 to 85 of 95 by gain at 1 h and 35 to 83 at 6 h. GRU 1 h, 3 seeds: overall -0.7% [-1.3, -0.2], storm -2.7% [-6.8, 0.8], intense +0.4%; real but below the bar. The 24 h window and the 3 and 12 h box means already carry most of this memory."
+}
