@@ -271,4 +271,5 @@ reports/                   metrics (tracked) and test predictions (ignored)
 scripts/build_dataset.py   raw OMNI2 -> data/kaggle/omni2_hourly.parquet
 data/raw/                  downloaded NASA files (ignored)
 data/kaggle/               Kaggle upload folder: parquet (ignored), metadata, column docs
+agents/                    scheduled agents: rules, retrain policy, helpers (see agents/README.md)
 ```
