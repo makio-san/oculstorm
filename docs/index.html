@@ -21,6 +21,7 @@
     --observed: #0b0d12; --gru: #2a78d6; --xgb: #eb6834; --persistence: #898781;
     --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
     --wash: rgba(15,20,40,0.05);
+    --spread: rgba(42,120,214,0.17);
     --shadow: 0 1px 2px rgba(15,20,40,0.04), 0 10px 28px rgba(15,20,40,0.06);
   }
   @media (prefers-color-scheme: dark) {
@@ -31,6 +32,7 @@
       --grid: #222632; --axis: #363b4a; --border: rgba(255,255,255,0.10);
       --observed: #eef0f5; --gru: #3987e5; --xgb: #d95926; --persistence: #898781;
       --wash: rgba(255,255,255,0.06);
+      --spread: rgba(57,135,229,0.26);
       --shadow: none;
     }
   }
@@ -41,6 +43,7 @@
     --grid: #222632; --axis: #363b4a; --border: rgba(255,255,255,0.10);
     --observed: #eef0f5; --gru: #3987e5; --xgb: #d95926; --persistence: #898781;
     --wash: rgba(255,255,255,0.06);
+    --spread: rgba(57,135,229,0.26);
     --shadow: none;
   }
   * { box-sizing: border-box; }
@@ -175,6 +178,7 @@
   .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text-secondary); font-size: 12.5px; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .key { width: 16px; height: 0; border-top: 2px solid; border-radius: 1px; display: inline-block; }
+  .key.band { height: 10px; border: 0; border-radius: 3px; background: var(--spread); }
   .plot { position: relative; }
   .plot svg { display: block; width: 100%; overflow: visible; }
   .plot text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
@@ -271,6 +275,8 @@
       <div class="legend" id="legend-live"></div>
       <div class="plot" id="plot-live"></div>
       <div class="table-wrap" id="table-live" hidden></div>
+      <p class="note" id="spread-note" hidden>The shaded band is the model spread: the lowest to highest forecast among the GRU seed members and XGBoost for each hour.
+        It shows how much the models disagree, not a confidence interval; the observed value can fall outside it.</p>
     </div>
     <div class="card" id="record" hidden style="overflow-x:auto">
       <div class="card-head">
@@ -548,6 +554,11 @@
       const pw = W - M.l - M.r, ph = height - M.t - M.b;
       let ymin = Infinity, ymax = -Infinity;
       for (const k of keys) for (let i = lo; i <= hi; i++) { const v = valueOf(k, i); if (v === null) continue; if (v < ymin) ymin = v; if (v > ymax) ymax = v; }
+      if (opts.band) for (let i = lo; i <= hi; i++) {
+        const a = opts.band.low(i), b = opts.band.high(i);
+        if (a !== null && a < ymin) ymin = a;
+        if (b !== null && b > ymax) ymax = b;
+      }
       ymin = Math.min(ymin, 0); ymax = Math.max(ymax, opts.thresholds ? 20 : 1);
       const step = niceStep(ymax - ymin, 5);
       ymin = Math.floor(ymin / step) * step; ymax = Math.ceil(ymax / step) * step;
@@ -597,6 +608,20 @@
         }
         close();
         root.append(svg("path", { d, fill: `url(#${gradient})`, stroke: "none", class: animate ? "fade" : "" }));
+      }
+      // Model spread: shaded between the lowest and highest member forecast, broken at gaps.
+      if (opts.band) {
+        let d = "", run = [];
+        const flush = () => {
+          if (run.length) {
+            d += run.map((i, j) => (j ? "L" : "M") + x(i).toFixed(1) + " " + y(opts.band.high(i)).toFixed(1)).join("");
+            d += run.slice().reverse().map((i) => "L" + x(i).toFixed(1) + " " + y(opts.band.low(i)).toFixed(1)).join("") + "Z";
+          }
+          run = [];
+        };
+        for (let i = lo; i <= hi; i++) { if (opts.band.low(i) === null || opts.band.high(i) === null) flush(); else run.push(i); }
+        flush();
+        root.append(svg("path", { d, fill: "var(--spread)", stroke: "none", class: animate ? "fade" : "" }));
       }
       for (const k of keys) {
         let d = "", pen = false;
@@ -660,6 +685,11 @@
         row.append(key, el("b", {}, valueOf(k, i) === null ? "pending" : fmt(valueOf(k, i), k === "observed" && opts.thresholds ? 0 : 1)), el("span", { className: "name" }, SERIES[k].name));
         tooltip.append(row);
       }
+      if (opts.band) {
+        const a = opts.band.low(i), b = opts.band.high(i), row = el("div", { className: "row" });
+        row.append(el("span", { className: "key band" }), el("b", {}, a === null || b === null ? "n/a" : fmt(a) + " to " + fmt(b)), el("span", { className: "name" }, "Model spread"));
+        tooltip.append(row);
+      }
       tooltip.style.display = "block";
       const scale = host.clientWidth / W, left = px * scale;
       tooltip.style.top = M.t + 6 + "px";
@@ -670,7 +700,7 @@
     return chart;
   }
 
-  function legend(host, keys) {
+  function legend(host, keys, band) {
     host.replaceChildren();
     for (const k of keys) {
       const item = el("span"), key = el("span", { className: "key" });
@@ -678,19 +708,27 @@
       item.append(key, document.createTextNode(SERIES[k].name));
       host.append(item);
     }
+    if (band) {
+      const item = el("span");
+      item.append(el("span", { className: "key band" }), document.createTextNode(band));
+      host.append(item);
+    }
   }
 
   // ---------- table views ----------
-  function dataTable(ctx, host, keys, valueOf, digitsOf) {
+  // extra: more columns after the series, as [header, (i) => cell text].
+  function dataTable(ctx, host, keys, valueOf, digitsOf, extra = []) {
     const T0 = ctx.t0, [lo, hi] = ctx.range();
     const table = el("table"), head = el("tr");
     head.append(el("th", {}, "Time (UTC)"));
     for (const k of keys) head.append(el("th", {}, SERIES[k].name));
+    for (const [name] of extra) head.append(el("th", {}, name));
     table.append(head);
     for (let i = hi; i >= lo; i--) {
       const row = el("tr");
       row.append(el("td", {}, stamp(T0 + i * HOUR).replace(" UTC", "")));
       for (const k of keys) row.append(el("td", {}, valueOf(k, i) === null ? "pending" : fmt(valueOf(k, i), digitsOf(k))));
+      for (const [, cell] of extra) row.append(el("td", {}, cell(i)));
       table.append(row);
     }
     host.replaceChildren(table);
@@ -840,9 +878,15 @@
 
     const ctx = { t0, range: () => [0, last], group: [], hover: null };
     const value = (k, i) => L[k][i];
-    const chart = lineChart(ctx, $("plot-live"), 320, dstKeys, value, { thresholds: true, area: "observed", endDot: "gru", label: "Line chart of observed quick-look Dst and one hour ahead forecasts over the last seven days" });
-    legend($("legend-live"), legendOrder);
-    wireToggle("toggle-live", "table-live", () => dataTable(ctx, $("table-live"), legendOrder, value, (k) => (k === "observed" ? 0 : 1)));
+    // Older live.js files have no spread; the chart then simply has no band.
+    const S = L.spread && L.spread.low && L.spread.low.length === L.hours ? L.spread : null;
+    const band = S ? { low: (i) => S.low[i], high: (i) => S.high[i] } : null;
+    const spreadCell = (i) => (S.low[i] === null || S.high[i] === null ? "n/a" : fmt(S.low[i]) + " to " + fmt(S.high[i]));
+    $("spread-note").hidden = !S;
+    const chart = lineChart(ctx, $("plot-live"), 320, dstKeys, value, { thresholds: true, area: "observed", endDot: "gru", band,
+      label: "Line chart of observed quick-look Dst and one hour ahead forecasts over the last seven days" + (S ? ", with the model spread shaded" : "") });
+    legend($("legend-live"), legendOrder, S ? "Model spread (not a confidence interval)" : null);
+    wireToggle("toggle-live", "table-live", () => dataTable(ctx, $("table-live"), legendOrder, value, (k) => (k === "observed" ? 0 : 1), S ? [["Model spread", spreadCell]] : []));
     chart.draw(true);
     liveChart = chart;
     renderRecord(L.archive);
