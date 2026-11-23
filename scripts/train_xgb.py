@@ -1,9 +1,10 @@
 """Train the XGBoost baseline and compare it with persistence on the held out test years.
 
-Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K]
-Writes: models/xgb_dst_{H}h{_swK}.ubj, reports/xgb_baseline{_Hh}{_swK}.json,
-reports/xgb_test_predictions{_Hh}{_swK}.parquet
-(the 1 hour reports keep their names without the suffix; _swK only when K is not 1)
+Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--driver-memory]
+Writes: models/xgb_dst_{H}h{_swK}{_mem}.ubj, reports/xgb_baseline{_Hh}{_swK}{_mem}.json,
+reports/xgb_test_predictions{_Hh}{_swK}{_mem}.parquet
+(the 1 hour reports keep their names without the suffix; _swK only when K is not 1,
+_mem only with --driver-memory)
 """
 import argparse
 import json
@@ -18,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
-from oculstorm.features import HORIZON, HORIZONS, build_features, suffix, weight_tag  # noqa: E402
+from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, build_features, suffix, weight_tag  # noqa: E402
 from oculstorm.metrics import evaluate, persistence, storm_weights, trend_persistence  # noqa: E402
 
 PARAMS = dict(
@@ -53,11 +54,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
     parser.add_argument("--storm-weight", type=float, default=1.0, help="loss weight at Dst <= -100 nT relative to quiet time")
+    parser.add_argument("--driver-memory", action="store_true",
+                        help=f"add decaying means of VBs and Newell with time constants {MEMORY_TAUS} h")
     args = parser.parse_args()
     h, peak = args.horizon, args.storm_weight
-    tag = suffix(h) + weight_tag(peak)
+    memory = MEMORY_TAUS if args.driver_memory else ()
+    model_tag = weight_tag(peak) + ("_mem" if memory else "")
+    tag = suffix(h) + model_tag
     df = load_hourly()
-    X, y = build_features(df, horizon=h)
+    X, y = build_features(df, horizon=h, memory=memory)
     X_dst, _ = build_features(df, use_solar_wind=False, horizon=h)
     (_, X_va, X_te), (_, y_va, y_te) = split(X), split(y)
     print(f"horizon: {h}h  storm weight: {peak:g}  features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}  test: {len(X_te):,}")
@@ -87,11 +92,12 @@ def main() -> None:
 
     (ROOT / "models").mkdir(exist_ok=True)
     (ROOT / "reports").mkdir(exist_ok=True)
-    model.save_model(ROOT / "models" / f"xgb_dst_{h}h{weight_tag(peak)}.ubj")
+    model.save_model(ROOT / "models" / f"xgb_dst_{h}h{model_tag}.ubj")
     pd.DataFrame({"dst_observed": y_te, **predictions}).to_parquet(ROOT / "reports" / f"xgb_test_predictions{tag}.parquet")
     report = {
         "horizon_hours": h,
         "storm_weight": peak,
+        "driver_memory_taus": list(memory),
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
         "test": f"{TEST_START} .. {y_te.index.max()}",
