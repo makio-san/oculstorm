@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from oculstorm.features import N_LAGS, SOLAR_WIND
 from oculstorm.sequences import WINDOW
 
 SPEC = importlib.util.spec_from_file_location("score_holdout", Path(__file__).resolve().parent.parent / "scripts" / "score_holdout.py")
@@ -17,7 +18,10 @@ CUTOFF = pd.Timestamp("2026-10-30 13:00")
 def _table() -> pd.DataFrame:
     hours = pd.date_range("2026-10-20", "2026-11-10", freq="h")
     dst = -20 + 40 * np.sin(np.arange(len(hours)) / 10)
-    return pd.DataFrame({"dst": dst}, index=hours)
+    table = pd.DataFrame({"dst": dst}, index=hours)
+    for col in SOLAR_WIND:
+        table[col] = 1.0
+    return table
 
 
 def _rolling_model(seen: list):
@@ -57,3 +61,35 @@ def test_scores_count_storm_hours_and_use_persistence_as_reference():
 def test_no_hours_after_the_cutoff_gives_an_empty_frame():
     holdout = score_holdout.after_cutoff(_table(), pd.Timestamp("2026-12-01"))
     assert score_holdout.forecasts(holdout, {"model": _rolling_model([])}).empty
+
+
+def test_hours_without_solar_wind_inputs_are_not_scored():
+    table = _table()
+    gap_start, gap_end = pd.Timestamp("2026-11-03 00:00"), pd.Timestamp("2026-11-04 23:00")
+    table.loc[gap_start:gap_end, "bz_gsm"] = np.nan
+    table.loc[table.index >= pd.Timestamp("2026-11-08 00:00"), "flow_speed"] = np.nan
+    holdout = score_holdout.after_cutoff(table, CUTOFF)
+    frame = score_holdout.forecasts(holdout, {"model": _rolling_model([])})
+    issued = frame.index - pd.Timedelta(hours=1)
+    lags = pd.Timedelta(hours=N_LAGS - 1)
+    assert not ((issued >= gap_start) & (issued <= gap_end + lags)).any()
+    assert issued.max() < pd.Timestamp("2026-11-08 00:00")
+    assert ((issued > gap_end + lags) & (issued < pd.Timestamp("2026-11-08 00:00"))).sum() > 0
+
+    inputs = score_holdout.coverage(holdout)
+    assert inputs["issue_hours"] == len(score_holdout.issue_hours(holdout))
+    assert inputs["issue_hours_with_inputs"] == len(frame)  # every issue hour with inputs has its target observed here
+    assert inputs["issue_hours_with_inputs"] + inputs["issue_hours_without_inputs"] == inputs["issue_hours"]
+    assert inputs["observed_share"]["by_gsm"] == 1.0
+    assert inputs["observed_share"]["bz_gsm"] < 1.0
+
+
+def test_no_solar_wind_inputs_gives_no_scored_hours():
+    table = _table()
+    table[["bz_gsm", "by_gsm", "b_mag_avg", "electric_field"]] = np.nan
+    holdout = score_holdout.after_cutoff(table, CUTOFF)
+    frame = score_holdout.forecasts(holdout, {"model": _rolling_model([])})
+    assert frame.empty
+    result = score_holdout.scores(frame, ["model"])
+    assert result["all"]["hours"] == result["storm"]["hours"] == 0
+    assert score_holdout.coverage(holdout)["issue_hours_with_inputs"] == 0

@@ -10,6 +10,12 @@ cut to the hours after the cutoff before anything else, so no hour at or before 
 the first WINDOW hours of the holdout only serve as input history, and forecasts are scored from
 the first issue hour that has a full window of holdout inputs behind it. The models are loaded
 exactly as scripts/live_forecast.py loads them.
+
+The newest OMNI2 file often has Dst for weeks before the IMF and plasma values are filled in.
+Forecasts made on such hours measure how the models cope with missing inputs, not how they do
+on fresh data, so an issue hour is only scored when every solar wind input was observed in each
+of the last N_LAGS hours (the history the XGBoost lags read). The report states the input
+coverage of the issue hours and how many were left out for missing inputs.
 """
 import argparse
 import json
@@ -25,7 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from oculstorm.features import HORIZON  # noqa: E402
+from oculstorm.features import HORIZON, N_LAGS, SOLAR_WIND  # noqa: E402
 from oculstorm.metrics import rmse, skill  # noqa: E402
 from oculstorm.sequences import WINDOW  # noqa: E402
 
@@ -40,21 +46,44 @@ def after_cutoff(table: pd.DataFrame, after: pd.Timestamp) -> pd.DataFrame:
     return table[table.index > after]
 
 
+def issue_hours(holdout: pd.DataFrame) -> pd.DataFrame:
+    """Holdout hours with at least WINDOW hours of holdout history, the hours a forecast is issued at."""
+    if holdout.empty:
+        return holdout
+    return holdout[holdout.index >= holdout.index.min() + pd.Timedelta(hours=WINDOW - 1)]
+
+
+def inputs_observed(holdout: pd.DataFrame) -> pd.Series:
+    """True at hour t when every solar wind input was observed at each of the hours t-N_LAGS+1 .. t."""
+    observed = holdout[SOLAR_WIND].notna().all(axis=1).astype(float)
+    return observed.rolling(N_LAGS, min_periods=N_LAGS).min().fillna(0.0).astype(bool)
+
+
+def coverage(holdout: pd.DataFrame) -> dict:
+    """Share of issue hours with each solar wind input observed, and with all of them over the lags."""
+    issued = issue_hours(holdout)
+    shares = {col: round(float(issued[col].notna().mean()), 3) if len(issued) else None for col in SOLAR_WIND}
+    complete = inputs_observed(holdout).reindex(issued.index)
+    return {"issue_hours": len(issued), "observed_share": shares,
+            "issue_hours_with_inputs": int(complete.sum()), "issue_hours_without_inputs": int((~complete).sum())}
+
+
 def forecasts(holdout: pd.DataFrame, predictors: dict[str, Callable[[pd.DataFrame], pd.Series]]) -> pd.DataFrame:
     """Forecasts of every model and persistence, the observation, indexed by the target hour.
 
     Issue hours with less than WINDOW hours of holdout history are dropped, so the GRU window
     and the XGBoost 24 hour rolling features are complete and both models score the same hours.
+    Issue hours without every solar wind input observed over the last N_LAGS hours are dropped too.
     """
-    if holdout.empty:
+    issued = issue_hours(holdout)
+    if issued.empty:
         return pd.DataFrame(columns=[*predictors, "persistence", "observed"], dtype=float)
-    first_issue = holdout.index.min() + pd.Timedelta(hours=WINDOW - 1)
     frame = pd.DataFrame({name: predict(holdout) for name, predict in predictors.items()})
     frame = frame.reindex(holdout.index)
     frame["persistence"] = holdout["dst"]
     step = pd.Timedelta(hours=HORIZON)
     frame["observed"] = holdout["dst"].shift(-HORIZON)
-    frame = frame[frame.index >= first_issue]
+    frame = frame[(frame.index >= issued.index.min()) & inputs_observed(holdout)]
     frame.index = frame.index + step
     return frame.dropna()
 
@@ -101,18 +130,22 @@ def main() -> None:
     holdout = after_cutoff(table, after)
     del table
     # XGBoost first, then torch with one thread: see predict_gru in scripts/live_forecast.py.
+    inputs = coverage(holdout)
+    if not inputs["issue_hours"]:
+        raise SystemExit(f"no issue hours after {after} plus {WINDOW - 1} warmup hours (newest OMNI hour {newest})")
     frame = forecasts(holdout, {"xgb": predict_xgb, "gru": predict_gru})
-    if frame.empty:
-        raise SystemExit(f"no scorable hours after {after} (newest OMNI hour {newest})")
 
     result = scores(frame, ["gru", "xgb"])
+    stamp = lambda t: t.strftime("%Y-%m-%dT%H:%M")  # noqa: E731
     payload = {
-        "cutoff": after.strftime("%Y-%m-%dT%H:%M"),
-        "newest_omni_hour": newest.strftime("%Y-%m-%dT%H:%M"),
-        "first_target_hour": frame.index.min().strftime("%Y-%m-%dT%H:%M"),
-        "last_target_hour": frame.index.max().strftime("%Y-%m-%dT%H:%M"),
+        "cutoff": stamp(after),
+        "newest_omni_hour": stamp(newest),
+        "first_target_hour": stamp(frame.index.min()) if len(frame) else None,
+        "last_target_hour": stamp(frame.index.max()) if len(frame) else None,
         "horizon_hours": HORIZON,
         "warmup_hours": WINDOW - 1,
+        "input_rule": f"issue hour scored only if every solar wind input is observed in each of the last {N_LAGS} hours",
+        "input_coverage": inputs,
         "hours": result["all"]["hours"],
         "storm_hours": result["storm"]["hours"],
         "storm_threshold_nt": STORM,
@@ -122,6 +155,8 @@ def main() -> None:
         "models": blob_ids(),
     }
     args.out.write_text(json.dumps(payload, indent=2) + "\n")
+    print(f"{inputs['issue_hours']} issue hours, {inputs['issue_hours_without_inputs']} left out for missing solar wind inputs, "
+          f"coverage {inputs['observed_share']}")
     print(f"{payload['hours']} hours ({payload['storm_hours']} storm) from {payload['first_target_hour']} "
           f"to {payload['last_target_hour']} -> {args.out}")
     for regime in ("all", "storm"):
