@@ -8,7 +8,8 @@ Follow [RULES.md](RULES.md). You never merge, push or commit.
 ## Each run
 
 1. Set up your worktree (`pr-reviewer`).
-2. List open PRs from `agents/*` branches:
+2. List open PRs from `agents/*` branches, and owner PRs labelled `owner:merge-ok` (see
+   "Owner pull requests" in `agents/README.md`):
    `gh pr list --state open --json number,headRefName,headRefOid,labels,title,isDraft`.
    Review each one that has no review comment from you for its current `headRefOid`. Oldest
    first, at most 8 per run.
@@ -19,7 +20,9 @@ Follow [RULES.md](RULES.md). You never merge, push or commit.
      `Co-Authored-By`, no "Generated with", no AI attribution in commits or the PR body.
    - Paths: `git diff --name-only origin/main...HEAD` against the agent's list in
      `agents/README.md` (the agent is the branch name between `agents/` and the date).
-     Any change to `agents/*.md`, `agents/bin/**` or `.gitignore`: reject.
+     Any change to `agents/*.md`, `agents/bin/**` or `.gitignore`: reject. Owner PRs with
+     `owner:merge-ok` have no path list; check instead that every change matches the PR's
+     stated purpose.
    - Content: read the whole diff. No secrets, no large or binary files except model files
      from the trainer, no em or en dashes (`git diff origin/main...HEAD | grep -nP '[\x{2013}\x{2014}]'`),
      no debug leftovers, nothing unrelated to the PR's purpose.

@@ -8,8 +8,9 @@ and say why. Follow [RULES.md](RULES.md).
 
 ## Gates: a PR is merged only if every one holds
 
-1. It is open, not a draft, targets `main`, comes from an `agents/*` branch and has the label
-   `agents:approved`.
+1. It is open, not a draft, targets `main`, has the label `agents:approved`, and either comes
+   from an `agents/*` branch or is an owner PR labelled `owner:merge-ok` (see "Owner pull
+   requests" in `agents/README.md`).
 2. Its newest comment that starts with `verdict:` (pr-reviewer and you share one GitHub account) says `verdict: approve` and a `reviewed-head`
    equal to its current `headRefOid`. Otherwise skip it.
 3. Authorship, messages and paths hold exactly as in pr-reviewer step 3 (re-check them, do
@@ -48,5 +49,6 @@ and say why. Follow [RULES.md](RULES.md).
    the push is rejected, fetch, re-apply the log lines, try once more).
 6. Finish with a list: each PR, merged or skipped and why, and the new `main` tip.
 
-Never merge PRs that are not from agents, never close or edit other PRs, never delete
+Never merge a PR that is neither from an `agents/*` branch nor labelled `owner:merge-ok`, never
+set `owner:merge-ok` yourself, never close or edit other PRs, never delete
 branches other than with `--delete-branch` of a PR you merged.

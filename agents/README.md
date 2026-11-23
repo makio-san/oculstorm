@@ -71,6 +71,17 @@ merged result. Model PRs also need the checks in the retrain policy. After every
 changes the deployed site or the models, the merger watches the live workflow run and reverts
 the merge if it fails.
 
+## Owner pull requests
+
+The owner can hand a pull request of their own (any branch that is not `agents/*`, also one
+Claude opened at the owner's request in a chat) to the agents by adding the label
+`owner:merge-ok`. Only the owner sets that label, or asks for it in their own words; an agent
+never sets it. Such a PR goes through the same review and the same gates, with two
+differences: there is no path list (the owner may change any file, including the agent files
+in `agents/`), and changes to `.github/**`, `models/**` or `agents/bin/**` still need both
+reviewers to approve with the reasons written out. Without the label, the agents leave the
+owner's PRs alone.
+
 ## Workspace
 
 Agents never work in the owner's checkout. `/Users/esma/Projects/oculstorm-agents/` holds a
