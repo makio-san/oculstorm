@@ -43,8 +43,34 @@ def _coupling(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+# O'Brien and McPherron (2000) ring current model, Burton form dDst*/dt = Q - Dst*/tau.
+OM_PRESSURE = 7.26  # nT / sqrt(nPa)
+OM_QUIET = 11.0  # nT
+OM_VBS_THRESHOLD = 0.49  # mV/m
+OM_INJECTION = -4.4  # nT/h per mV/m
+
+
+def _ring_current(df: pd.DataFrame) -> pd.DataFrame:
+    """O'Brien and McPherron (2000) terms at hour t, from Dst, VBs and pressure at t (and P at t-1).
+
+    dst_star is the pressure corrected Dst, q_om the injection, tau_om the decay time in hours,
+    om_step the predicted Dst* change over the next hour and dpress the pressure correction
+    change over the last hour. Missing pressure or VBs gives NaN, like the other drivers.
+    """
+    vbs = _coupling(df)["vbs"]
+    sqrt_p = np.sqrt(df["flow_pressure"])
+    out = pd.DataFrame(index=df.index)
+    out["dst_star"] = df["dst"] - OM_PRESSURE * sqrt_p + OM_QUIET
+    out["q_om"] = OM_INJECTION * (vbs - OM_VBS_THRESHOLD).clip(lower=0)
+    out["tau_om"] = 2.40 * np.exp(9.74 / (4.69 + vbs))
+    out["om_step"] = out["q_om"] - out["dst_star"] / out["tau_om"]
+    out["dpress"] = OM_PRESSURE * (sqrt_p - sqrt_p.shift(1))
+    return out
+
+
 def build_features(
-    df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON
+    df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON,
+    ring_current: bool = False,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y) where y is Dst at t+horizon and X only looks backwards from t.
 
@@ -53,6 +79,7 @@ def build_features(
     With use_solar_wind=False only the Dst history and calendar terms are kept,
     which shows how much of the skill actually comes from the solar wind.
     With require_target=False the newest hours, whose target is not known yet, are kept.
+    With ring_current=True the O'Brien and McPherron (2000) terms are added (needs the solar wind).
     """
     cols: dict[str, pd.Series] = {}
     dst = df["dst"]
@@ -73,6 +100,13 @@ def build_features(
             for window in (3, 12):
                 cols[f"{name}_mean{window}"] = drivers[name].rolling(window, min_periods=1).mean()
         cols["f107"] = df["f107"]
+        if ring_current:
+            om = _ring_current(df)
+            for name in ["dst_star", "om_step"]:
+                for lag in range(N_LAGS):
+                    cols[f"{name}_lag{lag}"] = om[name].shift(lag)
+            for name in ["q_om", "tau_om", "dpress"]:
+                cols[name] = om[name]
 
     # Dst has a diurnal and a semiannual (Russell-McPherron) modulation.
     hour = df.index.hour + 0.0
