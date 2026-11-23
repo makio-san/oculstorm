@@ -1,0 +1,271 @@
+{
+  "issue": 5,
+  "title": "O'Brien and McPherron (2000) ring current terms as features",
+  "result": "no-gain",
+  "split": "validation only, 2017-01-01 .. 2020-12-31; train 1995 .. 2016; test years not used",
+  "horizon_hours": 1,
+  "configuration": {
+    "option": "build_features(ring_current=True), build_windows(ring_current=True), --ring-current in scripts/train_xgb.py and scripts/train_gru.py; default off",
+    "terms": {
+      "dst_star": "dst - 7.26 * sqrt(flow_pressure) + 11",
+      "q_om": "-4.4 * max(vbs - 0.49, 0)",
+      "tau_om": "2.40 * exp(9.74 / (4.69 + vbs))",
+      "om_step": "q_om - dst_star / tau_om",
+      "dpress": "7.26 * (sqrt(P_t) - sqrt(P_t-1))"
+    },
+    "xgboost_features": "baseline 89 plus dst_star and om_step lags 0..5, q_om, tau_om, dpress (104)",
+    "gru_channels": "baseline channels plus dst_star and om_step (standardised on train, same gap filling)",
+    "models": "production hyperparameters from scripts/train_xgb.py and scripts/train_gru.py, storm weight 1, GRU seeds 0 1 2 averaged"
+  },
+  "bootstrap": {
+    "method": "oculstorm.metrics.block_bootstrap_rmse, paired",
+    "block_hours": 168,
+    "resamples": 2000,
+    "seed": 0,
+    "intervals": "95% for candidate minus baseline RMSE and for the MSE change in percent"
+  },
+  "baseline_check": "both baselines retrained here reproduce validation_scores in reports/xgb_baseline.json (RMSE 2.6565) and reports/gru_baseline.json (2.6205)",
+  "xgboost": {
+    "validation": "2017-01-01 00:00:00 .. 2020-12-31 23:00:00",
+    "baseline": {
+      "n_features": 89,
+      "best_iteration": 2151,
+      "seconds": 72
+    },
+    "candidate": {
+      "n_features": 104,
+      "best_iteration": 1892,
+      "seconds": 82,
+      "top_features_gain_share": {
+        "om_step_lag0": 0.2283,
+        "dst_diff1": 0.0665,
+        "flow_pressure_lag0": 0.0458,
+        "bz_gsm_lag0": 0.0451,
+        "dst_lag1": 0.0367,
+        "b_mag_avg_lag0": 0.0328,
+        "newell_lag0": 0.0219,
+        "dst_diff3": 0.019,
+        "bz_gsm_lag2": 0.0185,
+        "electric_field_lag0": 0.0161
+      }
+    },
+    "regimes": {
+      "all": {
+        "n_hours": 35064,
+        "rmse_persistence": 3.3704,
+        "rmse_baseline": 2.6565,
+        "rmse_candidate": 2.6563,
+        "skill_baseline": 0.3788,
+        "skill_candidate": 0.3788,
+        "mse_change_pct": -0.01,
+        "mse_change_pct_ci95": [
+          -0.48,
+          0.45
+        ],
+        "rmse_difference": -0.0001,
+        "rmse_difference_ci95": [
+          -0.0064,
+          0.0059
+        ],
+        "share_candidate_better": 0.502
+      },
+      "quiet (Dst > -50)": {
+        "n_hours": 34702,
+        "rmse_persistence": 3.2359,
+        "rmse_baseline": 2.5678,
+        "rmse_candidate": 2.5683,
+        "skill_baseline": 0.3703,
+        "skill_candidate": 0.3701,
+        "mse_change_pct": 0.04,
+        "mse_change_pct_ci95": [
+          -0.36,
+          0.43
+        ],
+        "rmse_difference": 0.0005,
+        "rmse_difference_ci95": [
+          -0.0046,
+          0.0055
+        ],
+        "share_candidate_better": 0.422
+      },
+      "storm (Dst <= -50)": {
+        "n_hours": 362,
+        "rmse_persistence": 9.8253,
+        "rmse_baseline": 7.1727,
+        "rmse_candidate": 7.1528,
+        "skill_baseline": 0.4671,
+        "skill_candidate": 0.47,
+        "mse_change_pct": -0.55,
+        "mse_change_pct_ci95": [
+          -3.76,
+          2.59
+        ],
+        "rmse_difference": -0.0199,
+        "rmse_difference_ci95": [
+          -0.1338,
+          0.0922
+        ],
+        "share_candidate_better": 0.639
+      },
+      "intense (Dst <= -100)": {
+        "n_hours": 35,
+        "rmse_persistence": 15.9553,
+        "rmse_baseline": 11.6867,
+        "rmse_candidate": 11.8066,
+        "skill_baseline": 0.4635,
+        "skill_candidate": 0.4524,
+        "mse_change_pct": 2.06,
+        "mse_change_pct_ci95": [
+          -6.14,
+          40.36
+        ],
+        "rmse_difference": 0.1199,
+        "rmse_difference_ci95": [
+          -0.435,
+          1.6265
+        ],
+        "share_candidate_better": 0.403
+      }
+    }
+  },
+  "gru": {
+    "validation": "2017-01-01 00:00:00 .. 2020-12-31 23:00:00",
+    "baseline": {
+      "n_channels": 18,
+      "runs": [
+        {
+          "seed": 0,
+          "epochs": 21,
+          "best_val_rmse": 2.6403,
+          "val_rmse": 2.6403,
+          "seconds": 151
+        },
+        {
+          "seed": 1,
+          "epochs": 31,
+          "best_val_rmse": 2.6375,
+          "val_rmse": 2.6375,
+          "seconds": 507
+        },
+        {
+          "seed": 2,
+          "epochs": 21,
+          "best_val_rmse": 2.6359,
+          "val_rmse": 2.6359,
+          "seconds": 391
+        }
+      ],
+      "seconds": 1049
+    },
+    "candidate": {
+      "n_channels": 20,
+      "runs": [
+        {
+          "seed": 0,
+          "epochs": 20,
+          "best_val_rmse": 2.6506,
+          "val_rmse": 2.6506,
+          "seconds": 287
+        },
+        {
+          "seed": 1,
+          "epochs": 23,
+          "best_val_rmse": 2.6322,
+          "val_rmse": 2.6322,
+          "seconds": 344
+        },
+        {
+          "seed": 2,
+          "epochs": 24,
+          "best_val_rmse": 2.6409,
+          "val_rmse": 2.6409,
+          "seconds": 367
+        }
+      ],
+      "seconds": 998
+    },
+    "regimes": {
+      "all": {
+        "n_hours": 35064,
+        "rmse_persistence": 3.3704,
+        "rmse_baseline": 2.6205,
+        "rmse_candidate": 2.6235,
+        "skill_baseline": 0.3955,
+        "skill_candidate": 0.3941,
+        "mse_change_pct": 0.23,
+        "mse_change_pct_ci95": [
+          -0.26,
+          0.8
+        ],
+        "rmse_difference": 0.003,
+        "rmse_difference_ci95": [
+          -0.0034,
+          0.0105
+        ],
+        "share_candidate_better": 0.165
+      },
+      "quiet (Dst > -50)": {
+        "n_hours": 34702,
+        "rmse_persistence": 3.2359,
+        "rmse_baseline": 2.5324,
+        "rmse_candidate": 2.5315,
+        "skill_baseline": 0.3875,
+        "skill_candidate": 0.388,
+        "mse_change_pct": -0.07,
+        "mse_change_pct_ci95": [
+          -0.48,
+          0.36
+        ],
+        "rmse_difference": -0.0009,
+        "rmse_difference_ci95": [
+          -0.006,
+          0.0045
+        ],
+        "share_candidate_better": 0.613
+      },
+      "storm (Dst <= -50)": {
+        "n_hours": 362,
+        "rmse_persistence": 9.8253,
+        "rmse_baseline": 7.0968,
+        "rmse_candidate": 7.2348,
+        "skill_baseline": 0.4783,
+        "skill_candidate": 0.4578,
+        "mse_change_pct": 3.93,
+        "mse_change_pct_ci95": [
+          -0.41,
+          8.69
+        ],
+        "rmse_difference": 0.138,
+        "rmse_difference_ci95": [
+          -0.0142,
+          0.3021
+        ],
+        "share_candidate_better": 0.034
+      },
+      "intense (Dst <= -100)": {
+        "n_hours": 35,
+        "rmse_persistence": 15.9553,
+        "rmse_baseline": 10.5678,
+        "rmse_candidate": 10.9017,
+        "skill_baseline": 0.5613,
+        "skill_candidate": 0.5331,
+        "mse_change_pct": 6.42,
+        "mse_change_pct_ci95": [
+          0.33,
+          25.29
+        ],
+        "rmse_difference": 0.3339,
+        "rmse_difference_ci95": [
+          0.0174,
+          1.1121
+        ],
+        "share_candidate_better": 0.022
+      }
+    }
+  },
+  "run_time_seconds": {
+    "xgboost": 154,
+    "gru": 2047
+  },
+  "conclusion": "XGBoost: no change overall (MSE -0.01%) or in storm hours (-0.55%, interval includes zero), although om_step_lag0 becomes the top feature by gain. GRU: no change overall (+0.23%), storm MSE +3.9% (interval includes zero) and intense MSE +6.4% (interval excludes zero). Neither family meets the promotion bar."
+}
