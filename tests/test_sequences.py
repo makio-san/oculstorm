@@ -5,8 +5,8 @@ import pandas as pd
 from oculstorm.data import load_hourly
 import pytest
 
-from oculstorm.features import HORIZONS
-from oculstorm.sequences import WINDOW, build_windows
+from oculstorm.features import HORIZONS, MEMORY_TAUS
+from oculstorm.sequences import WINDOW, build_channels, build_windows, channel_stats
 
 CUT = pd.Timestamp("2024-05-10 12:00")
 
@@ -41,3 +41,29 @@ def test_window_ends_at_t_and_target_is_one_horizon_ahead(horizon):
     # so it has to move in step with the raw Dst over the window.
     raw = df["dst"].loc[t - pd.Timedelta(hours=WINDOW - 1) : t].to_numpy()
     assert np.corrcoef(windows[row][:, 0], raw)[0, 1] > 0.9999
+
+
+def test_driver_memory_windows_do_not_depend_on_the_future():
+    df = load_hourly()
+    windows, meta = build_windows(df, memory=MEMORY_TAUS)
+    base, _ = build_windows(df)
+    assert windows.shape[2] == base.shape[2] + 2 * len(MEMORY_TAUS)
+
+    corrupted = df.copy()
+    floats = corrupted.select_dtypes("float").columns
+    corrupted.loc[corrupted.index > CUT, floats] = -1234.0
+    windows_corrupted, _ = build_windows(corrupted, memory=MEMORY_TAUS)
+
+    past = meta.loc[meta.index <= CUT, "row"].to_numpy()[-500:]
+    future = meta.loc[meta.index > CUT, "row"].to_numpy()[:50]
+    assert np.array_equal(windows[past], windows_corrupted[past])
+    assert not np.array_equal(windows[future], windows_corrupted[future])
+
+
+def test_saved_stats_bring_their_driver_memory():
+    df = load_hourly()
+    stats = channel_stats(df, MEMORY_TAUS)
+    channels, _ = build_channels(df, stats)
+    assert channels.equals(build_channels(df, memory=MEMORY_TAUS)[0])
+    # Without memory the channels are exactly today's.
+    assert set(channel_stats(df)["mean"]) == set(stats["mean"]) - {c for c in stats["mean"] if "_ewm" in c}
