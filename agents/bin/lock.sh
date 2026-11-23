@@ -8,7 +8,7 @@
 # A lock older than 6 hours is treated as left behind by a crashed run and is taken over.
 set -euo pipefail
 
-LOCK=/Users/esma/Projects/oculstorm-agents/heavy.lock
+LOCK="${OCULSTORM_AGENTS_ROOT:-/Users/esma/Projects/oculstorm-agents}/heavy.lock"
 ACTION="${1:?usage: lock.sh take|release <agent>}"
 AGENT="${2:?usage: lock.sh take|release <agent>}"
 
