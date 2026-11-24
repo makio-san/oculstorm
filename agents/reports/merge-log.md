@@ -12,3 +12,9 @@ One line per pull request the release-merger considered. Appended by the merger 
 | 2026-11-23T17:47Z | #20 | agents/experimenter-2026-11-23-2 | 27381ab | skipped | limit of 5 merges per run reached |
 | 2026-11-23T17:47Z | #19 | agents/experimenter-2026-11-23-3 | 82c24a1 | skipped | limit of 5 merges per run reached |
 | 2026-11-23T17:47Z | #17 | agents/feature-builder-2026-11-23-2 | 11470b8 | skipped | limit of 5 merges per run reached |
+| 2026-11-24T08:28Z | #20 | agents/experimenter-2026-11-23-2 | 27381ab | skipped | does not merge cleanly into main 8ef7605 (conflicts in features, sequences, train scripts, tests); commented |
+| 2026-11-24T08:29Z | #19 | agents/experimenter-2026-11-23-3 | 82c24a1 | merged | all gates hold; validation only, full tests pass, live run 45356493095 succeeded |
+| 2026-11-24T08:30Z | #17 | agents/feature-builder-2026-11-23-2 | 11470b8 | skipped | does not merge cleanly into main 2f9b07a (conflicts in docs/index.html, scripts/live_forecast.py); commented |
+| 2026-11-24T08:31Z | #26 | agents/experimenter-2026-11-24 | 1056a86 | merged | all gates hold; validation only, full tests pass, live forecast unchanged and finite, live run 45356857560 succeeded |
+| 2026-11-24T08:33Z | #22 | agents/dashboard-qa-2026-11-24 | f0e356b | merged | all gates hold; tests pass, live run 45357198194 succeeded |
+| 2026-11-24T08:36Z | #21 | agents/data-watch-2026-11-24 | 1d7d03c | merged | all gates hold; report only, tests pass |
