@@ -56,3 +56,18 @@ def test_robust_objective_fits():
         params = {**train_xgb.PARAMS, "n_estimators": 5, "early_stopping_rounds": 2, **train_xgb.objective_params(objective)}
         _, val_pred, _ = train_xgb.fit(X, y, params=params, test=False)
         assert np.isfinite(val_pred).all()
+
+
+def test_main_validation_only_runs_with_a_robust_objective(monkeypatch, capsys):
+    X, y = _frame()
+    keep = y.notna()
+    X, y = X[keep], y[keep]
+    monkeypatch.setitem(train_xgb.PARAMS, "n_estimators", 5)
+    monkeypatch.setitem(train_xgb.PARAMS, "early_stopping_rounds", 2)
+    monkeypatch.setattr(train_xgb, "load_hourly", lambda: None)
+    monkeypatch.setattr(train_xgb, "build_features", lambda *a, **k: (X, y))
+    for objective in ("absolute", "pseudohuber"):
+        monkeypatch.setattr(train_xgb.sys, "argv", ["train_xgb.py", "--validation-only", "--objective", objective])
+        train_xgb.main()
+        out = capsys.readouterr().out
+        assert "reg:" in out and "Validation:" in out
