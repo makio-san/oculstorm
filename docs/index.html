@@ -397,7 +397,8 @@
   const stamp = (ms) => iso(ms).slice(0, 16).replace("T", " ") + " UTC";
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const shortDay = (ms) => { const d = new Date(ms); return MONTHS[d.getUTCMonth()] + " " + d.getUTCDate(); };
-  const fmt = (v, digits = 1) => v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  // Round first so a tiny negative value prints as "0.0", not "-0.0".
+  const fmt = (v, digits = 1) => (Number(v.toFixed(digits)) || 0).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   const index = (ms) => clamp(Math.round((ms - T0) / HOUR), 0, D.hours - 1);
 
