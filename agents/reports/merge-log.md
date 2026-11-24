@@ -18,3 +18,7 @@ One line per pull request the release-merger considered. Appended by the merger 
 | 2026-11-24T08:31Z | #26 | agents/experimenter-2026-11-24 | 1056a86 | merged | all gates hold; validation only, full tests pass, live forecast unchanged and finite, live run 45356857560 succeeded |
 | 2026-11-24T08:33Z | #22 | agents/dashboard-qa-2026-11-24 | f0e356b | merged | all gates hold; tests pass, live run 45357198194 succeeded |
 | 2026-11-24T08:36Z | #21 | agents/data-watch-2026-11-24 | 1d7d03c | merged | all gates hold; report only, tests pass |
+| 2026-11-24T17:50Z | #20 | agents/experimenter-2026-11-23-2 | 93f01ff | merged | all gates hold; validation only, full tests pass, live forecast finite, live run 45452273427 succeeded |
+| 2026-11-24T17:50Z | #17 | agents/feature-builder-2026-11-23-2 | b8ed2ef | merged | all gates hold; full tests pass, live forecast finite, live run 45452729895 succeeded |
+| 2026-11-24T17:50Z | #28 | agents/experimenter-2026-11-24 | 7a717f7 | skipped | conflicts with main in scripts/train_xgb.py after #20; commented |
+| 2026-11-24T17:50Z | #29 | agents/experimenter-2026-11-24-2 | 257a235 | skipped | conflicts with main in scripts/train_xgb.py after #20; commented |
