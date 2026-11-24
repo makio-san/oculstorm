@@ -182,6 +182,7 @@
   .plot { position: relative; }
   .plot svg { display: block; width: 100%; overflow: visible; }
   .plot text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .plot text.end-label { fill: var(--text-primary); font-weight: 600; stroke: var(--surface); stroke-width: 5px; stroke-linejoin: round; paint-order: stroke; }
   .plot path.draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1000ms ease-out forwards; }
   .plot path.fade { opacity: 0; animation: fade 700ms ease-out 350ms forwards; }
   .plot circle.ring { transform-box: fill-box; transform-origin: center; animation: ring 2s ease-out infinite; }
@@ -396,7 +397,8 @@
   const stamp = (ms) => iso(ms).slice(0, 16).replace("T", " ") + " UTC";
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const shortDay = (ms) => { const d = new Date(ms); return MONTHS[d.getUTCMonth()] + " " + d.getUTCDate(); };
-  const fmt = (v, digits = 1) => v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  // Round first so a tiny negative value prints as "0.0", not "-0.0".
+  const fmt = (v, digits = 1) => (Number(v.toFixed(digits)) || 0).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   const index = (ms) => clamp(Math.round((ms - T0) / HOUR), 0, D.hours - 1);
 
@@ -639,7 +641,7 @@
         const v = valueOf(opts.endDot, hi), color = SERIES[opts.endDot].color;
         root.append(svg("circle", { class: "ring", cx: x(hi), cy: y(v), r: 4.5, fill: color }));
         root.append(svg("circle", { cx: x(hi), cy: y(v), r: 4.5, fill: color, stroke: "var(--surface)", "stroke-width": 2 }));
-        root.append(svg("text", { x: x(hi) - 10, y: y(v) - 12, "text-anchor": "end", fill: "var(--text-primary)", "font-weight": 600 }, fmt(v) + " nT forecast"));
+        root.append(svg("text", { x: x(hi) - 10, y: y(v) - 12, "text-anchor": "end", class: "end-label" }, fmt(v) + " nT forecast"));
       }
       const cross = svg("g", { visibility: "hidden" });
       cross.append(svg("line", { y1: M.t, y2: M.t + ph, stroke: "var(--muted)", "stroke-width": 1 }));
