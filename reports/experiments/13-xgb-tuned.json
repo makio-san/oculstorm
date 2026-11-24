@@ -1,0 +1,458 @@
+{
+  "issue": 13,
+  "title": "Tuned XGBoost 1 hour configuration (tuning-2026-11-23-xgb.json, configuration 21), confirmation with 5 seeds",
+  "result": "promising",
+  "date": "2026-11-24",
+  "split": "validation only, 2017-01-01 .. 2020-12-31; train 1995 .. 2016; test years not used (fit(..., test=False), the test rows are never predicted)",
+  "horizon_hours": 1,
+  "storm_weight": 1.0,
+  "configuration": {
+    "option": "scripts/train_xgb.py --n-lags 10 --max-depth 4 --min-child-weight 13.842 --learning-rate 0.042 --subsample 0.959 --colsample-bytree 0.912 --n-estimators 20000 [--seed S]; build_features(n_lags=...) in oculstorm/features.py; defaults unchanged (N_LAGS 6, PARAMS)",
+    "baseline": {
+      "n_lags": 6,
+      "n_features": 89,
+      "params": {
+        "n_estimators": 3000,
+        "learning_rate": 0.03,
+        "max_depth": 6,
+        "min_child_weight": 5,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "tree_method": "hist",
+        "early_stopping_rounds": 100
+      }
+    },
+    "candidate": {
+      "n_lags": 10,
+      "n_features": 137,
+      "params": {
+        "n_estimators": 20000,
+        "learning_rate": 0.042,
+        "max_depth": 4,
+        "min_child_weight": 13.842,
+        "subsample": 0.959,
+        "colsample_bytree": 0.912,
+        "tree_method": "hist",
+        "early_stopping_rounds": 100
+      }
+    },
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "note": "Tree cap raised from 3000 to 20000; early stopping (100 rounds on validation, as in production) ended every candidate seed between 3229 and 3506 trees, so the cap no longer binds."
+  },
+  "reproduction": {
+    "baseline_seed0": {
+      "rmse_all": 2.6565,
+      "best_iteration": 2151,
+      "matches": "reports/xgb_baseline.json validation RMSE 2.6565, 2151 trees"
+    },
+    "candidate_seed0_cap3000": {
+      "rmse_all": 2.6597,
+      "rmse_storm": 6.982,
+      "best_iteration": 2934,
+      "seconds": 151.8,
+      "matches": "reports/experiments/tuning-2026-11-23-xgb.json configuration 21 (2.6597, storm 6.9820, 2934 trees)"
+    }
+  },
+  "runs": {
+    "baseline": [
+      {
+        "seed": 0,
+        "best_iteration": 2151,
+        "seconds": 71.1
+      },
+      {
+        "seed": 1,
+        "best_iteration": 1838,
+        "seconds": 61.8
+      },
+      {
+        "seed": 2,
+        "best_iteration": 1980,
+        "seconds": 67.7
+      },
+      {
+        "seed": 3,
+        "best_iteration": 1721,
+        "seconds": 60.1
+      },
+      {
+        "seed": 4,
+        "best_iteration": 1958,
+        "seconds": 73.5
+      }
+    ],
+    "candidate": [
+      {
+        "seed": 0,
+        "best_iteration": 3415,
+        "seconds": 177.9
+      },
+      {
+        "seed": 1,
+        "best_iteration": 3259,
+        "seconds": 174.6
+      },
+      {
+        "seed": 2,
+        "best_iteration": 3313,
+        "seconds": 184.6
+      },
+      {
+        "seed": 3,
+        "best_iteration": 3506,
+        "seconds": 226.8
+      },
+      {
+        "seed": 4,
+        "best_iteration": 3229,
+        "seconds": 215.1
+      }
+    ]
+  },
+  "bootstrap": {
+    "method": "oculstorm.metrics.block_bootstrap_rmse, paired, the same resamples for every model",
+    "block_hours": 168,
+    "resamples": 2000,
+    "seed": 0,
+    "seed_mean": "decision statistic: MSE averaged over the 5 seeds of each configuration, candidate against baseline, percent change with 95% interval",
+    "seed_ensemble": "predictions averaged over the 5 seeds of each configuration",
+    "per_seed": "candidate seed s against baseline seed s",
+    "intense": "with only 35 intense hours some resamples hold none; those are left out of the intervals (resamples_without_hours)"
+  },
+  "regimes": {
+    "all": {
+      "n_hours": 35064,
+      "resamples_without_hours": 0,
+      "rmse_persistence": 3.3704,
+      "seed_mean": {
+        "rmse_baseline": 2.6586,
+        "rmse_candidate": 2.6614,
+        "skill_baseline": 0.3778,
+        "skill_candidate": 0.3765,
+        "mse_change_pct": 0.21,
+        "mse_change_pct_ci95": [
+          -0.24,
+          0.63
+        ],
+        "share_candidate_better": 0.164
+      },
+      "seed_ensemble": {
+        "rmse_baseline": 2.6535,
+        "rmse_candidate": 2.658,
+        "mse_change_pct": 0.33,
+        "mse_change_pct_ci95": [
+          -0.1,
+          0.74
+        ]
+      },
+      "per_seed": [
+        {
+          "seed": 0,
+          "rmse_baseline": 2.6565,
+          "rmse_candidate": 2.6579,
+          "mse_change_pct": 0.11,
+          "mse_change_pct_ci95": [
+            -0.43,
+            0.63
+          ]
+        },
+        {
+          "seed": 1,
+          "rmse_baseline": 2.6613,
+          "rmse_candidate": 2.6619,
+          "mse_change_pct": 0.05,
+          "mse_change_pct_ci95": [
+            -0.53,
+            0.61
+          ]
+        },
+        {
+          "seed": 2,
+          "rmse_baseline": 2.656,
+          "rmse_candidate": 2.6634,
+          "mse_change_pct": 0.56,
+          "mse_change_pct_ci95": [
+            0.07,
+            1.05
+          ]
+        },
+        {
+          "seed": 3,
+          "rmse_baseline": 2.6628,
+          "rmse_candidate": 2.6641,
+          "mse_change_pct": 0.09,
+          "mse_change_pct_ci95": [
+            -0.54,
+            0.71
+          ]
+        },
+        {
+          "seed": 4,
+          "rmse_baseline": 2.6565,
+          "rmse_candidate": 2.6598,
+          "mse_change_pct": 0.25,
+          "mse_change_pct_ci95": [
+            -0.26,
+            0.76
+          ]
+        }
+      ],
+      "rmse_candidate_cap3000_seed0": 2.6597
+    },
+    "quiet (Dst > -50)": {
+      "n_hours": 34702,
+      "resamples_without_hours": 0,
+      "rmse_persistence": 3.2359,
+      "seed_mean": {
+        "rmse_baseline": 2.5685,
+        "rmse_candidate": 2.5761,
+        "skill_baseline": 0.37,
+        "skill_candidate": 0.3662,
+        "mse_change_pct": 0.6,
+        "mse_change_pct_ci95": [
+          0.27,
+          0.9
+        ],
+        "share_candidate_better": 0.0
+      },
+      "seed_ensemble": {
+        "rmse_baseline": 2.5641,
+        "rmse_candidate": 2.5731,
+        "mse_change_pct": 0.7,
+        "mse_change_pct_ci95": [
+          0.39,
+          1.02
+        ]
+      },
+      "per_seed": [
+        {
+          "seed": 0,
+          "rmse_baseline": 2.5678,
+          "rmse_candidate": 2.5749,
+          "mse_change_pct": 0.55,
+          "mse_change_pct_ci95": [
+            0.09,
+            1.01
+          ]
+        },
+        {
+          "seed": 1,
+          "rmse_baseline": 2.5699,
+          "rmse_candidate": 2.5759,
+          "mse_change_pct": 0.47,
+          "mse_change_pct_ci95": [
+            -0.01,
+            0.96
+          ]
+        },
+        {
+          "seed": 2,
+          "rmse_baseline": 2.5668,
+          "rmse_candidate": 2.5772,
+          "mse_change_pct": 0.81,
+          "mse_change_pct_ci95": [
+            0.39,
+            1.22
+          ]
+        },
+        {
+          "seed": 3,
+          "rmse_baseline": 2.5721,
+          "rmse_candidate": 2.5784,
+          "mse_change_pct": 0.49,
+          "mse_change_pct_ci95": [
+            0.08,
+            0.88
+          ]
+        },
+        {
+          "seed": 4,
+          "rmse_baseline": 2.5659,
+          "rmse_candidate": 2.5743,
+          "mse_change_pct": 0.66,
+          "mse_change_pct_ci95": [
+            0.26,
+            1.05
+          ]
+        }
+      ],
+      "rmse_candidate_cap3000_seed0": 2.5766
+    },
+    "storm (Dst <= -50)": {
+      "n_hours": 362,
+      "resamples_without_hours": 0,
+      "rmse_persistence": 9.8253,
+      "seed_mean": {
+        "rmse_baseline": 7.2259,
+        "rmse_candidate": 7.0643,
+        "skill_baseline": 0.4591,
+        "skill_candidate": 0.4831,
+        "mse_change_pct": -4.42,
+        "mse_change_pct_ci95": [
+          -6.97,
+          -1.63
+        ],
+        "share_candidate_better": 1.0
+      },
+      "seed_ensemble": {
+        "rmse_baseline": 7.1941,
+        "rmse_candidate": 7.0428,
+        "mse_change_pct": -4.16,
+        "mse_change_pct_ci95": [
+          -6.69,
+          -1.44
+        ]
+      },
+      "per_seed": [
+        {
+          "seed": 0,
+          "rmse_baseline": 7.1727,
+          "rmse_candidate": 6.978,
+          "mse_change_pct": -5.36,
+          "mse_change_pct_ci95": [
+            -8.52,
+            -1.55
+          ]
+        },
+        {
+          "seed": 1,
+          "rmse_baseline": 7.2734,
+          "rmse_candidate": 7.0911,
+          "mse_change_pct": -4.95,
+          "mse_change_pct_ci95": [
+            -9.54,
+            -1.58
+          ]
+        },
+        {
+          "seed": 2,
+          "rmse_baseline": 7.1906,
+          "rmse_candidate": 7.0976,
+          "mse_change_pct": -2.57,
+          "mse_change_pct_ci95": [
+            -5.56,
+            0.76
+          ]
+        },
+        {
+          "seed": 3,
+          "rmse_baseline": 7.2543,
+          "rmse_candidate": 7.0834,
+          "mse_change_pct": -4.65,
+          "mse_change_pct_ci95": [
+            -9.44,
+            0.48
+          ]
+        },
+        {
+          "seed": 4,
+          "rmse_baseline": 7.238,
+          "rmse_candidate": 7.0704,
+          "mse_change_pct": -4.58,
+          "mse_change_pct_ci95": [
+            -7.35,
+            -1.19
+          ]
+        }
+      ],
+      "rmse_candidate_cap3000_seed0": 6.982
+    },
+    "intense (Dst <= -100)": {
+      "n_hours": 35,
+      "resamples_without_hours": 76,
+      "rmse_persistence": 15.9553,
+      "seed_mean": {
+        "rmse_baseline": 11.8063,
+        "rmse_candidate": 11.3901,
+        "skill_baseline": 0.4525,
+        "skill_candidate": 0.4904,
+        "mse_change_pct": -6.93,
+        "mse_change_pct_ci95": [
+          -21.12,
+          -0.9
+        ],
+        "share_candidate_better": 0.981
+      },
+      "seed_ensemble": {
+        "rmse_baseline": 11.7361,
+        "rmse_candidate": 11.3524,
+        "mse_change_pct": -6.43,
+        "mse_change_pct_ci95": [
+          -21.27,
+          -0.59
+        ]
+      },
+      "per_seed": [
+        {
+          "seed": 0,
+          "rmse_baseline": 11.6867,
+          "rmse_candidate": 11.1637,
+          "mse_change_pct": -8.75,
+          "mse_change_pct_ci95": [
+            -17.04,
+            -1.32
+          ]
+        },
+        {
+          "seed": 1,
+          "rmse_baseline": 11.9009,
+          "rmse_candidate": 11.53,
+          "mse_change_pct": -6.14,
+          "mse_change_pct_ci95": [
+            -25.79,
+            -0.52
+          ]
+        },
+        {
+          "seed": 2,
+          "rmse_baseline": 11.6388,
+          "rmse_candidate": 11.4034,
+          "mse_change_pct": -4.0,
+          "mse_change_pct_ci95": [
+            -25.63,
+            4.08
+          ]
+        },
+        {
+          "seed": 3,
+          "rmse_baseline": 12.0931,
+          "rmse_candidate": 11.5652,
+          "mse_change_pct": -8.54,
+          "mse_change_pct_ci95": [
+            -22.25,
+            -3.91
+          ]
+        },
+        {
+          "seed": 4,
+          "rmse_baseline": 11.7056,
+          "rmse_candidate": 11.2832,
+          "mse_change_pct": -7.09,
+          "mse_change_pct_ci95": [
+            -15.2,
+            1.43
+          ]
+        }
+      ],
+      "rmse_candidate_cap3000_seed0": 11.1927
+    }
+  },
+  "decision": {
+    "bar": "agents/retrain-policy.md: overall MSE at least 2% lower, or storm MSE at least 3% lower with overall MSE no more than 1% higher, intervals excluding zero for the claimed gain",
+    "overall_branch": "not met: overall MSE +0.21% [-0.24%, +0.63%]",
+    "storm_branch": "met on the seed mean: storm MSE -4.42% [-6.97%, -1.63%], overall +0.21% (below +1%)",
+    "caveats": [
+      "Configuration 21 was picked as the best of 24 on these same validation hours and early stopping also uses them; more seeds remove seed luck but not this selection, so the gain stays optimistic until the trainer's test look.",
+      "Per seed the storm gain ranges from -2.57% (seed 2, interval includes zero) to -5.36%; 3 of 5 seeds pass the storm bar alone.",
+      "Quiet hour MSE is worse on every seed: +0.60% [+0.27%, +0.90%] on the seed mean.",
+      "Promotion needs the live forecast and champion_challenger to build the XGBoost features with 10 lags while the GRU keeps 6; today both read the shared N_LAGS constant."
+    ]
+  },
+  "wall_seconds": 1465.0
+}
