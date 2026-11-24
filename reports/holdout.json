@@ -1,0 +1,41 @@
+{
+  "cutoff": "2026-10-30T13:00",
+  "newest_omni_hour": "2026-11-16T12:00",
+  "first_target_hour": null,
+  "last_target_hour": null,
+  "horizon_hours": 1,
+  "warmup_hours": 23,
+  "input_rule": "issue hour scored only if every solar wind input is observed in each of the last 6 hours",
+  "input_coverage": {
+    "issue_hours": 384,
+    "observed_share": {
+      "bz_gsm": 0.0,
+      "by_gsm": 0.0,
+      "b_mag_avg": 0.0,
+      "flow_speed": 0.284,
+      "proton_density": 0.284,
+      "flow_pressure": 0.284,
+      "electric_field": 0.0,
+      "proton_temp": 0.284
+    },
+    "issue_hours_with_inputs": 0,
+    "issue_hours_without_inputs": 384
+  },
+  "hours": 0,
+  "storm_hours": 0,
+  "storm_threshold_nt": -50.0,
+  "skill": "1 - MSE_model / MSE_persistence",
+  "all": {
+    "hours": 0
+  },
+  "storm": {
+    "hours": 0
+  },
+  "models": {
+    "models/xgb_dst_1h.ubj": "d5dcfffe5161a1a76a8ed26499fd364b9a852d13",
+    "models/gru_channels.json": "f276800094095041ddacdfd9bc7338219984a432",
+    "models/gru_dst_1h_seed0.pt": "f92c3f730e734db343bbc3fc53ae4f22100f073e",
+    "models/gru_dst_1h_seed1.pt": "f2cd61df7938ab2174b0414d523722ec260b278f",
+    "models/gru_dst_1h_seed2.pt": "b71145b9147da4b3b1a233ccf8f7097ae2e90809"
+  }
+}
