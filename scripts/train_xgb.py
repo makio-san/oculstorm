@@ -112,7 +112,7 @@ def main() -> None:
     (_, X_va, X_te), (_, y_va, y_te) = split(X), split(y)
     print(f"horizon: {h}h  storm weight: {peak:g}  ring current: {args.ring_current}  lags: {n_lags}  features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}")
     if params != PARAMS:
-        print("params:", {k: v for k, v in params.items() if v != PARAMS[k]})
+        print("params:", {k: v for k, v in params.items() if v != PARAMS.get(k)})
 
     if args.validation_only:
         model, val_pred, _ = fit(X, y, peak, params, test=False)
