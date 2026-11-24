@@ -1,10 +1,11 @@
 """Train the small GRU and compare it with persistence and the XGBoost baseline.
 
-Usage: python scripts/train_gru.py [--horizon H] [--storm-weight K] [--driver-memory]
-Writes: models/gru_dst_{H}h{_swK}{_mem}_seed*.pt, models/gru_channels{_mem}.json,
-reports/gru_baseline{_Hh}{_swK}{_mem}.json, reports/gru_test_predictions{_Hh}{_swK}{_mem}.parquet
-(the 1 hour reports keep their names without the suffix; _swK only when K is not 1,
-_mem only with --driver-memory)
+Usage: python scripts/train_gru.py [--horizon H] [--storm-weight K] [--ring-current] [--driver-memory]
+Writes: models/gru_dst_{H}h{_swK}{_rc}{_mem}_seed*.pt, models/gru_channels{_rc}{_mem}.json,
+reports/gru_baseline{_Hh}{_swK}{_rc}{_mem}.json, reports/gru_test_predictions{_Hh}{_swK}{_rc}{_mem}.parquet
+(the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
+--ring-current adds the Dst* and Burton step channels and the tag _rc to every file name;
+_mem only with --driver-memory, which adds decaying means of VBs and Newell)
 """
 import argparse
 import json
@@ -95,16 +96,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
     parser.add_argument("--storm-weight", type=float, default=1.0, help="loss weight at Dst <= -100 nT relative to quiet time")
+    parser.add_argument("--ring-current", action="store_true", help="add the O'Brien and McPherron (2000) Dst* and Burton step channels")
     parser.add_argument("--driver-memory", action="store_true",
                         help=f"add decaying means of VBs and Newell with time constants {MEMORY_TAUS} h as channels")
     args = parser.parse_args()
     h, peak = args.horizon, args.storm_weight
+    rc = "_rc" if args.ring_current else ""
     memory = MEMORY_TAUS if args.driver_memory else ()
     mem_tag = "_mem" if memory else ""
-    tag = suffix(h) + weight_tag(peak) + mem_tag
+    tag = suffix(h) + weight_tag(peak) + rc + mem_tag
     torch.set_num_threads(4)
     df = load_hourly()
-    windows, meta = build_windows(df, horizon=h, memory=memory)
+    windows, meta = build_windows(df, horizon=h, ring_current=args.ring_current, memory=memory)
     parts = dict(zip(["train", "val", "test"], split(meta)))
     scale = float((parts["train"]["dst_target"] - parts["train"]["dst_lag0"]).std())
     n_params = sum(p.numel() for p in DstGRU(windows.shape[2], HIDDEN).parameters())
@@ -118,7 +121,7 @@ def main() -> None:
     (ROOT / "models").mkdir(exist_ok=True)
     (ROOT / "reports").mkdir(exist_ok=True)
     # Scaling statistics the live pipeline needs to prepare inputs without the training data.
-    (ROOT / "models" / f"gru_channels{mem_tag}.json").write_text(json.dumps(channel_stats(df, memory), indent=2) + "\n")
+    (ROOT / "models" / f"gru_channels{rc}{mem_tag}.json").write_text(json.dumps(channel_stats(df, args.ring_current, memory), indent=2) + "\n")
 
     runs, seed_preds, val_preds = [], {}, []
     for seed in SEEDS:
@@ -130,7 +133,7 @@ def main() -> None:
         info["seconds"] = round(time.time() - started)
         runs.append(info)
         torch.save({"state_dict": model.state_dict(), "scale": scale, "hidden": HIDDEN, "window": WINDOW},
-                   ROOT / "models" / f"gru_dst_{h}h{weight_tag(peak)}{mem_tag}_seed{seed}.pt")
+                   ROOT / "models" / f"gru_dst_{h}h{weight_tag(peak)}{rc}{mem_tag}_seed{seed}.pt")
         print({k: v for k, v in info.items() if k != "val_rmse_history"})
 
     predictions = {"persistence": lag0}
@@ -159,6 +162,7 @@ def main() -> None:
     report = {
         "horizon_hours": h,
         "storm_weight": peak,
+        "ring_current": args.ring_current,
         "driver_memory_taus": list(memory),
         "window_hours": WINDOW,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",

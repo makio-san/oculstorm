@@ -52,11 +52,35 @@ def decaying_memory(x: pd.Series, tau: float) -> pd.Series:
     only. Missing hours keep the last value and the weights of older hours decay through the gap.
     """
     return x.ewm(alpha=1 - np.exp(-1 / tau), adjust=False).mean()
+# O'Brien and McPherron (2000) ring current model, Burton form dDst*/dt = Q - Dst*/tau.
+OM_PRESSURE = 7.26  # nT / sqrt(nPa)
+OM_QUIET = 11.0  # nT
+OM_VBS_THRESHOLD = 0.49  # mV/m
+OM_INJECTION = -4.4  # nT/h per mV/m
+
+
+def _ring_current(df: pd.DataFrame) -> pd.DataFrame:
+    """O'Brien and McPherron (2000) terms at hour t, from Dst, VBs and pressure at t (and P at t-1).
+
+    dst_star is the pressure corrected Dst, q_om the injection, tau_om the decay time in hours,
+    om_step the predicted Dst* change over the next hour and dpress the pressure correction
+    change over the last hour. Missing pressure or VBs gives NaN, like the other drivers.
+    """
+    vbs = _coupling(df)["vbs"]
+    sqrt_p = np.sqrt(df["flow_pressure"])
+    out = pd.DataFrame(index=df.index)
+    out["dst_star"] = df["dst"] - OM_PRESSURE * sqrt_p + OM_QUIET
+    out["q_om"] = OM_INJECTION * (vbs - OM_VBS_THRESHOLD).clip(lower=0)
+    out["tau_om"] = 2.40 * np.exp(9.74 / (4.69 + vbs))
+    out["om_step"] = out["q_om"] - out["dst_star"] / out["tau_om"]
+    out["dpress"] = OM_PRESSURE * (sqrt_p - sqrt_p.shift(1))
+    return out
 
 
 def build_features(
     df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON,
     memory: tuple[float, ...] = (),
+    ring_current: bool = False, n_lags: int = N_LAGS,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y) where y is Dst at t+horizon and X only looks backwards from t.
 
@@ -68,11 +92,16 @@ def build_features(
     `memory` lists time constants (hours) of decaying means of VBs and the Newell function
     (see MEMORY_TAUS); empty, the default, adds none. They are computed on the full hourly
     index before any row is dropped.
+    With ring_current=True the O'Brien and McPherron (2000) terms are added (needs the solar wind).
+    n_lags sets how many hours of history (lag 0 .. n_lags-1) the lag columns cover; the
+    default N_LAGS is what the production models and the live forecast use.
     """
+    if n_lags < 1:
+        raise ValueError("n_lags must be at least 1")
     cols: dict[str, pd.Series] = {}
     dst = df["dst"]
 
-    for lag in range(N_LAGS):
+    for lag in range(n_lags):
         cols[f"dst_lag{lag}"] = dst.shift(lag)
     cols["dst_diff1"] = dst - dst.shift(1)
     cols["dst_diff3"] = dst - dst.shift(3)
@@ -82,7 +111,7 @@ def build_features(
     if use_solar_wind:
         drivers = pd.concat([df[SOLAR_WIND], _coupling(df)], axis=1)
         for name in drivers:
-            for lag in range(N_LAGS):
+            for lag in range(n_lags):
                 cols[f"{name}_lag{lag}"] = drivers[name].shift(lag)
         for name in ["vbs", "newell", "bz_gsm", "flow_speed"]:
             for window in (3, 12):
@@ -91,6 +120,13 @@ def build_features(
             for tau in memory:
                 cols[f"{name}_ewm{tau:g}"] = decaying_memory(drivers[name], tau)
         cols["f107"] = df["f107"]
+        if ring_current:
+            om = _ring_current(df)
+            for name in ["dst_star", "om_step"]:
+                for lag in range(n_lags):
+                    cols[f"{name}_lag{lag}"] = om[name].shift(lag)
+            for name in ["q_om", "tau_om", "dpress"]:
+                cols[name] = om[name]
 
     # Dst has a diurnal and a semiannual (Russell-McPherron) modulation.
     hour = df.index.hour + 0.0

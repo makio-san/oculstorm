@@ -43,6 +43,22 @@ def test_window_ends_at_t_and_target_is_one_horizon_ahead(horizon):
     assert np.corrcoef(windows[row][:, 0], raw)[0, 1] > 0.9999
 
 
+def test_ring_current_windows_do_not_depend_on_the_future():
+    df = load_hourly()
+    windows, meta = build_windows(df, ring_current=True)
+    base, _ = build_windows(df)
+    assert windows.shape[2] == base.shape[2] + 2
+
+    corrupted = df.copy()
+    floats = corrupted.select_dtypes("float").columns
+    corrupted.loc[corrupted.index > CUT, floats] = -1234.0
+    windows_corrupted, _ = build_windows(corrupted, ring_current=True)
+
+    past = meta.loc[meta.index <= CUT, "row"].to_numpy()[-500:]
+    assert np.array_equal(windows[past], windows_corrupted[past])
+    assert not np.isnan(windows[meta["row"].to_numpy()[-1000:]]).any()
+
+
 def test_driver_memory_windows_do_not_depend_on_the_future():
     df = load_hourly()
     windows, meta = build_windows(df, memory=MEMORY_TAUS)
@@ -62,8 +78,17 @@ def test_driver_memory_windows_do_not_depend_on_the_future():
 
 def test_saved_stats_bring_their_driver_memory():
     df = load_hourly()
-    stats = channel_stats(df, MEMORY_TAUS)
+    stats = channel_stats(df, memory=MEMORY_TAUS)
     channels, _ = build_channels(df, stats)
     assert channels.equals(build_channels(df, memory=MEMORY_TAUS)[0])
     # Without memory the channels are exactly today's.
     assert set(channel_stats(df)["mean"]) == set(stats["mean"]) - {c for c in stats["mean"] if "_ewm" in c}
+
+
+def test_ring_current_and_driver_memory_combine():
+    df = load_hourly()
+    both, _ = build_channels(df, ring_current=True, memory=MEMORY_TAUS)
+    rc, _ = build_channels(df, ring_current=True)
+    assert both.shape[1] == rc.shape[1] + 2 * len(MEMORY_TAUS)
+    stats = channel_stats(df, ring_current=True, memory=MEMORY_TAUS)
+    assert build_channels(df, stats, ring_current=True)[0].equals(both)
