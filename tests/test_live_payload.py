@@ -64,3 +64,18 @@ def test_spread_is_missing_when_any_member_is():
     band = live_forecast.model_spread(members)
     assert band["low"].tolist()[0] == -3.0 and band["high"].tolist()[0] == -1.0
     assert band.iloc[1].isna().all()
+
+
+def test_error_band_and_spread_sit_side_by_side():
+    table, members = _inputs()
+    frame = live_forecast.align(table, members)
+    bands = live_forecast.load_error_bands()
+    payload = live_forecast.build_payload(pd.Timestamp("2026-01-01 05:20"), table, frame, members.columns, bands=bands)
+    assert "spread" in payload
+    for field in ["band_low", "band_high", "band_regime"]:
+        assert len(payload[field]) == payload["hours"]
+    assert payload["band_low"][2] is None and payload["band_high"][2] is None
+    for low, high, gru in zip(payload["band_low"], payload["band_high"], payload["gru"]):
+        if gru is not None:
+            assert low < gru < high
+    assert "band_low" not in _payload()
