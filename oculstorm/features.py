@@ -70,7 +70,7 @@ def _ring_current(df: pd.DataFrame) -> pd.DataFrame:
 
 def build_features(
     df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON,
-    ring_current: bool = False,
+    ring_current: bool = False, n_lags: int = N_LAGS,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y) where y is Dst at t+horizon and X only looks backwards from t.
 
@@ -80,11 +80,15 @@ def build_features(
     which shows how much of the skill actually comes from the solar wind.
     With require_target=False the newest hours, whose target is not known yet, are kept.
     With ring_current=True the O'Brien and McPherron (2000) terms are added (needs the solar wind).
+    n_lags sets how many hours of history (lag 0 .. n_lags-1) the lag columns cover; the
+    default N_LAGS is what the production models and the live forecast use.
     """
+    if n_lags < 1:
+        raise ValueError("n_lags must be at least 1")
     cols: dict[str, pd.Series] = {}
     dst = df["dst"]
 
-    for lag in range(N_LAGS):
+    for lag in range(n_lags):
         cols[f"dst_lag{lag}"] = dst.shift(lag)
     cols["dst_diff1"] = dst - dst.shift(1)
     cols["dst_diff3"] = dst - dst.shift(3)
@@ -94,7 +98,7 @@ def build_features(
     if use_solar_wind:
         drivers = pd.concat([df[SOLAR_WIND], _coupling(df)], axis=1)
         for name in drivers:
-            for lag in range(N_LAGS):
+            for lag in range(n_lags):
                 cols[f"{name}_lag{lag}"] = drivers[name].shift(lag)
         for name in ["vbs", "newell", "bz_gsm", "flow_speed"]:
             for window in (3, 12):
@@ -103,7 +107,7 @@ def build_features(
         if ring_current:
             om = _ring_current(df)
             for name in ["dst_star", "om_step"]:
-                for lag in range(N_LAGS):
+                for lag in range(n_lags):
                     cols[f"{name}_lag{lag}"] = om[name].shift(lag)
             for name in ["q_om", "tau_om", "dpress"]:
                 cols[name] = om[name]
