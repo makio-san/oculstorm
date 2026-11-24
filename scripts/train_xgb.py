@@ -2,7 +2,8 @@
 
 Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-current]
        [--n-lags N] [--max-depth D] [--min-child-weight W] [--learning-rate R] [--subsample S]
-       [--colsample-bytree C] [--n-estimators T] [--seed S] [--validation-only]
+       [--colsample-bytree C] [--n-estimators T] [--seed S] [--objective {squarederror,pseudohuber,absolute}]
+       [--huber-slope D] [--validation-only]
 Writes: models/xgb_dst_{H}h{_swK}.ubj, reports/xgb_baseline{_Hh}{_swK}.json,
 reports/xgb_test_predictions{_Hh}{_swK}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -47,6 +48,22 @@ TUNABLE = {
     "colsample_bytree": float, "n_estimators": int, "random_state": int,
 }
 
+# Loss of the change model: name -> (XGBoost objective, early stopping metric). The default
+# squared error is left out of the params so the production configuration is unchanged.
+OBJECTIVES = {
+    "squarederror": None,
+    "pseudohuber": ("reg:pseudohubererror", "mphe"),
+    "absolute": ("reg:absoluteerror", "mae"),
+}
+
+
+def objective_params(objective: str, huber_slope: float = 3.0) -> dict:
+    """Extra XGBoost params for a robust loss, empty for the default squared error."""
+    if OBJECTIVES[objective] is None:
+        return {}
+    name, metric = OBJECTIVES[objective]
+    return {"objective": name, "eval_metric": metric, **({"huber_slope": huber_slope} if objective == "pseudohuber" else {})}
+
 
 def fit(
     X: pd.DataFrame, y: pd.Series, peak: float = 1.0, params: dict | None = None, test: bool = True,
@@ -77,6 +94,8 @@ def build_parser() -> argparse.ArgumentParser:
     for name, kind in TUNABLE.items():
         flag = "--seed" if name == "random_state" else "--" + name.replace("_", "-")
         parser.add_argument(flag, dest=name, type=kind, default=PARAMS[name], help=f"XGBoost {name} (default {PARAMS[name]})")
+    parser.add_argument("--objective", choices=list(OBJECTIVES), default="squarederror", help="loss of the change model (default squarederror)")
+    parser.add_argument("--huber-slope", type=float, default=3.0, help="pseudo-Huber slope in nT, only with --objective pseudohuber")
     parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never predict the test years")
     return parser
 
@@ -84,7 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     h, peak, n_lags = args.horizon, args.storm_weight, args.n_lags
-    params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}}
+    params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}, **objective_params(args.objective, args.huber_slope)}
     rc = "_rc" if args.ring_current else ""
     variant = rc + (f"_l{n_lags}" if n_lags != N_LAGS else "") + ("_hp" if params != PARAMS else "")
     tag = suffix(h) + weight_tag(peak) + variant
