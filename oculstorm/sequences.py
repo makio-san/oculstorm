@@ -94,3 +94,20 @@ def build_windows(
     meta = meta[keep]
     meta["row"] = np.flatnonzero(keep)  # position of each sample inside `windows`
     return windows, meta
+
+
+def concat_windows(pieces: list[tuple[np.ndarray, pd.DataFrame]]) -> tuple[np.ndarray, pd.DataFrame]:
+    """Join several (windows, meta) pairs of `build_windows` into one, still without copying windows.
+
+    Used to add perturbed copies of the training years to the clean table. The channels of the
+    pieces are laid end to end and `row` of every meta is moved to its place in the joined
+    view, so no sample of one piece can reach into another: windows that straddle a seam are
+    never pointed at by a row.
+    """
+    channels, metas, offset = [], [], 0
+    for windows, meta in pieces:
+        channels.append(np.concatenate([windows[0], windows[1:, -1, :]]))
+        metas.append(meta.assign(row=meta["row"] + offset))
+        offset += len(channels[-1])
+    view = np.lib.stride_tricks.sliding_window_view(np.concatenate(channels), WINDOW, axis=0)
+    return view.transpose(0, 2, 1), pd.concat(metas)
