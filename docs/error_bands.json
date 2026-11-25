@@ -1,0 +1,35 @@
+{
+  "model": "gru (mean of 3 seeds), 1 hour",
+  "period": "2017-01-01 .. 2020-12-31",
+  "error": "observed minus forecast, nT",
+  "quantiles": [
+    0.1,
+    0.9
+  ],
+  "regimes": [
+    {
+      "name": "quiet",
+      "label": "Dst > -50 nT",
+      "above": -50,
+      "hours": 34701,
+      "q10": -2.81,
+      "q90": 2.76
+    },
+    {
+      "name": "storm",
+      "label": "-100 < Dst <= -50 nT",
+      "above": -100,
+      "hours": 327,
+      "q10": -5.9,
+      "q90": 7.06
+    },
+    {
+      "name": "intense",
+      "label": "Dst <= -100 nT",
+      "above": null,
+      "hours": 35,
+      "q10": -15.61,
+      "q90": 14.99
+    }
+  ]
+}

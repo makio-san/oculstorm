@@ -1,12 +1,17 @@
 """Fetch real-time data, forecast the hour in progress and hindcast the last week.
 
 Usage: python scripts/live_forecast.py [--archive forecasts.csv]
-Reads : models/xgb_dst_1h.ubj, models/gru_dst_1h_seed*.pt, models/gru_channels.json
+Reads : models/xgb_dst_1h.ubj, models/gru_dst_1h_seed*.pt, models/gru_channels.json,
+        docs/error_bands.json (written by scripts/build_dashboard.py --error-bands)
 Writes: docs/live.js (loaded by the dashboard)
 
 The GRU forecast is the mean of its seed members. The spread field is the lowest and highest
 of the GRU seed members and XGBoost for each hour: how much the models disagree, not a
 confidence interval.
+
+band_low and band_high are the GRU forecast plus the 10th and 90th percentile of its 1 hour
+errors on the validation years (2017 to 2020), taken for the regime of the Dst at the hour
+the forecast was issued: how wrong the GRU typically was in the same conditions.
 
 With --archive the newest forecast is also appended to a log that is never rewritten,
 and the log's scores are added to live.js. That log is the honest real-time track record.
@@ -33,6 +38,7 @@ from oculstorm.sequences import build_windows  # noqa: E402
 
 MODELS = ROOT / "models"
 OUT = ROOT / "docs" / "live.js"
+ERROR_BANDS = ROOT / "docs" / "error_bands.json"
 INPUTS = {"bz_gsm": "IMF Bz (GSM)", "flow_speed": "Solar wind speed", "proton_density": "Proton density", "flow_pressure": "Dynamic pressure"}
 
 
@@ -75,6 +81,26 @@ def model_spread(members: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({"low": members.min(axis=1, skipna=False), "high": members.max(axis=1, skipna=False)})
 
 
+def load_error_bands(path: Path = ERROR_BANDS) -> dict | None:
+    """The validation error quantiles per Dst regime, None if the file is missing."""
+    return json.loads(path.read_text()) if path.exists() else None
+
+
+def regime_of(dst_lag0: float, regimes: list[dict]) -> dict | None:
+    """The first regime whose `above` the Dst exceeds; the last one (above null) takes the rest."""
+    if pd.isna(dst_lag0):
+        return None
+    return next(r for r in regimes if r["above"] is None or dst_lag0 > r["above"])
+
+
+def error_band(gru: pd.Series, dst_lag0: pd.Series, bands: dict) -> pd.DataFrame:
+    """Per hour: the regime of the issue-time Dst and the GRU forecast plus that regime's quantiles."""
+    picked = [regime_of(v, bands["regimes"]) for v in dst_lag0]
+    q10 = pd.Series([np.nan if r is None else r["q10"] for r in picked], index=gru.index)
+    q90 = pd.Series([np.nan if r is None else r["q90"] for r in picked], index=gru.index)
+    return pd.DataFrame({"regime": [None if r is None else r["name"] for r in picked], "low": gru + q10, "high": gru + q90}, index=gru.index)
+
+
 def as_list(series: pd.Series, digits: int = 1) -> list:
     return [None if pd.isna(v) else round(float(v), digits) for v in series]
 
@@ -96,14 +122,16 @@ def align(table: pd.DataFrame, members: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def build_payload(now: pd.Timestamp, table: pd.DataFrame, frame: pd.DataFrame, members: list, record: dict | None = None) -> dict:
-    """The live.js payload; frame comes from align, members names the spread's member forecasts."""
+def build_payload(now: pd.Timestamp, table: pd.DataFrame, frame: pd.DataFrame, members: list, record: dict | None = None, bands: dict | None = None) -> dict:
+    """The live.js payload; frame comes from align, members names the spread's member forecasts.
+
+    bands is the validation error table; without it the band fields are left out."""
     hours = frame.index
     scored = frame[["gru", "xgb", "persistence", "observed"]].dropna()
     truth = scored["observed"].to_numpy()
     scores = {name: round(rmse(truth, scored[name].to_numpy()), 2) for name in ["gru", "xgb", "persistence"]}
     latest = table.index.max()
-    return {
+    payload = {
         "generated": now.strftime("%Y-%m-%dT%H:%MZ"),
         "start": hours[0].strftime("%Y-%m-%dT%H:%M"),
         "hours": len(hours),
@@ -120,6 +148,14 @@ def build_payload(now: pd.Timestamp, table: pd.DataFrame, frame: pd.DataFrame, m
         "inputs": {name: None if pd.isna(table.loc[latest, col]) else round(float(table.loc[latest, col]), 2) for col, name in INPUTS.items()},
         "solar_wind_coverage": round(float(table["flow_speed"].notna().mean()), 3),
     }
+    if bands:
+        # persistence is Dst(t), the Dst the forecast for t + HORIZON was issued with.
+        band = error_band(frame["gru"], frame["persistence"], bands)
+        payload["band_low"] = as_list(band["low"])
+        payload["band_high"] = as_list(band["high"])
+        payload["band_regime"] = [None if pd.isna(r) else r for r in band["regime"]]
+        payload["error_band"] = {k: bands[k] for k in ["model", "period", "quantiles", "regimes"]}
+    return payload
 
 
 def main() -> None:
@@ -141,13 +177,15 @@ def main() -> None:
         archive.save(log, args.archive)
         record = archive.summary(log)
 
-    payload = build_payload(now, table, frame, members.columns, record)
+    payload = build_payload(now, table, frame, members.columns, record, load_error_bands())
     OUT.write_text("window.OCULSTORM_LIVE = " + json.dumps(payload, separators=(",", ":")) + ";\n")
 
     newest = frame.iloc[-1]
     print(f"generated {payload['generated']}  inputs through {table.index.max()}  solar wind coverage {payload['solar_wind_coverage']:.0%}")
     print(f"forecast for {hours[-1]}: GRU {newest['gru']:.1f} nT, XGBoost {newest['xgb']:.1f} nT, "
           f"persistence {newest['persistence']:.0f} nT, model spread {newest['low']:.1f} to {newest['high']:.1f} nT")
+    if "band_low" in payload:
+        print(f"typical error band ({payload['band_regime'][-1]}): {payload['band_low'][-1]} to {payload['band_high'][-1]} nT")
     print(f"hindcast over {payload['hindcast']['hours']} hours, RMSE: {payload['hindcast']['rmse']}")
     if record:
         print(f"archive: {record['issued']} forecasts logged since {record['since']}, {record['all']['hours']} scored: {record['all']['rmse']}")
