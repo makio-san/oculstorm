@@ -1,11 +1,15 @@
 """Train the small GRU and compare it with persistence and the XGBoost baseline.
 
 Usage: python scripts/train_gru.py [--horizon H] [--storm-weight K] [--ring-current] [--driver-memory]
+       [--sw-noise-aug LEVEL] [--sw-noise-copies K] [--sw-noise-seed S]
 Writes: models/gru_dst_{H}h{_swK}{_rc}{_mem}_seed*.pt, models/gru_channels{_rc}{_mem}.json,
 reports/gru_baseline{_Hh}{_swK}{_rc}{_mem}.json, reports/gru_test_predictions{_Hh}{_swK}{_rc}{_mem}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
 --ring-current adds the Dst* and Burton step channels and the tag _rc to every file name;
-_mem only with --driver-memory, which adds decaying means of VBs and Newell)
+_mem only with --driver-memory, which adds decaying means of VBs and Newell;
+--sw-noise-aug LEVEL (off at 0, the default) adds K real-time like perturbed copies of the
+training years, see oculstorm/augment.py, and the tag _swnLEVEL after the other tags;
+scaling statistics, validation and test stay those of the clean table)
 """
 import argparse
 import json
@@ -21,11 +25,12 @@ from torch import nn
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from oculstorm.augment import train_copies  # noqa: E402
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
 from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, suffix, weight_tag  # noqa: E402
 from oculstorm.gru import DstGRU  # noqa: E402
 from oculstorm.metrics import evaluate, rmse, storm_weights  # noqa: E402
-from oculstorm.sequences import WINDOW, build_windows, channel_stats  # noqa: E402
+from oculstorm.sequences import WINDOW, build_windows, channel_stats, concat_windows  # noqa: E402
 
 SEEDS = [0, 1, 2]
 HIDDEN = 64
@@ -92,6 +97,25 @@ def train_one(seed: int, windows: np.ndarray, parts: dict[str, pd.DataFrame], sc
     return model, {"seed": seed, "epochs": epoch, "best_val_rmse": round(best, 4), "val_rmse_history": history}
 
 
+def add_train_copies(
+    windows: np.ndarray, meta: pd.DataFrame, copies: list[pd.DataFrame], stats: dict, horizon: int = HORIZON,
+    ring_current: bool = False, memory: tuple[float, ...] = (),
+) -> tuple[np.ndarray, dict[str, pd.DataFrame]]:
+    """Return the joined windows and the train / val / test parts, with `copies` added to train only.
+
+    `copies` are perturbed tables of the training years (oculstorm.augment.train_copies). They
+    are scaled with the clean training statistics `stats`, like live data would be. Validation
+    and test rows come from the clean table alone. Without copies nothing changes.
+    """
+    pieces = [(windows, meta)]
+    for copy in copies:
+        copy_windows, copy_meta = build_windows(copy, stats, horizon=horizon, ring_current=ring_current, memory=memory)
+        pieces.append((copy_windows, split(copy_meta)[0]))  # training hours only, whatever the table holds
+    if copies:
+        windows, meta = concat_windows(pieces)
+    return windows, dict(zip(["train", "val", "test"], split(meta)))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
@@ -99,20 +123,30 @@ def main() -> None:
     parser.add_argument("--ring-current", action="store_true", help="add the O'Brien and McPherron (2000) Dst* and Burton step channels")
     parser.add_argument("--driver-memory", action="store_true",
                         help=f"add decaying means of VBs and Newell with time constants {MEMORY_TAUS} h as channels")
+    parser.add_argument("--sw-noise-aug", type=float, default=0.0, metavar="LEVEL",
+                        help="add real-time like perturbed copies of the training years; 1 is the recipe of issue 24, 0 (default) is off")
+    parser.add_argument("--sw-noise-copies", type=int, default=1, help="perturbed copies of the training years added with --sw-noise-aug")
+    parser.add_argument("--sw-noise-seed", type=int, default=0, help="seed of the first perturbed copy")
     args = parser.parse_args()
     h, peak = args.horizon, args.storm_weight
+    noise = args.sw_noise_aug if args.sw_noise_copies > 0 else 0.0
+    noise_tag = f"_swn{noise:g}" if noise > 0 else ""
     rc = "_rc" if args.ring_current else ""
     memory = MEMORY_TAUS if args.driver_memory else ()
     mem_tag = "_mem" if memory else ""
-    tag = suffix(h) + weight_tag(peak) + rc + mem_tag
+    tag = suffix(h) + weight_tag(peak) + rc + mem_tag + noise_tag
     torch.set_num_threads(4)
     df = load_hourly()
     windows, meta = build_windows(df, horizon=h, ring_current=args.ring_current, memory=memory)
-    parts = dict(zip(["train", "val", "test"], split(meta)))
+    stats = channel_stats(df, args.ring_current, memory)
+    copies = train_copies(df, noise, args.sw_noise_copies, args.sw_noise_seed)
+    windows, parts = add_train_copies(windows, meta, copies, stats, h, args.ring_current, memory)
     scale = float((parts["train"]["dst_target"] - parts["train"]["dst_lag0"]).std())
     n_params = sum(p.numel() for p in DstGRU(windows.shape[2], HIDDEN).parameters())
     print(f"horizon: {h}h  storm weight: {peak:g}  channels: {windows.shape[2]}  window: {WINDOW}h  params: {n_params:,}  "
           + "  ".join(f"{k}: {len(v):,}" for k, v in parts.items()))
+    if copies:
+        print(f"solar wind noise: level {noise:g}, {len(copies)} perturbed copies of the training years")
 
     te = parts["test"]
     te_rows, lag0 = te["row"].to_numpy(), te["dst_lag0"].to_numpy()
@@ -121,7 +155,7 @@ def main() -> None:
     (ROOT / "models").mkdir(exist_ok=True)
     (ROOT / "reports").mkdir(exist_ok=True)
     # Scaling statistics the live pipeline needs to prepare inputs without the training data.
-    (ROOT / "models" / f"gru_channels{rc}{mem_tag}.json").write_text(json.dumps(channel_stats(df, args.ring_current, memory), indent=2) + "\n")
+    (ROOT / "models" / f"gru_channels{rc}{mem_tag}{noise_tag}.json").write_text(json.dumps(stats, indent=2) + "\n")
 
     runs, seed_preds, val_preds = [], {}, []
     for seed in SEEDS:
@@ -133,7 +167,7 @@ def main() -> None:
         info["seconds"] = round(time.time() - started)
         runs.append(info)
         torch.save({"state_dict": model.state_dict(), "scale": scale, "hidden": HIDDEN, "window": WINDOW},
-                   ROOT / "models" / f"gru_dst_{h}h{weight_tag(peak)}{rc}{mem_tag}_seed{seed}.pt")
+                   ROOT / "models" / f"gru_dst_{h}h{weight_tag(peak)}{rc}{mem_tag}{noise_tag}_seed{seed}.pt")
         print({k: v for k, v in info.items() if k != "val_rmse_history"})
 
     predictions = {"persistence": lag0}
@@ -164,6 +198,7 @@ def main() -> None:
         "storm_weight": peak,
         "ring_current": args.ring_current,
         "driver_memory_taus": list(memory),
+        "sw_noise_aug": {"level": noise, "copies": len(copies), "seed": args.sw_noise_seed},
         "window_hours": WINDOW,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
