@@ -1,12 +1,14 @@
 """Train the XGBoost baseline and compare it with persistence on the held out test years.
 
-Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-current]
+Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-current] [--driver-memory]
        [--n-lags N] [--max-depth D] [--min-child-weight W] [--learning-rate R] [--subsample S]
-       [--colsample-bytree C] [--n-estimators T] [--seed S] [--dst-offset-aug K] [--validation-only]
-Writes: models/xgb_dst_{H}h{_swK}.ubj, reports/xgb_baseline{_Hh}{_swK}.json,
-reports/xgb_test_predictions{_Hh}{_swK}.parquet
+       [--colsample-bytree C] [--n-estimators T] [--seed S] [--validation-only]
+       [--dst-offset-aug K]
+Writes: models/xgb_dst_{H}h{_swK}{variant}.ubj, reports/xgb_baseline{_Hh}{_swK}{variant}.json,
+reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
 --ring-current adds the O'Brien and McPherron terms and the tag _rc to every file name;
+--driver-memory adds decaying means of VBs and Newell and the tag _mem;
 a lag count other than N_LAGS adds _lN and any other model option that differs from PARAMS
 adds _hp, and --dst-offset-aug K adds _oaK, so a tuned run never overwrites the production files.
 --validation-only fits, prints the validation scores and writes nothing; the test years are
@@ -26,7 +28,7 @@ sys.path.insert(0, str(ROOT))
 
 from oculstorm.augment import consistent_rows, offset_table  # noqa: E402
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
-from oculstorm.features import HORIZON, HORIZONS, N_LAGS, build_features, suffix, weight_tag  # noqa: E402
+from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, N_LAGS, build_features, suffix, weight_tag  # noqa: E402
 from oculstorm.metrics import evaluate, persistence, storm_weights, trend_persistence  # noqa: E402
 
 PARAMS = dict(
@@ -96,6 +98,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
     parser.add_argument("--storm-weight", type=float, default=1.0, help="loss weight at Dst <= -100 nT relative to quiet time")
     parser.add_argument("--ring-current", action="store_true", help="add the O'Brien and McPherron (2000) ring current terms")
+    parser.add_argument("--driver-memory", action="store_true",
+                        help=f"add decaying means of VBs and Newell with time constants {MEMORY_TAUS} h")
     parser.add_argument("--n-lags", type=int, default=N_LAGS, help="hours of history in the lag features (lag 0 .. N-1)")
     for name, kind in TUNABLE.items():
         flag = "--seed" if name == "random_state" else "--" + name.replace("_", "-")
@@ -110,10 +114,12 @@ def main() -> None:
     h, peak, n_lags = args.horizon, args.storm_weight, args.n_lags
     params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}}
     rc = "_rc" if args.ring_current else ""
-    variant = rc + (f"_l{n_lags}" if n_lags != N_LAGS else "") + ("_hp" if params != PARAMS else "") + (f"_oa{args.dst_offset_aug}" if args.dst_offset_aug else "")
+    memory = MEMORY_TAUS if args.driver_memory else ()
+    variant = rc + ("_mem" if memory else "") + (f"_l{n_lags}" if n_lags != N_LAGS else "") + ("_hp" if params != PARAMS else "")
+    variant += f"_oa{args.dst_offset_aug}" if args.dst_offset_aug else ""
     tag = suffix(h) + weight_tag(peak) + variant
     df = load_hourly()
-    X, y = build_features(df, horizon=h, ring_current=args.ring_current, n_lags=n_lags)
+    X, y = build_features(df, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory)
     (_, X_va, X_te), (_, y_va, y_te) = split(X), split(y)
     print(f"horizon: {h}h  storm weight: {peak:g}  ring current: {args.ring_current}  lags: {n_lags}  features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}")
     if params != PARAMS:
@@ -166,6 +172,7 @@ def main() -> None:
         "horizon_hours": h,
         "storm_weight": peak,
         "ring_current": args.ring_current,
+        "driver_memory_taus": list(memory),
         "n_lags": n_lags,
         "dst_offset_aug": args.dst_offset_aug,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
