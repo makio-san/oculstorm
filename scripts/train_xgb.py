@@ -51,7 +51,7 @@ TUNABLE = {
 }
 
 
-def offset_copies(df: pd.DataFrame, copies: int, horizon: int, ring_current: bool = False, n_lags: int = N_LAGS, seed: int = 1) -> tuple[pd.DataFrame, pd.Series]:
+def offset_copies(df: pd.DataFrame, copies: int, horizon: int, ring_current: bool = False, n_lags: int = N_LAGS, seed: int = 1, memory: tuple[float, ...] = ()) -> tuple[pd.DataFrame, pd.Series]:
     """Train years of `copies` Dst offset copies of the table (oculstorm.augment), features and target.
 
     Only rows before the validation years are returned, so no augmented row reaches validation or test.
@@ -59,7 +59,7 @@ def offset_copies(df: pd.DataFrame, copies: int, horizon: int, ring_current: boo
     parts = []
     for k in range(copies):
         shifted = offset_table(df, seed + k)
-        X_k, y_k = build_features(shifted, horizon=horizon, ring_current=ring_current, n_lags=n_lags)
+        X_k, y_k = build_features(shifted, horizon=horizon, ring_current=ring_current, n_lags=n_lags, memory=memory)
         rows = pd.Series(consistent_rows(df.index, horizon), index=df.index).reindex(X_k.index)
         X_k, y_k = X_k[rows.to_numpy()], y_k[rows.to_numpy()]
         X_k, y_k = split(X_k)[0], split(y_k)[0]
@@ -125,7 +125,7 @@ def main() -> None:
     if params != PARAMS:
         print("params:", {k: v for k, v in params.items() if v != PARAMS[k]})
 
-    extra = offset_copies(df, args.dst_offset_aug, h, args.ring_current, n_lags) if args.dst_offset_aug else None
+    extra = offset_copies(df, args.dst_offset_aug, h, args.ring_current, n_lags, memory=memory) if args.dst_offset_aug else None
     if extra is not None:
         print(f"offset augmentation: {args.dst_offset_aug} copies, {len(extra[0]):,} extra train rows")
 
