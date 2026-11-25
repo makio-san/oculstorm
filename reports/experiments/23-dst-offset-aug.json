@@ -1,0 +1,735 @@
+{
+ "issue": 23,
+ "title": "Dst baseline offset augmentation for quick-look robustness (variant A, XGBoost, 1 hour)",
+ "result": "no-gain",
+ "date": "2026-11-24",
+ "split": "validation only, 2017-01-01 .. 2020-12-31; train 1995 .. 2016; test years not used (fit(..., test=False))",
+ "horizon_hours": 1,
+ "configuration": {
+  "option": "scripts/train_xgb.py --dst-offset-aug K (K = 1 or 2 copies of the train years); oculstorm/augment.py; default 0 = off, production unchanged",
+  "augmentation": "per 168 hour block one offset c ~ Uniform(-25, +10) nT added to the Dst column of a copy of the table, then build_features on the copy, so every Dst feature, the target, dst_star and om_step move together; rows whose 24 hour window or target cross a block edge are dropped; copies only from the train years; validation never augmented and used for early stopping as before",
+  "baseline": "production configuration of scripts/train_xgb.py (6 lags, PARAMS, 89 features), seeds 0 1 2; seed 0 reproduces best_iteration 2151 and RMSE 2.6565 of reports/xgb_baseline.json",
+  "candidates": "aug1 (K=1) and aug2 (K=2), seeds 0 1 2, same hyperparameters",
+  "perturbed_validation": "a copy of the validation table with a fixed seed (12345) offset per 168 hour block from the same distribution, applied to inputs and target alike; scored on the rows whose window and target lie inside one block (30,049 hours); persistence is unchanged by construction",
+  "not_run": "GRU, variant B (dst minus 168 hour median) and Dst-only model variants"
+ },
+ "bootstrap": {
+  "method": "oculstorm.metrics.block_bootstrap_rmse, paired",
+  "block_hours": 168,
+  "resamples": 2000,
+  "seed": 0,
+  "intervals": "95% for the MSE change of the candidate against the baseline in percent; _seed0 is seed 0 against seed 0, _seedmean is the mean prediction of seeds 0 1 2 against the same for the baseline; nan where the regime has too few blocks (intense)"
+ },
+ "fits": {
+  "baseline_0": {
+   "best_iteration": 2151,
+   "seconds": 72
+  },
+  "baseline_1": {
+   "best_iteration": 1838,
+   "seconds": 67
+  },
+  "baseline_2": {
+   "best_iteration": 1980,
+   "seconds": 93
+  },
+  "aug1_0": {
+   "best_iteration": 2416,
+   "seconds": 182
+  },
+  "aug1_1": {
+   "best_iteration": 1817,
+   "seconds": 144
+  },
+  "aug1_2": {
+   "best_iteration": 2028,
+   "seconds": 156
+  },
+  "aug2_0": {
+   "best_iteration": 2588,
+   "seconds": 182
+  },
+  "aug2_1": {
+   "best_iteration": 1820,
+   "seconds": 141
+  },
+  "aug2_2": {
+   "best_iteration": 2267,
+   "seconds": 171
+  }
+ },
+ "sets": {
+  "clean": "all 35,064 validation hours",
+  "perturbed": "perturbed validation copy",
+  "clean_same_rows": "clean validation on the same rows as the perturbed copy"
+ },
+ "regimes": {
+  "clean": {
+   "all": {
+    "n_hours": 35064,
+    "rmse_persistence": 3.3704090118408203,
+    "rmse_baseline_seeds": [
+     2.6565,
+     2.6613,
+     2.656
+    ],
+    "rmse_aug1_seeds": [
+     2.6695,
+     2.6711,
+     2.669
+    ],
+    "rmse_aug2_seeds": [
+     2.6723,
+     2.6764,
+     2.6686
+    ],
+    "aug1_seed0": {
+     "rmse_base": 2.6565,
+     "rmse_cand": 2.6695,
+     "mse_change_pct": 0.98,
+     "mse_change_pct_ci95": [
+      0.49,
+      1.52
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 2.6535,
+     "rmse_cand": 2.6657,
+     "mse_change_pct": 0.92,
+     "mse_change_pct_ci95": [
+      0.45,
+      1.43
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 2.6565,
+     "rmse_cand": 2.6723,
+     "mse_change_pct": 1.2,
+     "mse_change_pct_ci95": [
+      0.71,
+      1.72
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 2.6535,
+     "rmse_cand": 2.6683,
+     "mse_change_pct": 1.11,
+     "mse_change_pct_ci95": [
+      0.75,
+      1.5
+     ]
+    }
+   },
+   "quiet (Dst > -50)": {
+    "n_hours": 34702,
+    "rmse_persistence": 3.2359118461608887,
+    "rmse_baseline_seeds": [
+     2.5678,
+     2.5699,
+     2.5668
+    ],
+    "rmse_aug1_seeds": [
+     2.583,
+     2.5847,
+     2.5832
+    ],
+    "rmse_aug2_seeds": [
+     2.5863,
+     2.5874,
+     2.5825
+    ],
+    "aug1_seed0": {
+     "rmse_base": 2.5678,
+     "rmse_cand": 2.583,
+     "mse_change_pct": 1.18,
+     "mse_change_pct_ci95": [
+      0.63,
+      1.77
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 2.5645,
+     "rmse_cand": 2.5799,
+     "mse_change_pct": 1.21,
+     "mse_change_pct_ci95": [
+      0.7,
+      1.73
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 2.5678,
+     "rmse_cand": 2.5863,
+     "mse_change_pct": 1.45,
+     "mse_change_pct_ci95": [
+      0.89,
+      2.03
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 2.5645,
+     "rmse_cand": 2.5816,
+     "mse_change_pct": 1.34,
+     "mse_change_pct_ci95": [
+      0.93,
+      1.78
+     ]
+    }
+   },
+   "storm (Dst <= -50)": {
+    "n_hours": 362,
+    "rmse_persistence": 9.825268745422363,
+    "rmse_baseline_seeds": [
+     7.1727,
+     7.2734,
+     7.1906
+    ],
+    "rmse_aug1_seeds": [
+     7.1207,
+     7.1183,
+     7.0934
+    ],
+    "rmse_aug2_seeds": [
+     7.1057,
+     7.2141,
+     7.104
+    ],
+    "aug1_seed0": {
+     "rmse_base": 7.1727,
+     "rmse_cand": 7.1207,
+     "mse_change_pct": -1.45,
+     "mse_change_pct_ci95": [
+      -5.03,
+      2.76
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 7.1824,
+     "rmse_cand": 7.0888,
+     "mse_change_pct": -2.59,
+     "mse_change_pct_ci95": [
+      -4.97,
+      -0.54
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 7.1727,
+     "rmse_cand": 7.1057,
+     "mse_change_pct": -1.86,
+     "mse_change_pct_ci95": [
+      -6.21,
+      2.92
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 7.1824,
+     "rmse_cand": 7.122,
+     "mse_change_pct": -1.68,
+     "mse_change_pct_ci95": [
+      -4.77,
+      0.62
+     ]
+    }
+   },
+   "intense (Dst <= -100)": {
+    "n_hours": 35,
+    "rmse_persistence": 15.955294609069824,
+    "rmse_baseline_seeds": [
+     11.6867,
+     11.9009,
+     11.6388
+    ],
+    "rmse_aug1_seeds": [
+     11.3932,
+     11.417,
+     11.3032
+    ],
+    "rmse_aug2_seeds": [
+     11.5954,
+     11.7111,
+     11.3884
+    ],
+    "aug1_seed0": {
+     "rmse_base": 11.6867,
+     "rmse_cand": 11.3932,
+     "mse_change_pct": -4.96,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 11.6674,
+     "rmse_cand": 11.329,
+     "mse_change_pct": -5.72,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 11.6867,
+     "rmse_cand": 11.5954,
+     "mse_change_pct": -1.56,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 11.6674,
+     "rmse_cand": 11.5315,
+     "mse_change_pct": -2.32,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    }
+   }
+  },
+  "perturbed": {
+   "all": {
+    "n_hours": 30049,
+    "rmse_persistence": 3.3481025464585064,
+    "rmse_baseline_seeds": [
+     2.7754,
+     2.7724,
+     2.7707
+    ],
+    "rmse_aug1_seeds": [
+     2.6756,
+     2.6795,
+     2.6778
+    ],
+    "rmse_aug2_seeds": [
+     2.6692,
+     2.674,
+     2.6686
+    ],
+    "aug1_seed0": {
+     "rmse_base": 2.7754,
+     "rmse_cand": 2.6756,
+     "mse_change_pct": -7.06,
+     "mse_change_pct_ci95": [
+      -8.44,
+      -5.77
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 2.7682,
+     "rmse_cand": 2.6736,
+     "mse_change_pct": -6.72,
+     "mse_change_pct_ci95": [
+      -8.1,
+      -5.43
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 2.7754,
+     "rmse_cand": 2.6692,
+     "mse_change_pct": -7.5,
+     "mse_change_pct_ci95": [
+      -8.95,
+      -6.13
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 2.7682,
+     "rmse_cand": 2.6665,
+     "mse_change_pct": -7.21,
+     "mse_change_pct_ci95": [
+      -8.68,
+      -5.9
+     ]
+    }
+   },
+   "quiet (Dst > -50)": {
+    "n_hours": 29059,
+    "rmse_persistence": 3.1633820197746494,
+    "rmse_baseline_seeds": [
+     2.6298,
+     2.6265,
+     2.624
+    ],
+    "rmse_aug1_seeds": [
+     2.5511,
+     2.5541,
+     2.5538
+    ],
+    "rmse_aug2_seeds": [
+     2.5472,
+     2.5501,
+     2.5452
+    ],
+    "aug1_seed0": {
+     "rmse_base": 2.6298,
+     "rmse_cand": 2.5511,
+     "mse_change_pct": -5.9,
+     "mse_change_pct_ci95": [
+      -7.2,
+      -4.61
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 2.623,
+     "rmse_cand": 2.5495,
+     "mse_change_pct": -5.52,
+     "mse_change_pct_ci95": [
+      -6.83,
+      -4.26
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 2.6298,
+     "rmse_cand": 2.5472,
+     "mse_change_pct": -6.19,
+     "mse_change_pct_ci95": [
+      -7.59,
+      -4.85
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 2.623,
+     "rmse_cand": 2.5439,
+     "mse_change_pct": -5.94,
+     "mse_change_pct_ci95": [
+      -7.31,
+      -4.65
+     ]
+    }
+   },
+   "storm (Dst <= -50)": {
+    "n_hours": 990,
+    "rmse_persistence": 6.820201657325889,
+    "rmse_baseline_seeds": [
+     5.5486,
+     5.5503,
+     5.5601
+    ],
+    "rmse_aug1_seeds": [
+     5.1237,
+     5.1424,
+     5.1194
+    ],
+    "rmse_aug2_seeds": [
+     5.0803,
+     5.1131,
+     5.0991
+    ],
+    "aug1_seed0": {
+     "rmse_base": 5.5486,
+     "rmse_cand": 5.1237,
+     "mse_change_pct": -14.73,
+     "mse_change_pct_ci95": [
+      -19.82,
+      -11.02
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 5.5359,
+     "rmse_cand": 5.1149,
+     "mse_change_pct": -14.63,
+     "mse_change_pct_ci95": [
+      -19.51,
+      -11.24
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 5.5486,
+     "rmse_cand": 5.0803,
+     "mse_change_pct": -16.17,
+     "mse_change_pct_ci95": [
+      -21.62,
+      -12.02
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 5.5359,
+     "rmse_cand": 5.0857,
+     "mse_change_pct": -15.6,
+     "mse_change_pct_ci95": [
+      -20.83,
+      -11.83
+     ]
+    }
+   },
+   "intense (Dst <= -100)": {
+    "n_hours": 28,
+    "rmse_persistence": 16.28649700518053,
+    "rmse_baseline_seeds": [
+     11.7846,
+     11.5012,
+     11.7826
+    ],
+    "rmse_aug1_seeds": [
+     11.0636,
+     11.3839,
+     11.1866
+    ],
+    "rmse_aug2_seeds": [
+     11.0753,
+     11.2133,
+     11.1
+    ],
+    "aug1_seed0": {
+     "rmse_base": 11.7846,
+     "rmse_cand": 11.0636,
+     "mse_change_pct": -11.86,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 11.6103,
+     "rmse_cand": 11.1607,
+     "mse_change_pct": -7.6,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 11.7846,
+     "rmse_cand": 11.0753,
+     "mse_change_pct": -11.68,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 11.6103,
+     "rmse_cand": 11.0971,
+     "mse_change_pct": -8.65,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    }
+   }
+  },
+  "clean_same_rows": {
+   "all": {
+    "n_hours": 30049,
+    "rmse_persistence": 3.348102569580078,
+    "rmse_baseline_seeds": [
+     2.6395,
+     2.6416,
+     2.6369
+    ],
+    "rmse_aug1_seeds": [
+     2.6532,
+     2.6547,
+     2.6534
+    ],
+    "rmse_aug2_seeds": [
+     2.6537,
+     2.6584,
+     2.6516
+    ],
+    "aug1_seed0": {
+     "rmse_base": 2.6395,
+     "rmse_cand": 2.6532,
+     "mse_change_pct": 1.04,
+     "mse_change_pct_ci95": [
+      0.49,
+      1.63
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 2.635,
+     "rmse_cand": 2.6498,
+     "mse_change_pct": 1.13,
+     "mse_change_pct_ci95": [
+      0.63,
+      1.66
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 2.6395,
+     "rmse_cand": 2.6537,
+     "mse_change_pct": 1.08,
+     "mse_change_pct_ci95": [
+      0.51,
+      1.71
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 2.635,
+     "rmse_cand": 2.6504,
+     "mse_change_pct": 1.18,
+     "mse_change_pct_ci95": [
+      0.75,
+      1.62
+     ]
+    }
+   },
+   "quiet (Dst > -50)": {
+    "n_hours": 29770,
+    "rmse_persistence": 3.2375338077545166,
+    "rmse_baseline_seeds": [
+     2.5607,
+     2.5618,
+     2.5589
+    ],
+    "rmse_aug1_seeds": [
+     2.5778,
+     2.5782,
+     2.5783
+    ],
+    "rmse_aug2_seeds": [
+     2.579,
+     2.5812,
+     2.5764
+    ],
+    "aug1_seed0": {
+     "rmse_base": 2.5607,
+     "rmse_cand": 2.5778,
+     "mse_change_pct": 1.34,
+     "mse_change_pct_ci95": [
+      0.7,
+      2.0
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 2.5567,
+     "rmse_cand": 2.5744,
+     "mse_change_pct": 1.39,
+     "mse_change_pct_ci95": [
+      0.87,
+      1.94
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 2.5607,
+     "rmse_cand": 2.579,
+     "mse_change_pct": 1.44,
+     "mse_change_pct_ci95": [
+      0.82,
+      2.07
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 2.5567,
+     "rmse_cand": 2.575,
+     "mse_change_pct": 1.44,
+     "mse_change_pct_ci95": [
+      0.95,
+      1.94
+     ]
+    }
+   },
+   "storm (Dst <= -50)": {
+    "n_hours": 279,
+    "rmse_persistence": 9.429040908813477,
+    "rmse_baseline_seeds": [
+     7.1188,
+     7.1621,
+     7.0837
+    ],
+    "rmse_aug1_seeds": [
+     7.0123,
+     7.0558,
+     7.0005
+    ],
+    "rmse_aug2_seeds": [
+     6.9802,
+     7.0875,
+     6.9973
+    ],
+    "aug1_seed0": {
+     "rmse_base": 7.1188,
+     "rmse_cand": 7.0123,
+     "mse_change_pct": -2.97,
+     "mse_change_pct_ci95": [
+      -6.5,
+      1.91
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 7.0933,
+     "rmse_cand": 7.0035,
+     "mse_change_pct": -2.51,
+     "mse_change_pct_ci95": [
+      -5.4,
+      -0.02
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 7.1188,
+     "rmse_cand": 6.9802,
+     "mse_change_pct": -3.86,
+     "mse_change_pct_ci95": [
+      -8.3,
+      1.52
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 7.0933,
+     "rmse_cand": 7.005,
+     "mse_change_pct": -2.47,
+     "mse_change_pct_ci95": [
+      -6.33,
+      0.68
+     ]
+    }
+   },
+   "intense (Dst <= -100)": {
+    "n_hours": 18,
+    "rmse_persistence": 15.616942405700684,
+    "rmse_baseline_seeds": [
+     11.2907,
+     11.2222,
+     10.8923
+    ],
+    "rmse_aug1_seeds": [
+     10.977,
+     11.0595,
+     11.0592
+    ],
+    "rmse_aug2_seeds": [
+     10.812,
+     11.231,
+     10.8573
+    ],
+    "aug1_seed0": {
+     "rmse_base": 11.2907,
+     "rmse_cand": 10.977,
+     "mse_change_pct": -5.48,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    },
+    "aug1_seedmean": {
+     "rmse_base": 11.014,
+     "rmse_cand": 10.9708,
+     "mse_change_pct": -0.78,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    },
+    "aug2_seed0": {
+     "rmse_base": 11.2907,
+     "rmse_cand": 10.812,
+     "mse_change_pct": -8.3,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    },
+    "aug2_seedmean": {
+     "rmse_base": 11.014,
+     "rmse_cand": 10.9271,
+     "mse_change_pct": -1.57,
+     "mse_change_pct_ci95": [
+      NaN,
+      NaN
+     ]
+    }
+   }
+  }
+ },
+ "summary": "clean validation: overall MSE +0.9 to +1.2% (interval excludes zero, worse), quiet +1.2 to +1.4% (worse), storm -1.5 to -2.6% (does not reach the 3% bar, seed 0 interval includes zero). Perturbed validation: overall MSE -6.7 to -7.2%, quiet -5.5 to -5.9%, storm -14.6 to -15.6%, all intervals exclude zero; the baseline loses quiet skill under the offsets (quiet RMSE 2.561 on the clean rows, 2.624 to 2.630 perturbed) but the candidates stay at their clean level. The promising bar of agents/retrain-policy.md is on clean validation and is not met."
+}
