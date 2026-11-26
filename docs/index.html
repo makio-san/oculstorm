@@ -216,6 +216,20 @@
   .score tr.best td { font-weight: 650; }
   .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: baseline; }
 
+  /* ---------- storm scale explainer ---------- */
+  .scale-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+  @media (max-width: 860px) { .scale-grid { grid-template-columns: minmax(0, 1fr); } }
+  .scale-grid .card { margin-top: 0; border-top: 3px solid var(--level); }
+  .scale-grid .status svg { color: var(--level); }
+  .scale-grid .at { font-size: 22px; font-weight: 680; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .scale-grid .near { color: var(--text-secondary); font-size: 12.5px; }
+  .scale-grid dl { margin: 12px 0 0; }
+  .scale-grid dt { font-size: 11.5px; font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-top: 10px; }
+  .scale-grid dd { margin: 2px 0 0; color: var(--text-secondary); font-size: 13.5px; }
+  .sources { margin: 8px 0 0; padding-left: 18px; color: var(--text-secondary); font-size: 12.5px; }
+  .sources li { margin-top: 3px; overflow-wrap: anywhere; }
+  .note a, .sources a { color: inherit; text-underline-offset: 3px; }
+
   footer { max-width: 1160px; margin: 0 auto; padding: 20px 16px 40px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--border); }
   footer a { color: var(--text-secondary); }
   [hidden] { display: none !important; }
@@ -242,6 +256,7 @@
       <a class="sec" href="#live">Live</a>
       <a class="sec" href="#explore">Explore</a>
       <a class="sec" href="#scorecard">Scorecard</a>
+      <a class="sec" href="#scale">Scale</a>
       <a href="https://github.com/makio-san/oculstorm">GitHub</a>
     </nav>
     <button class="icon-btn" id="theme" type="button" aria-label="Switch between light and dark theme" title="Switch theme">
@@ -333,7 +348,7 @@
       <div class="plot" id="plot-err"></div>
       <div class="table-wrap" id="table-err" hidden></div>
     </div>
-    <p class="note"><span id="lead-note">Each forecast for an hour was made with data up to the previous hour.</span> Lower (more negative) Dst means a stronger storm; the shaded bands mark moderate, intense and severe levels.
+    <p class="note"><span id="lead-note">Each forecast for an hour was made with data up to the previous hour.</span> Lower (more negative) Dst means a stronger storm; the shaded bands mark moderate, intense and severe levels (<a href="#scale">what they mean</a>).
       Hover or focus a chart and use the arrow keys to read exact values.</p>
   </section>
 
@@ -353,6 +368,66 @@
     <div class="card" style="overflow-x:auto"><h3 id="score-title-lead" style="margin-bottom:6px"></h3><table class="score" id="score"></table></div>
     <p class="note">Bars show each model's RMSE relative to persistence in the same row group. Skill is the MSE skill score against persistence:
       0 means no better than "next hour equals this hour", 1 means perfect. Results are on the cleaned OMNI science product, so real-time performance will be lower.</p>
+  </section>
+  <section aria-labelledby="scale-title" id="scale">
+    <div class="kicker">Storm scale</div>
+    <h2 id="scale-title">What -50, -100 and -250 nT mean</h2>
+    <p class="note" style="margin:6px 0 0; max-width: 820px">Dst is the drop of the magnetic field at the equator, in nanotesla, caused by the ring current a storm builds around Earth.
+      The more negative it gets, the stronger the storm. These are the three levels the gauge and the charts on this page mark.</p>
+    <div class="scale-grid">
+      <div class="card" style="--level: var(--warning)">
+        <span class="status"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1 13 7 7 13 1 7Z" fill="currentColor"/></svg>Moderate storm</span>
+        <div class="at">Dst &le; -50 nT</div>
+        <div class="near">Roughly NOAA G1 to G2</div>
+        <dl>
+          <dt>Aurora</dt>
+          <dd>Common at high latitudes. In the stronger cases it has been seen as far south as New York and Idaho (about 55&deg; geomagnetic latitude).</dd>
+          <dt>Power grids</dt>
+          <dd>Weak fluctuations. High latitude systems may see voltage alarms.</dd>
+          <dt>Satellites</dt>
+          <dd>Minor effects on operations and more drag in low orbit. In February 2022 a minor to moderate storm thickened the upper atmosphere enough to bring down 38 of 49 newly launched Starlink satellites.</dd>
+        </dl>
+      </div>
+      <div class="card" style="--level: var(--serious)">
+        <span class="status"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1 13 12H1Z" fill="currentColor"/></svg>Intense storm</span>
+        <div class="at">Dst &le; -100 nT</div>
+        <div class="near">Roughly NOAA G3 to G4</div>
+        <dl>
+          <dt>Aurora</dt>
+          <dd>Has been seen as far south as Illinois and Oregon (about 50&deg;), in the strongest cases Alabama and northern California (about 45&deg;).</dd>
+          <dt>Power grids</dt>
+          <dd>Voltage corrections may be needed and protection devices can raise false alarms. Near the severe end, voltage control problems become widespread.</dd>
+          <dt>Satellites</dt>
+          <dd>Surface charging on components, more drag in low orbit, and orientation or tracking problems that need correcting from the ground.</dd>
+        </dl>
+      </div>
+      <div class="card" style="--level: var(--critical)">
+        <span class="status"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1 13 12H1Z" fill="currentColor"/></svg>Severe storm</span>
+        <div class="at">Dst &le; -250 nT</div>
+        <div class="near">Roughly NOAA G4 to G5</div>
+        <dl>
+          <dt>Aurora</dt>
+          <dd>Can reach Florida and southern Texas (about 40&deg;). The May 2024 storm went down to -406 nT (provisional value).</dd>
+          <dt>Power grids</dt>
+          <dd>Widespread voltage control and protection problems; blackouts and transformer damage are possible. The March 1989 storm (-589 nT) caused a nine hour blackout in Canada.</dd>
+          <dt>Satellites</dt>
+          <dd>Extensive surface charging, and problems with orientation, uplink, downlink and tracking.</dd>
+        </dl>
+      </div>
+    </div>
+    <p class="note" style="max-width: 820px">The moderate and intense thresholds follow the storm classes of Gonzalez et al. (1994); the -250 nT line is this page's own cut for the rare largest storms.
+      The effects are paraphrased from the NOAA geomagnetic storm scale, which is defined by the Kp index, not by Dst, so the pairing is approximate.
+      What a storm does at one place also depends on latitude, local time and how fast the field changes there. The quiet side of the scale, above -50 nT, has no effects worth listing.</p>
+    <p class="note" style="margin-top:14px"><b>Sources</b></p>
+    <ul class="sources">
+      <li>NOAA space weather scales, effects by storm level: <a href="https://www.spaceweather.gov/noaa-scales-explanation">https://www.spaceweather.gov/noaa-scales-explanation</a></li>
+      <li>Gonzalez et al. (1994), What is a geomagnetic storm?, J. Geophys. Res.: <a href="https://doi.org/10.1029/93JA02867">https://doi.org/10.1029/93JA02867</a></li>
+      <li>WDC Kyoto, what the Dst index measures: <a href="https://wdc.kugi.kyoto-u.ac.jp/dstdir/dst2/onDstindex.html">https://wdc.kugi.kyoto-u.ac.jp/dstdir/dst2/onDstindex.html</a></li>
+      <li>WDC Kyoto, hourly Dst for March 1989 and May 2024: <a href="https://wdc.kugi.kyoto-u.ac.jp/dst_final/198903/index.html">https://wdc.kugi.kyoto-u.ac.jp/dst_final/198903/index.html</a>,
+        <a href="https://wdc.kugi.kyoto-u.ac.jp/dst_provisional/202405/index.html">https://wdc.kugi.kyoto-u.ac.jp/dst_provisional/202405/index.html</a></li>
+      <li>NOAA SWPC, storms and electric power transmission (1989 blackout): <a href="https://www.spaceweather.gov/impacts/electric-power-transmission">https://www.spaceweather.gov/impacts/electric-power-transmission</a></li>
+      <li>Fang et al. (2022), the February 2022 Starlink loss, Space Weather: <a href="https://doi.org/10.1029/2022SW003193">https://doi.org/10.1029/2022SW003193</a></li>
+    </ul>
   </section>
 </main>
 <footer>
