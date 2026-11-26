@@ -3,7 +3,8 @@
 Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-current] [--driver-memory]
        [--n-lags N] [--max-depth D] [--min-child-weight W] [--learning-rate R] [--subsample S]
        [--colsample-bytree C] [--n-estimators T] [--seed S] [--objective {squarederror,pseudohuber,absolute}]
-       [--huber-slope D] [--dst-offset-aug K] [--validation-only]
+       [--huber-slope D] [--dst-offset-aug K] [--sw-noise-aug LEVEL] [--sw-noise-copies K]
+       [--sw-noise-seed S] [--validation-only]
 Writes: models/xgb_dst_{H}h{_swK}{variant}.ubj, reports/xgb_baseline{_Hh}{_swK}{variant}.json,
 reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -11,6 +12,8 @@ reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 --driver-memory adds decaying means of VBs and Newell and the tag _mem;
 a lag count other than N_LAGS adds _lN and any other model option that differs from PARAMS
 adds _hp, and --dst-offset-aug K adds _oaK, so a tuned run never overwrites the production files.
+--sw-noise-aug LEVEL (off at 0, the default) adds K real-time like perturbed copies of the
+training years, see oculstorm/augment.py, and the tag _swnLEVEL; validation and test stay clean.
 --validation-only fits, prints the validation scores and writes nothing; the test years are
 not predicted)
 """
@@ -26,7 +29,7 @@ import xgboost as xgb
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from oculstorm.augment import consistent_rows, offset_table  # noqa: E402
+from oculstorm.augment import consistent_rows, offset_table, train_copies  # noqa: E402
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
 from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, N_LAGS, build_features, suffix, weight_tag  # noqa: E402
 from oculstorm.metrics import evaluate, persistence, storm_weights, trend_persistence  # noqa: E402
@@ -85,7 +88,7 @@ def offset_copies(df: pd.DataFrame, copies: int, horizon: int, ring_current: boo
 
 def fit(
     X: pd.DataFrame, y: pd.Series, peak: float = 1.0, params: dict | None = None, test: bool = True,
-    extra: tuple[pd.DataFrame, pd.Series] | None = None,
+    extra: list[tuple[pd.DataFrame, pd.Series]] | None = None,
 ) -> tuple[xgb.XGBRegressor, np.ndarray, np.ndarray | None]:
     """Fit on train, early stop on validation, return the model and validation and test predictions.
 
@@ -93,14 +96,16 @@ def fit(
     persistence and anything it learns is skill on top of it. With `peak` > 1 storm hours
     weigh more in the loss, on validation as well, so early stopping follows the same goal.
     `params` defaults to PARAMS. With test=False the test years are not predicted (None).
-    `extra` is more training rows (the offset copies of offset_copies); validation never gets any.
+    `extra` holds more (X, y) training rows, for example the Dst offset copies of offset_copies
+    or perturbed solar wind copies of the training years; only their rows before VAL_START are
+    used and validation and test are never extended.
     """
     delta = y - X["dst_lag0"]
     (X_tr, X_va, X_te), (d_tr, d_va, _), (y_tr, y_va, _) = split(X), split(delta), split(y)
-    if extra is not None:
-        X_ex, y_ex = extra
-        X_tr, y_tr = pd.concat([X_tr, X_ex]), pd.concat([y_tr, y_ex])
-        d_tr = y_tr - X_tr["dst_lag0"]
+    for X_more, y_more in extra or []:
+        X_more, y_more = split(X_more)[0][X_tr.columns], split(y_more)[0]
+        X_tr, y_tr = pd.concat([X_tr, X_more]), pd.concat([y_tr, y_more])
+        d_tr = pd.concat([d_tr, y_more - X_more["dst_lag0"]])
     model = xgb.XGBRegressor(**(PARAMS if params is None else params))
     model.fit(X_tr, d_tr, sample_weight=storm_weights(y_tr, peak), eval_set=[(X_va, d_va)],
               sample_weight_eval_set=[storm_weights(y_va, peak)], verbose=False)
@@ -123,6 +128,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--objective", choices=list(OBJECTIVES), default="squarederror", help="loss of the change model (default squarederror)")
     parser.add_argument("--huber-slope", type=float, default=3.0, help="pseudo-Huber slope in nT, only with --objective pseudohuber")
     parser.add_argument("--dst-offset-aug", type=int, default=0, metavar="K", help="train on K extra copies of the train years with a random Dst offset per 168 hours (0 = off)")
+    parser.add_argument("--sw-noise-aug", type=float, default=0.0, metavar="LEVEL",
+                        help="add real-time like perturbed copies of the training years; 1 is the recipe of issue 24, 0 (default) is off")
+    parser.add_argument("--sw-noise-copies", type=int, default=1, help="perturbed copies of the training years added with --sw-noise-aug")
+    parser.add_argument("--sw-noise-seed", type=int, default=0, help="seed of the first perturbed copy")
     parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never predict the test years")
     return parser
 
@@ -133,8 +142,10 @@ def main() -> None:
     params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}, **objective_params(args.objective, args.huber_slope)}
     rc = "_rc" if args.ring_current else ""
     memory = MEMORY_TAUS if args.driver_memory else ()
+    noise = args.sw_noise_aug if args.sw_noise_copies > 0 else 0.0
     variant = rc + ("_mem" if memory else "") + (f"_l{n_lags}" if n_lags != N_LAGS else "") + ("_hp" if params != PARAMS else "")
     variant += f"_oa{args.dst_offset_aug}" if args.dst_offset_aug else ""
+    variant += f"_swn{noise:g}" if noise > 0 else ""
     tag = suffix(h) + weight_tag(peak) + variant
     df = load_hourly()
     X, y = build_features(df, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory)
@@ -143,9 +154,14 @@ def main() -> None:
     if params != PARAMS:
         print("params:", {k: v for k, v in params.items() if v != PARAMS.get(k)})
 
-    extra = offset_copies(df, args.dst_offset_aug, h, args.ring_current, n_lags, memory=memory) if args.dst_offset_aug else None
-    if extra is not None:
-        print(f"offset augmentation: {args.dst_offset_aug} copies, {len(extra[0]):,} extra train rows")
+    offset = [offset_copies(df, args.dst_offset_aug, h, args.ring_current, n_lags, memory=memory)] if args.dst_offset_aug else []
+    if offset:
+        print(f"offset augmentation: {args.dst_offset_aug} copies, {len(offset[0][0]):,} extra train rows")
+    noisy = [build_features(copy, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory)
+             for copy in train_copies(df, noise, args.sw_noise_copies, args.sw_noise_seed)]
+    if noisy:
+        print(f"solar wind noise: level {noise:g}, {len(noisy)} perturbed copies of the training years, {sum(len(x) for x, _ in noisy):,} extra rows")
+    extra = offset + noisy
 
     if args.validation_only:
         model, val_pred, _ = fit(X, y, peak, params, test=False, extra=extra)
@@ -157,9 +173,7 @@ def main() -> None:
 
     X_dst, _ = build_features(df, use_solar_wind=False, horizon=h, n_lags=n_lags)
     model, val_pred, pred = fit(X, y, peak, params, extra=extra)
-    extra_dst = offset_copies(df, args.dst_offset_aug, h, False, n_lags) if args.dst_offset_aug else None
-    if extra_dst is not None:
-        extra_dst = (extra_dst[0][[c for c in X_dst.columns]], extra_dst[1])
+    extra_dst = [offset_copies(df, args.dst_offset_aug, h, False, n_lags)] if args.dst_offset_aug else []
     model_dst, _, pred_dst = fit(X_dst, y, peak, params, extra=extra_dst)
     print(f"test: {len(X_te):,}  trees: full={model.best_iteration + 1}, dst-only={model_dst.best_iteration + 1}")
 
@@ -193,6 +207,7 @@ def main() -> None:
         "driver_memory_taus": list(memory),
         "n_lags": n_lags,
         "dst_offset_aug": args.dst_offset_aug,
+        "sw_noise_aug": {"level": noise, "copies": len(noisy), "seed": args.sw_noise_seed},
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
         "test": f"{TEST_START} .. {y_te.index.max()}",
