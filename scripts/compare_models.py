@@ -2,6 +2,7 @@
 
 Usage: python scripts/compare_models.py [--horizon H] [--storm-weight K]
        python scripts/compare_models.py --ensemble [--out PATH]
+       python scripts/compare_models.py --shrink [--out PATH]
 Reads : reports/xgb_test_predictions{_Hh}.parquet, reports/gru_test_predictions{_Hh}.parquet
         and, with --storm-weight, the {_swK} versions of both
 Writes: reports/comparison{_Hh}.json
@@ -9,6 +10,11 @@ Writes: reports/comparison{_Hh}.json
 With --ensemble (experiment, validation only) it instead loads the production 1 hour models,
 predicts the validation years 2017 to 2020 from a table cut before 2021, fits GRU plus XGBoost
 weights on one half, scores them on the other (both ways round) and writes --out.
+
+With --shrink (experiment, validation only, issue 32) it multiplies the predicted change of the
+same production models by a factor alpha in causally quiet conditions, cross-fits alpha on the
+two halves of validation and scores it against alpha 1, on clean inputs and on a copy whose
+newest Dst hour carries a real-time like error.
 
 Test hours are resampled in one week blocks, because errors an hour apart are not independent.
 Every model is scored on the same resamples, so a difference is significant when its 95%
@@ -48,10 +54,32 @@ def interval(values: np.ndarray) -> list[float]:
     return [round(float(v), 3) for v in np.nanpercentile(values, [2.5, 97.5])]
 
 
-def validation_predictions() -> pd.DataFrame:
+def newest_hour_features(X: pd.DataFrame, dst: pd.Series, error: pd.Series) -> pd.DataFrame:
+    """Copy of the features where only the newest Dst hour of every row carries `error`.
+
+    Row t sees Dst(t) + error(t) and the clean Dst of every earlier hour, as a real-time
+    forecast sees an unsettled newest value. The lags 1 and older, the drivers and the target
+    are untouched.
+    """
+    e = error.reindex(X.index).to_numpy(dtype=float)
+    out = X.copy()
+    newest = dst.reindex(X.index).to_numpy(dtype=float) + e
+    out["dst_lag0"] = newest
+    for name in ("dst_diff1", "dst_diff3"):
+        out[name] = X[name].to_numpy(dtype=float) + e
+    earlier = dst.shift(1).rolling(23, min_periods=1).min().reindex(X.index).to_numpy(dtype=float)
+    out["dst_min24"] = np.fmin(earlier, newest)
+    hours = dst.rolling(24, min_periods=1).count().reindex(X.index).to_numpy(dtype=float)
+    out["dst_mean24"] = X["dst_mean24"].to_numpy(dtype=float) + e / hours
+    return out.astype("float32")
+
+
+def validation_predictions(dst_error: pd.Series | None = None) -> pd.DataFrame:
     """Production 1 hour GRU (mean of the seeds) and XGBoost forecasts on the validation hours.
 
     The table is cut before TEST_START first, so no test hour is used, not even as a target.
+    With `dst_error` (nT, indexed by hour) the newest Dst hour of every forecast carries that
+    error: both models see it, dst_lag0 and persistence include it, the target stays clean.
     """
     import xgboost as xgb
 
@@ -67,7 +95,15 @@ def validation_predictions() -> pd.DataFrame:
     booster = xgb.XGBRegressor(n_jobs=1)
     booster.load_model(models / "xgb_dst_1h.ubj")
     X, _ = build_features(df)
-    X = split(X[booster.get_booster().feature_names])[1]
+    names = booster.get_booster().feature_names
+    if dst_error is not None:
+        known = {f"dst_lag{lag}" for lag in range(24)} | {"dst_diff1", "dst_diff3", "dst_min24", "dst_mean24"}
+        other = [c for c in names if ("dst" in c or "om" in c.split("_")) and c not in known]
+        assert not other, f"Dst features the newest hour error does not cover: {other}"
+        X = newest_hour_features(X, df["dst"], dst_error)
+    X = split(X[names + [c for c in ("dst_min24", "vbs_mean3") if c not in names]])[1]
+    quiet_inputs = X[["dst_min24", "vbs_mean3"]]
+    X = X[names]
     xgb_pred = pd.Series(X["dst_lag0"].to_numpy() + booster.predict(X), index=X.index)
 
     # torch and xgboost each bundle their own OpenMP runtime: as in scripts/live_forecast.py,
@@ -79,6 +115,18 @@ def validation_predictions() -> pd.DataFrame:
     windows, meta = build_windows(df, stats)
     meta = split(meta)[1]
     rows = meta["row"].to_numpy()
+    shift = None
+    if dst_error is not None:
+        assert list(stats["mean"])[0] == "dst" and not any("dst_star" in c for c in stats["mean"])
+        shift = (dst_error.reindex(meta.index).to_numpy(dtype=float) / stats["std"]["dst"]).astype("float32")
+
+    def batch(i: int):
+        """Windows of samples i .. i + 4096, the newest hour of the Dst channel shifted by the error."""
+        part = np.ascontiguousarray(windows[rows[i : i + 4096]])
+        if shift is not None:
+            part[:, -1, 0] += shift[i : i + 4096]
+        return torch.from_numpy(part)
+
     deltas = []
     for path in sorted(models.glob("gru_dst_1h_seed*.pt")):
         checkpoint = torch.load(path, weights_only=True)
@@ -86,23 +134,28 @@ def validation_predictions() -> pd.DataFrame:
         model.load_state_dict(checkpoint["state_dict"])
         model.eval()
         with torch.no_grad():
-            parts = [model(torch.from_numpy(np.ascontiguousarray(windows[rows[i : i + 4096]]))).numpy()
-                     for i in range(0, len(rows), 4096)]
+            parts = [model(batch(i)).numpy() for i in range(0, len(rows), 4096)]
         deltas.append(np.concatenate(parts) * checkpoint["scale"])
-    gru_pred = pd.Series(meta["dst_lag0"].to_numpy() + np.mean(deltas, axis=0), index=meta.index)
+    lag0 = meta["dst_lag0"] if dst_error is None else meta["dst_lag0"] + dst_error.reindex(meta.index)
+    gru_pred = pd.Series(lag0.to_numpy() + np.mean(deltas, axis=0), index=meta.index)
 
-    frame = pd.DataFrame({"observed": meta["dst_target"], "dst_lag0": meta["dst_lag0"],
-                          "persistence": meta["dst_lag0"], "gru": gru_pred, "xgboost": xgb_pred}).dropna()
+    frame = pd.DataFrame({"observed": meta["dst_target"], "dst_lag0": lag0,
+                          "persistence": lag0, "gru": gru_pred, "xgboost": xgb_pred}).dropna()
+    # Inputs of the causal quiet condition of --shrink; vbs_mean3 is missing in solar wind gaps.
+    frame = frame.join(quiet_inputs)
     assert frame.index.max() < pd.Timestamp(TEST_START)
     return frame
 
 
-def score(frame: pd.DataFrame, models: list[str], reference: str = "gru") -> dict:
-    """RMSE per regime with block bootstrap intervals, and each model's paired difference to `reference`."""
+def score(frame: pd.DataFrame, models: list[str], reference: str = "gru", extra: dict | None = None) -> dict:
+    """RMSE per regime with block bootstrap intervals, and each model's paired difference to `reference`.
+
+    `extra` adds subsets that are not defined by the observed Dst: name to boolean mask.
+    """
     y = frame["observed"].to_numpy()
     out = {}
-    for regime, mask_fn in REGIMES.items():
-        mask = mask_fn(y)
+    masks = {regime: mask_fn(y) for regime, mask_fn in REGIMES.items()} | (extra or {})
+    for regime, mask in masks.items():
         if not mask.any():
             out[regime] = {"n_hours": 0}  # e.g. no intense hours in 2019 to 2020
             continue
@@ -194,15 +247,126 @@ def ensemble_experiment(out_path: Path) -> None:
                       f"RMSE {v['rmse_value']:+.3f} {v['rmse_ci95']}")
 
 
+def shrink_experiment(out_path: Path) -> None:
+    """Validation only: cross-fit a shrink factor for the predicted change in quiet conditions."""
+    from oculstorm.data import TEST_START, VAL_START
+    from oculstorm.metrics import skill
+    from oculstorm.shrink import (BINS, CHANGE_EDGE, ERROR_COEFFICIENT, ERROR_MEAN, ERROR_SD, MIN_FIT_HOURS, QUIET_DST,
+                                  QUIET_MIN24, QUIET_VBS, ar1_error, fit_alpha, fit_bin_alphas, least_squares_alpha, quiet_condition,
+                                  shrink)
+
+    started = time.time()
+    seed = 32
+    hours = pd.date_range(VAL_START, TEST_START, freq="h", inclusive="left")
+    error = pd.Series(ar1_error(len(hours), seed), index=hours)
+    inputs = {"clean": None, "perturbed newest Dst hour": error}
+    families = ["gru", "xgboost"]
+    quiet_name = "causal quiet condition (the shrunk hours)"
+    results = {}
+    for input_name, dst_error in inputs.items():
+        frame = validation_predictions(dst_error)
+        frame["quiet"] = quiet_condition(frame["dst_lag0"], frame["dst_min24"], frame["vbs_mean3"])
+        halves = {"2017-2018": frame[frame.index < "2019-01-01"], "2019-2020": frame[frame.index >= "2019-01-01"]}
+        folds, held_out = {}, []
+        for fit_name, score_name in [("2017-2018", "2019-2020"), ("2019-2020", "2017-2018")]:
+            fit, held = halves[fit_name], halves[score_name].copy()
+            fold = {"fit_hours_quiet": int(fit["quiet"].sum()), "n_hours_scored": len(held), "alpha": {}, "alpha_not_clipped": {},
+                    "alpha_by_bin": {}}
+            for m in families:
+                change = fit[m] - fit["dst_lag0"]
+                alpha = fit_alpha(fit["observed"], fit["dst_lag0"], change, fit["quiet"])
+                bins = fit_bin_alphas(fit["observed"], fit["dst_lag0"], change, fit["quiet"])
+                held_change = held[m] - held["dst_lag0"]
+                held[f"{m} shrunk"] = shrink(held["dst_lag0"], held_change, alpha, held["quiet"])
+                held[f"{m} shrunk 2 bins"] = shrink(held["dst_lag0"], held_change, bins, held["quiet"])
+                fold["alpha"][m] = round(alpha, 4)
+                fold["alpha_not_clipped"][m] = round(least_squares_alpha(fit["observed"], fit["dst_lag0"], change, fit["quiet"]), 4)
+                fold["alpha_by_bin"][m] = {b: round(a, 4) for b, a in bins.items()}
+            held_out.append(held)
+            folds[f"fit {fit_name}, score {score_name}"] = fold
+        pooled = pd.concat(held_out).sort_index()
+        assert pooled.index.max() < pd.Timestamp(TEST_START) and len(pooled) == len(frame)
+
+        y, quiet = pooled["observed"].to_numpy(), pooled["quiet"].to_numpy()
+        block = {"n_hours": len(pooled), "n_hours_quiet_condition": int(quiet.sum()), "folds": folds,
+                 "predicted_change_sd": {}, "scores": {}, "skill_vs_persistence": {}, "promising": {}}
+        for m in families:
+            variants = [m, f"{m} shrunk", f"{m} shrunk 2 bins"]
+            block["predicted_change_sd"][m] = {
+                subset: {v: round(float(np.std((pooled[v] - pooled["dst_lag0"]).to_numpy()[mask])), 4) for v in variants}
+                for subset, mask in [("all", np.ones(len(pooled), dtype=bool)), (quiet_name, quiet)]
+            }
+            scores = score(pooled, ["persistence", *variants], reference=m, extra={quiet_name: quiet})
+            block["scores"][m] = scores
+            block["skill_vs_persistence"][m] = {
+                regime: {v: round(skill(y[mask], pooled[v].to_numpy()[mask], pooled["persistence"].to_numpy()[mask]), 4) for v in variants}
+                for regime, mask in [*((r, f(y)) for r, f in REGIMES.items()), (quiet_name, quiet)] if mask.any()
+            }
+            for v in variants[1:]:
+                d_all = scores["all"]["differences"][f"{v} minus {m}"]
+                d_storm = scores["storm (Dst <= -50)"]["differences"][f"{v} minus {m}"]
+                overall = d_all["mse_change_percent"] <= -2 and d_all["rmse_ci95"][1] < 0
+                storm = d_storm["mse_change_percent"] <= -3 and d_storm["rmse_ci95"][1] < 0 and d_all["mse_change_percent"] <= 1
+                block["promising"][v] = bool(overall or storm)
+        results[input_name] = block
+
+    report = {
+        "issue": 32,
+        "experiment": "shrink the predicted change in quiet conditions: forecast = Dst(t) + alpha * change",
+        "horizon_hours": 1,
+        "models": "production models/xgb_dst_1h.ubj and the mean of models/gru_dst_1h_seed*.pt, not retrained",
+        "data": f"validation {hours[0]} .. {hours[-1]}, table cut before {TEST_START}, test years not used",
+        "quiet_condition": f"dst_lag0 > {QUIET_DST:g} and dst_min24 > {QUIET_MIN24:g} and vbs_mean3 < {QUIET_VBS:g}, from the inputs as "
+                           "the model saw them at t; a missing vbs_mean3 (solar wind gap) is not quiet; alpha = 1 outside it",
+        "alpha": f"least squares on the quiet condition hours of the fitting half, clipped to [0, 1]; 1 with fewer than {MIN_FIT_HOURS} hours",
+        "bins": {"edge_nt": CHANGE_EDGE, "names": list(BINS), "by": "absolute predicted change"},
+        "cross_fit": "fit 2017 to 2018 and score 2019 to 2020, then the reverse; scores are on the pooled out of fold hours",
+        "inputs": {
+            "clean": "validation as it is",
+            "perturbed newest Dst hour": f"Dst(t) + e(t) as the newest hour of every forecast, e an AR(1) series with mean {ERROR_MEAN:g} nT, "
+                                         f"standard deviation {ERROR_SD:g} nT, coefficient {ERROR_COEFFICIENT:g}, seed {seed}; earlier hours and "
+                                         "the target are clean; the forecast and persistence start from the perturbed value",
+            "not_run": "perturbed solar wind: the issue 24 code is not on main",
+        },
+        "scoring_regimes": "by the observed target Dst, as in oculstorm.metrics.REGIMES, plus the causal quiet condition",
+        "bootstrap": {"method": "oculstorm.metrics.block_bootstrap_rmse, paired against alpha 1 of the same model",
+                      "block_hours": 168, "resamples": 2000, "seed": 0},
+        "promising_bar": "retrain policy on the pooled out of fold hours: overall MSE at least 2% lower, or storm MSE at least 3% lower "
+                         "with overall at most 1% higher, intervals excluding zero",
+        "results": results,
+    }
+    report["seconds"] = round(time.time() - started)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(report, indent=2) + "\n")
+
+    for input_name, block in results.items():
+        print(f"\n== {input_name}: {block['n_hours']:,} hours, {block['n_hours_quiet_condition']:,} in the quiet condition")
+        for name, fold in block["folds"].items():
+            print(f"  {name}: alpha {fold['alpha']}  not clipped {fold['alpha_not_clipped']}  by bin {fold['alpha_by_bin']}")
+        for m in families:
+            print(f"  sd of the predicted change: {block['predicted_change_sd'][m]}")
+            for regime, result in block["scores"][m].items():
+                if not result["n_hours"]:
+                    continue
+                print(f"  {regime} ({result['n_hours']:,} h): " + "  ".join(f"{k} {r['value']:.3f}" for k, r in result["rmse"].items()))
+                for d, v in result["differences"].items():
+                    print(f"    {d:<36} MSE {v['mse_change_percent']:+6.2f}% {v['mse_change_percent_ci95']}  "
+                          f"RMSE {v['rmse_value']:+.4f} {v['rmse_ci95']}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
     parser.add_argument("--storm-weight", type=float, help="also compare the storm-weighted runs with this weight")
     parser.add_argument("--ensemble", action="store_true", help="validation only: fit and score GRU plus XGBoost weights at 1 hour")
-    parser.add_argument("--out", type=Path, default=REPORTS / "experiments" / "7-gru-xgb-ensemble.json", help="report of --ensemble")
+    parser.add_argument("--shrink", action="store_true", help="validation only: cross-fit a shrink factor for the predicted change in quiet conditions at 1 hour")
+    parser.add_argument("--out", type=Path, help="report of --ensemble or --shrink (default reports/experiments/7-gru-xgb-ensemble.json or 32-shrink.json)")
     args = parser.parse_args()
     if args.ensemble:
-        ensemble_experiment(args.out)
+        ensemble_experiment(args.out or REPORTS / "experiments" / "7-gru-xgb-ensemble.json")
+        return
+    if args.shrink:
+        shrink_experiment(args.out or REPORTS / "experiments" / "32-shrink.json")
         return
     h = args.horizon
 

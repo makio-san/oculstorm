@@ -1,19 +1,59 @@
-"""Real-time like perturbation of the solar wind columns of the hourly table (experiment, issue 24).
+"""Training set augmentations of the hourly table. Both are off by default.
 
-Real-time L1 solar wind is noisier than the OMNI science data the models are trained on:
-density and temperature are less certain, speed and field a little, there are short gaps and
-the propagation to the bow shock can be off by about an hour. `perturb_solar_wind` imitates
-that on a copy of the table, so the training years can be seen a second time the way a live
-feed would show them.
+Dst baseline offset augmentation (issue 23). Quick-look Dst has a quiet time baseline that
+drifts by tens of nT, while the models learn a recovery toward the final Dst baseline.
+Persistence is invariant to a constant offset, the models are not. The augmentation adds one
+random offset per 168 hour block to the Dst column of a copy of the table, so inputs and target
+of a row move together and every delta target stays what it was.
 
-Nothing here looks ahead: the perturbed solar wind at hour t is made from the clean values at
-hour t or at hour t-1 (a delay, never an advance) and from random numbers. Dst, F10.7 and
-every other column are left alone.
+Real-time like solar wind perturbation (experiment, issue 24). Real-time L1 solar wind is
+noisier than the OMNI science data the models are trained on: density and temperature are less
+certain, speed and field a little, there are short gaps and the propagation to the bow shock
+can be off by about an hour. `perturb_solar_wind` imitates that on a copy of the table, so the
+training years can be seen a second time the way a live feed would show them. Nothing there
+looks ahead: the perturbed solar wind at hour t is made from the clean values at hour t or at
+hour t-1 (a delay, never an advance) and from random numbers. Dst, F10.7 and every other column
+are left alone.
 """
 import numpy as np
 import pandas as pd
 
 from .data import VAL_START
+
+BLOCK = 168  # hours that share one offset
+OFFSET_RANGE = (-25.0, 10.0)  # nT, from the quick-look bias reported by Nair et al. (2023)
+WARMUP = 24  # hours of a block a row needs behind it: the 24 hour Dst window and the lags
+
+
+def block_offsets(index: pd.DatetimeIndex, seed: int, block: int = BLOCK, low: float = OFFSET_RANGE[0], high: float = OFFSET_RANGE[1]) -> np.ndarray:
+    """One offset in [low, high] per block of `block` hours, repeated for every hour of the block.
+
+    Blocks are counted from the first row of `index`, so a longer table gives the same offsets
+    for the same hours.
+    """
+    n_blocks = len(index) // block + 1
+    draws = np.random.default_rng(seed).uniform(low, high, size=n_blocks)
+    return np.repeat(draws, block)[: len(index)]
+
+
+def offset_table(df: pd.DataFrame, seed: int, **kwargs) -> pd.DataFrame:
+    """Copy of the hourly table with the block offsets added to the Dst column."""
+    out = df.copy()
+    out["dst"] = df["dst"] + block_offsets(df.index, seed, **kwargs)
+    return out
+
+
+def consistent_rows(index: pd.DatetimeIndex, horizon: int, block: int = BLOCK, warmup: int = WARMUP) -> np.ndarray:
+    """Rows whose whole history window and target lie inside one offset block.
+
+    Only these rows have inputs and target shifted by the same offset. The others see a jump
+    in the baseline in the middle of their window and are left out.
+    """
+    position = np.arange(len(index)) % block
+    return (position >= warmup - 1) & (position + horizon < block)
+
+
+# Real-time like solar wind perturbation (issue 24)
 
 SIGMA_LOG_PLASMA = 0.2  # proton_density and proton_temp are multiplied by exp(N(0, sigma))
 SIGMA_SPEED = 0.03  # flow_speed is multiplied by 1 + N(0, sigma)
@@ -25,7 +65,7 @@ SEGMENT_HOURS = 24
 FIELD = ["bz_gsm", "by_gsm", "b_mag_avg"]
 PLASMA = ["proton_density", "proton_temp"]
 DERIVED = ["flow_pressure", "electric_field"]
-BLOCK = FIELD + ["flow_speed"] + PLASMA + DERIVED  # the same columns as features.SOLAR_WIND
+SW_COLUMNS = FIELD + ["flow_speed"] + PLASMA + DERIVED  # the same columns as features.SOLAR_WIND
 
 
 def delay_hours(index: pd.DatetimeIndex, rng: np.random.Generator, probability: float = DELAY_PROBABILITY) -> np.ndarray:
@@ -74,7 +114,7 @@ def perturb_solar_wind(df: pd.DataFrame, level: float = 1.0, seed: int = 0) -> p
         np.random.default_rng(s) for s in np.random.SeedSequence(seed).spawn(6)
     )
 
-    clean = df[BLOCK].astype("float64")
+    clean = df[SW_COLUMNS].astype("float64")
     late = delay_hours(df.index, r_delay, DELAY_PROBABILITY * level) == 1
     block = clean.copy()
     block[late] = clean.shift(1)[late]  # shift(1): the row of hour t-1, never t+1
@@ -92,7 +132,7 @@ def perturb_solar_wind(df: pd.DataFrame, level: float = 1.0, seed: int = 0) -> p
     new["electric_field"] = -new["flow_speed"] * new["bz_gsm"] * 1e-3
 
     new[dropout_mask(n, r_start, r_length, DROPOUT_FRACTION * level)] = np.nan
-    out[BLOCK] = new.astype(df[BLOCK].dtypes.to_dict())
+    out[SW_COLUMNS] = new.astype(df[SW_COLUMNS].dtypes.to_dict())
     return out
 
 

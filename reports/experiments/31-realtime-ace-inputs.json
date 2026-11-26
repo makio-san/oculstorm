@@ -1,0 +1,1288 @@
+{
+ "issue": 31,
+ "title": "Production 1 hour models on validation with archived real-time ACE solar wind in place of OMNI",
+ "result": "no-gain",
+ "date": "2026-11-26",
+ "command": "python -m oculstorm.realtime_inputs",
+ "reading": [
+  "A measurement, not a candidate: no model or default changes, so there is nothing to promote and the label is no-gain.",
+  "With real-time ACE inputs delayed 1 hour, validation MSE over all hours is 22.5% higher for XGBoost and 28.4% higher for the GRU; skill falls from 0.379 to 0.239 and from 0.396 to 0.224. Quiet hours lose 19.8% and 25.1%, storm hours 56.1% and 68.9%. Every interval excludes zero except intense hours for XGBoost.",
+  "Most of that loss is gaps, not noise: 18.6% of IMF hours and 27.0% of plasma hours are missing in the archive (daily tracking gaps, mostly 23 to 06 UT). On the 9,681 issue hours with every input observed over the last 6 hours the loss is 7.0% (XGBoost, interval touches zero) and 7.3% (GRU); only 31 storm hours are in that subset.",
+  "The 1 hour delay is the right alignment (Bz correlation with OMNI 0.81 against 0.58 at 0 hours and 0.63 at 2 hours); with no delay the loss is 38% for both models.",
+  "Real-time density is 2.75 per cc lower than OMNI on average (OMNI mean 6.58) and lower in 91% of hours, so pressure is 0.60 nPa low. The ACE Bt is the magnitude of the averaged vector: 0.53 nT below OMNI b_mag_avg but unbiased against OMNI b_vector_mag.",
+  "Caveat: the live forecast reads the SWPC propagated product (mostly DSCOVR), whose coverage is far better than ACE real-time tracking in 2017 to 2020, so the all hours loss overstates the live gap; the inputs observed rows are the closer proxy."
+ ],
+ "not_run": "the optional XGBoost retrain without proton_density, proton_temp and flow_pressure",
+ "split": "validation only, 2017-01-01 .. 2020-12-31; no training; the table is cut to these years before any model call",
+ "horizon_hours": 1,
+ "source": {
+  "url": "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/monthly",
+  "files": 96,
+  "megabytes": 5.66,
+  "pattern": "YYYYMM_ace_mag_1h.txt, YYYYMM_ace_swepam_1h.txt",
+  "user_agent": "python-urllib",
+  "kept": false
+ },
+ "configuration": {
+  "models": "models/xgb_dst_1h.ubj and the mean of models/gru_dst_1h_seed*.pt, loaded by scripts/live_forecast.py",
+  "replaced_columns": [
+   "bz_gsm",
+   "by_gsm",
+   "b_mag_avg",
+   "flow_speed",
+   "proton_density",
+   "flow_pressure",
+   "electric_field",
+   "proton_temp"
+  ],
+  "kept_from_parquet": [
+   "dst",
+   "f107"
+  ],
+  "missing": "status other than 0 or a value at or below -999 becomes NaN; XGBoost reads NaN, the GRU forward fills 3 hours and masks",
+  "derived": "flow_pressure = 2e-6 * n * V^2, electric_field = -V * Bz * 1e-3, as oculstorm/live.py",
+  "delays_hours": [
+   1,
+   0
+  ],
+  "scored_hours": "issue hours from 2017-01-02T00:00 to 2020-12-31T22:00, the same for every input; the first 24 hours only serve as input history"
+ },
+ "bootstrap": {
+  "method": "oculstorm.metrics.block_bootstrap_rmse, paired",
+  "block_hours": 168,
+  "resamples": 2000,
+  "seed": 0,
+  "intervals": "95%; differences are ACE inputs minus OMNI inputs for the same model"
+ },
+ "input_statistics": {
+  "ace_delay1h": {
+   "bz_gsm": {
+    "bias": 0.051,
+    "std_difference": 1.3244,
+    "correlation": 0.8125,
+    "omni_mean": -0.1475,
+    "omni_std": 2.1195,
+    "missing_share_realtime": 0.1862,
+    "missing_share_omni": 0.0009,
+    "hours_compared": 28513,
+    "share_abs_difference_above_4nT": 0.0156
+   },
+   "by_gsm": {
+    "bias": -0.0048,
+    "std_difference": 1.3451,
+    "correlation": 0.8891,
+    "omni_mean": -0.2438,
+    "omni_std": 2.8911,
+    "missing_share_realtime": 0.1862,
+    "missing_share_omni": 0.0009,
+    "hours_compared": 28513
+   },
+   "b_mag_avg": {
+    "bias": -0.5297,
+    "std_difference": 0.8332,
+    "correlation": 0.9184,
+    "omni_mean": 4.6415,
+    "omni_std": 2.0915,
+    "missing_share_realtime": 0.1862,
+    "missing_share_omni": 0.0002,
+    "hours_compared": 28530,
+    "bias_to_omni_b_vector_mag": 0.0091,
+    "std_difference_to_omni_b_vector_mag": 0.7397
+   },
+   "flow_speed": {
+    "bias": 1.7594,
+    "std_difference": 9.1555,
+    "correlation": 0.9947,
+    "omni_mean": 406.1536,
+    "omni_std": 89.0618,
+    "missing_share_realtime": 0.2695,
+    "missing_share_omni": 0.0002,
+    "hours_compared": 25615
+   },
+   "proton_density": {
+    "bias": -2.7472,
+    "std_difference": 3.4415,
+    "correlation": 0.6565,
+    "omni_mean": 6.5804,
+    "omni_std": 4.5243,
+    "missing_share_realtime": 0.2693,
+    "missing_share_omni": 0.0021,
+    "hours_compared": 25566,
+    "share_realtime_below_omni": 0.9143
+   },
+   "flow_pressure": {
+    "bias": -0.596,
+    "std_difference": 0.8397,
+    "correlation": 0.6882,
+    "omni_mean": 1.8167,
+    "omni_std": 1.0994,
+    "missing_share_realtime": 0.2695,
+    "missing_share_omni": 0.0022,
+    "hours_compared": 25559
+   },
+   "electric_field": {
+    "bias": -0.0221,
+    "std_difference": 0.6093,
+    "correlation": 0.774,
+    "omni_mean": 0.083,
+    "omni_std": 0.8868,
+    "missing_share_realtime": 0.2985,
+    "missing_share_omni": 0.0009,
+    "hours_compared": 24582
+   },
+   "proton_temp": {
+    "bias": 7282.5661,
+    "std_difference": 23948.9217,
+    "correlation": 0.9344,
+    "omni_mean": 72095.3672,
+    "omni_std": 64383.1094,
+    "missing_share_realtime": 0.2695,
+    "missing_share_omni": 0.0005,
+    "hours_compared": 25606
+   }
+  },
+  "ace_delay0h": {
+   "bz_gsm": {
+    "bias": 0.0549,
+    "std_difference": 1.9717,
+    "correlation": 0.5842,
+    "omni_mean": -0.1513,
+    "omni_std": 2.1224,
+    "missing_share_realtime": 0.1861,
+    "missing_share_omni": 0.0009,
+    "hours_compared": 28515,
+    "share_abs_difference_above_4nT": 0.0501
+   },
+   "by_gsm": {
+    "bias": 0.001,
+    "std_difference": 1.9551,
+    "correlation": 0.7653,
+    "omni_mean": -0.2496,
+    "omni_std": 2.8926,
+    "missing_share_realtime": 0.1861,
+    "missing_share_omni": 0.0009,
+    "hours_compared": 28515
+   },
+   "b_mag_avg": {
+    "bias": -0.5331,
+    "std_difference": 1.0842,
+    "correlation": 0.8615,
+    "omni_mean": 4.6449,
+    "omni_std": 2.0941,
+    "missing_share_realtime": 0.1861,
+    "missing_share_omni": 0.0002,
+    "hours_compared": 28532,
+    "bias_to_omni_b_vector_mag": 0.0041,
+    "std_difference_to_omni_b_vector_mag": 1.1464
+   },
+   "flow_speed": {
+    "bias": 1.8433,
+    "std_difference": 11.9337,
+    "correlation": 0.991,
+    "omni_mean": 406.0656,
+    "omni_std": 88.9963,
+    "missing_share_realtime": 0.2694,
+    "missing_share_omni": 0.0002,
+    "hours_compared": 25617
+   },
+   "proton_density": {
+    "bias": -2.7408,
+    "std_difference": 3.6955,
+    "correlation": 0.6028,
+    "omni_mean": 6.5742,
+    "omni_std": 4.555,
+    "missing_share_realtime": 0.2693,
+    "missing_share_omni": 0.0021,
+    "hours_compared": 25568,
+    "share_realtime_below_omni": 0.8945
+   },
+   "flow_pressure": {
+    "bias": -0.5932,
+    "std_difference": 0.914,
+    "correlation": 0.6339,
+    "omni_mean": 1.8138,
+    "omni_std": 1.1089,
+    "missing_share_realtime": 0.2694,
+    "missing_share_omni": 0.0022,
+    "hours_compared": 25561
+   },
+   "electric_field": {
+    "bias": -0.0193,
+    "std_difference": 0.8468,
+    "correlation": 0.5616,
+    "omni_mean": 0.0803,
+    "omni_std": 0.8844,
+    "missing_share_realtime": 0.2985,
+    "missing_share_omni": 0.0009,
+    "hours_compared": 24585
+   },
+   "proton_temp": {
+    "bias": 7359.3468,
+    "std_difference": 27206.7895,
+    "correlation": 0.9152,
+    "omni_mean": 72006.2734,
+    "omni_std": 64536.9453,
+    "missing_share_realtime": 0.2695,
+    "missing_share_omni": 0.0005,
+    "hours_compared": 25609
+   }
+  }
+ },
+ "coverage": {
+  "imf": {
+   "missing_share_by_year": {
+    "2017": 0.3096,
+    "2018": 0.2361,
+    "2019": 0.0788,
+    "2020": 0.1203
+   },
+   "gaps": 1629,
+   "longest_gap_hours": 145,
+   "share_of_missing_hours_in_gaps_up_to_3h": 0.2212
+  },
+  "plasma": {
+   "missing_share_by_year": {
+    "2017": 0.3581,
+    "2018": 0.2828,
+    "2019": 0.1751,
+    "2020": 0.2617
+   },
+   "gaps": 3641,
+   "longest_gap_hours": 23,
+   "share_of_missing_hours_in_gaps_up_to_3h": 0.4011
+  }
+ },
+ "alignment_correlation_with_omni": {
+  "delay0h": {
+   "bz_gsm": 0.5842,
+   "by_gsm": 0.7653,
+   "flow_speed": 0.991
+  },
+  "delay1h": {
+   "bz_gsm": 0.8125,
+   "by_gsm": 0.8891,
+   "flow_speed": 0.9947
+  },
+  "delay2h": {
+   "bz_gsm": 0.6304,
+   "by_gsm": 0.794,
+   "flow_speed": 0.9906
+  },
+  "delay3h": {
+   "bz_gsm": 0.4366,
+   "by_gsm": 0.6803,
+   "flow_speed": 0.9832
+  }
+ },
+ "issue_hours": {
+  "all": 35039,
+  "all_inputs_observed_last_6h_in_every_variant": 9681
+ },
+ "scores": {
+  "all_hours": {
+   "xgb": {
+    "all": {
+     "n_hours": 35039,
+     "rmse_persistence": 3.3705,
+     "inputs": {
+      "omni": {
+       "rmse": 2.6561,
+       "rmse_ci95": [
+        2.539,
+        2.775
+       ],
+       "skill": 0.379
+      },
+      "ace_delay1h": {
+       "rmse": 2.9401,
+       "rmse_ci95": [
+        2.78,
+        3.116
+       ],
+       "skill": 0.2391
+      },
+      "ace_delay0h": {
+       "rmse": 3.1255,
+       "rmse_ci95": [
+        2.977,
+        3.294
+       ],
+       "skill": 0.1401
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 0.2841,
+       "rmse_ci95": [
+        0.221,
+        0.362
+       ],
+       "mse_change_percent": 22.53,
+       "mse_change_percent_ci95": [
+        17.57,
+        28.48
+       ],
+       "skill_change": -0.1399,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 0.4694,
+       "rmse_ci95": [
+        0.41,
+        0.537
+       ],
+       "mse_change_percent": 38.47,
+       "mse_change_percent_ci95": [
+        33.6,
+        43.72
+       ],
+       "skill_change": -0.2389,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 34677,
+     "rmse_persistence": 3.2359,
+     "inputs": {
+      "omni": {
+       "rmse": 2.5674,
+       "rmse_ci95": [
+        2.473,
+        2.664
+       ],
+       "skill": 0.3705
+      },
+      "ace_delay1h": {
+       "rmse": 2.81,
+       "rmse_ci95": [
+        2.695,
+        2.925
+       ],
+       "skill": 0.2459
+      },
+      "ace_delay0h": {
+       "rmse": 2.9981,
+       "rmse_ci95": [
+        2.888,
+        3.117
+       ],
+       "skill": 0.1416
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 0.2426,
+       "rmse_ci95": [
+        0.202,
+        0.288
+       ],
+       "mse_change_percent": 19.8,
+       "mse_change_percent_ci95": [
+        16.39,
+        23.45
+       ],
+       "skill_change": -0.1246,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 0.4307,
+       "rmse_ci95": [
+        0.385,
+        0.479
+       ],
+       "mse_change_percent": 36.37,
+       "mse_change_percent_ci95": [
+        32.13,
+        40.7
+       ],
+       "skill_change": -0.2289,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 362,
+     "rmse_persistence": 9.8253,
+     "inputs": {
+      "omni": {
+       "rmse": 7.1727,
+       "rmse_ci95": [
+        6.332,
+        7.932
+       ],
+       "skill": 0.4671
+      },
+      "ace_delay1h": {
+       "rmse": 8.9623,
+       "rmse_ci95": [
+        7.235,
+        10.497
+       ],
+       "skill": 0.168
+      },
+      "ace_delay0h": {
+       "rmse": 9.1936,
+       "rmse_ci95": [
+        7.849,
+        10.405
+       ],
+       "skill": 0.1244
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 1.7895,
+       "rmse_ci95": [
+        0.615,
+        2.78
+       ],
+       "mse_change_percent": 56.12,
+       "mse_change_percent_ci95": [
+        18.75,
+        87.06
+       ],
+       "skill_change": -0.2991,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 2.0209,
+       "rmse_ci95": [
+        1.128,
+        2.749
+       ],
+       "mse_change_percent": 64.29,
+       "mse_change_percent_ci95": [
+        34.76,
+        91.83
+       ],
+       "skill_change": -0.3427,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 35,
+     "rmse_persistence": 15.9553,
+     "inputs": {
+      "omni": {
+       "rmse": 11.6867,
+       "rmse_ci95": [
+        8.804,
+        13.939
+       ],
+       "skill": 0.4635
+      },
+      "ace_delay1h": {
+       "rmse": 15.8193,
+       "rmse_ci95": [
+        8.456,
+        18.492
+       ],
+       "skill": 0.017
+      },
+      "ace_delay0h": {
+       "rmse": 14.7215,
+       "rmse_ci95": [
+        8.722,
+        18.17
+       ],
+       "skill": 0.1487
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 4.1325,
+       "rmse_ci95": [
+        -0.348,
+        5.546
+       ],
+       "mse_change_percent": 83.23,
+       "mse_change_percent_ci95": [
+        -7.76,
+        117.68
+       ],
+       "skill_change": -0.4465,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 3.0348,
+       "rmse_ci95": [
+        -0.083,
+        4.231
+       ],
+       "mse_change_percent": 58.68,
+       "mse_change_percent_ci95": [
+        -1.87,
+        73.55
+       ],
+       "skill_change": -0.3148,
+       "significant": false,
+       "resamples_with_hours": 1921
+      }
+     }
+    }
+   },
+   "gru": {
+    "all": {
+     "n_hours": 35039,
+     "rmse_persistence": 3.3705,
+     "inputs": {
+      "omni": {
+       "rmse": 2.6203,
+       "rmse_ci95": [
+        2.507,
+        2.738
+       ],
+       "skill": 0.3956
+      },
+      "ace_delay1h": {
+       "rmse": 2.9688,
+       "rmse_ci95": [
+        2.804,
+        3.151
+       ],
+       "skill": 0.2241
+      },
+      "ace_delay0h": {
+       "rmse": 3.0822,
+       "rmse_ci95": [
+        2.921,
+        3.259
+       ],
+       "skill": 0.1637
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 0.3486,
+       "rmse_ci95": [
+        0.271,
+        0.44
+       ],
+       "mse_change_percent": 28.38,
+       "mse_change_percent_ci95": [
+        22.31,
+        35.42
+       ],
+       "skill_change": -0.1715,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 0.462,
+       "rmse_ci95": [
+        0.39,
+        0.545
+       ],
+       "mse_change_percent": 38.37,
+       "mse_change_percent_ci95": [
+        32.46,
+        44.88
+       ],
+       "skill_change": -0.2319,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 34677,
+     "rmse_persistence": 3.2359,
+     "inputs": {
+      "omni": {
+       "rmse": 2.5321,
+       "rmse_ci95": [
+        2.442,
+        2.623
+       ],
+       "skill": 0.3877
+      },
+      "ace_delay1h": {
+       "rmse": 2.8316,
+       "rmse_ci95": [
+        2.712,
+        2.957
+       ],
+       "skill": 0.2343
+      },
+      "ace_delay0h": {
+       "rmse": 2.9431,
+       "rmse_ci95": [
+        2.832,
+        3.067
+       ],
+       "skill": 0.1728
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 0.2995,
+       "rmse_ci95": [
+        0.248,
+        0.351
+       ],
+       "mse_change_percent": 25.05,
+       "mse_change_percent_ci95": [
+        20.74,
+        29.5
+       ],
+       "skill_change": -0.1534,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 0.4109,
+       "rmse_ci95": [
+        0.361,
+        0.466
+       ],
+       "mse_change_percent": 35.09,
+       "mse_change_percent_ci95": [
+        30.7,
+        39.81
+       ],
+       "skill_change": -0.2149,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 362,
+     "rmse_persistence": 9.8253,
+     "inputs": {
+      "omni": {
+       "rmse": 7.0968,
+       "rmse_ci95": [
+        6.319,
+        7.891
+       ],
+       "skill": 0.4783
+      },
+      "ace_delay1h": {
+       "rmse": 9.2238,
+       "rmse_ci95": [
+        7.476,
+        10.743
+       ],
+       "skill": 0.1187
+      },
+      "ace_delay0h": {
+       "rmse": 9.4781,
+       "rmse_ci95": [
+        7.927,
+        10.926
+       ],
+       "skill": 0.0694
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 2.127,
+       "rmse_ci95": [
+        0.766,
+        3.235
+       ],
+       "mse_change_percent": 68.93,
+       "mse_change_percent_ci95": [
+        22.87,
+        107.55
+       ],
+       "skill_change": -0.3596,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 2.3813,
+       "rmse_ci95": [
+        1.186,
+        3.403
+       ],
+       "mse_change_percent": 78.37,
+       "mse_change_percent_ci95": [
+        36.86,
+        113.19
+       ],
+       "skill_change": -0.4089,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 35,
+     "rmse_persistence": 15.9553,
+     "inputs": {
+      "omni": {
+       "rmse": 10.5678,
+       "rmse_ci95": [
+        9.319,
+        11.712
+       ],
+       "skill": 0.5613
+      },
+      "ace_delay1h": {
+       "rmse": 18.1375,
+       "rmse_ci95": [
+        13.104,
+        21.627
+       ],
+       "skill": -0.2923
+      },
+      "ace_delay0h": {
+       "rmse": 17.7157,
+       "rmse_ci95": [
+        13.624,
+        20.734
+       ],
+       "skill": -0.2328
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 7.5697,
+       "rmse_ci95": [
+        3.785,
+        10.269
+       ],
+       "mse_change_percent": 194.57,
+       "mse_change_percent_ci95": [
+        97.74,
+        275.99
+       ],
+       "skill_change": -0.8536,
+       "significant": true,
+       "resamples_with_hours": 1921
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 7.1479,
+       "rmse_ci95": [
+        4.305,
+        9.708
+       ],
+       "mse_change_percent": 181.03,
+       "mse_change_percent_ci95": [
+        113.74,
+        254.56
+       ],
+       "skill_change": -0.7941,
+       "significant": true,
+       "resamples_with_hours": 1921
+      }
+     }
+    }
+   }
+  },
+  "inputs_observed": {
+   "xgb": {
+    "all": {
+     "n_hours": 9681,
+     "rmse_persistence": 2.9327,
+     "inputs": {
+      "omni": {
+       "rmse": 2.3526,
+       "rmse_ci95": [
+        2.252,
+        2.464
+       ],
+       "skill": 0.3564
+      },
+      "ace_delay1h": {
+       "rmse": 2.4333,
+       "rmse_ci95": [
+        2.274,
+        2.639
+       ],
+       "skill": 0.3116
+      },
+      "ace_delay0h": {
+       "rmse": 2.6853,
+       "rmse_ci95": [
+        2.537,
+        2.863
+       ],
+       "skill": 0.1616
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 0.0807,
+       "rmse_ci95": [
+        -0.003,
+        0.204
+       ],
+       "mse_change_percent": 6.97,
+       "mse_change_percent_ci95": [
+        -0.25,
+        17.42
+       ],
+       "skill_change": -0.0448,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 0.3327,
+       "rmse_ci95": [
+        0.255,
+        0.423
+       ],
+       "mse_change_percent": 30.28,
+       "mse_change_percent_ci95": [
+        23.11,
+        38.02
+       ],
+       "skill_change": -0.1948,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 9650,
+     "rmse_persistence": 2.8765,
+     "inputs": {
+      "omni": {
+       "rmse": 2.3081,
+       "rmse_ci95": [
+        2.225,
+        2.395
+       ],
+       "skill": 0.3561
+      },
+      "ace_delay1h": {
+       "rmse": 2.3579,
+       "rmse_ci95": [
+        2.261,
+        2.466
+       ],
+       "skill": 0.3281
+      },
+      "ace_delay0h": {
+       "rmse": 2.6236,
+       "rmse_ci95": [
+        2.513,
+        2.735
+       ],
+       "skill": 0.1681
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 0.0498,
+       "rmse_ci95": [
+        -0.001,
+        0.107
+       ],
+       "mse_change_percent": 4.36,
+       "mse_change_percent_ci95": [
+        -0.05,
+        9.32
+       ],
+       "skill_change": -0.028,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 0.3155,
+       "rmse_ci95": [
+        0.252,
+        0.379
+       ],
+       "mse_change_percent": 29.21,
+       "mse_change_percent_ci95": [
+        23.14,
+        35.58
+       ],
+       "skill_change": -0.188,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 31,
+     "rmse_persistence": 10.4942,
+     "inputs": {
+      "omni": {
+       "rmse": 8.3742,
+       "rmse_ci95": [
+        4.292,
+        12.044
+       ],
+       "skill": 0.3632
+      },
+      "ace_delay1h": {
+       "rmse": 10.8806,
+       "rmse_ci95": [
+        3.906,
+        17.089
+       ],
+       "skill": -0.075
+      },
+      "ace_delay0h": {
+       "rmse": 10.4504,
+       "rmse_ci95": [
+        4.711,
+        15.93
+       ],
+       "skill": 0.0083
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 2.5064,
+       "rmse_ci95": [
+        -0.876,
+        5.159
+       ],
+       "mse_change_percent": 68.82,
+       "mse_change_percent_ci95": [
+        -29.37,
+        114.27
+       ],
+       "skill_change": -0.4382,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 2.0762,
+       "rmse_ci95": [
+        -0.895,
+        4.109
+       ],
+       "mse_change_percent": 55.73,
+       "mse_change_percent_ci95": [
+        -26.12,
+        94.8
+       ],
+       "skill_change": -0.3549,
+       "significant": false,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 4,
+     "rmse_persistence": 11.9478,
+     "inputs": {
+      "omni": {
+       "rmse": 12.0451,
+       "rmse_ci95": [
+        2.149,
+        13.853
+       ],
+       "skill": -0.0163
+      },
+      "ace_delay1h": {
+       "rmse": 12.1044,
+       "rmse_ci95": [
+        0.041,
+        13.977
+       ],
+       "skill": -0.0264
+      },
+      "ace_delay0h": {
+       "rmse": 10.652,
+       "rmse_ci95": [
+        2.263,
+        12.23
+       ],
+       "skill": 0.2052
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 0.0593,
+       "rmse_ci95": [
+        -2.108,
+        0.124
+       ],
+       "mse_change_percent": 0.99,
+       "mse_change_percent_ci95": [
+        -99.96,
+        1.8
+       ],
+       "skill_change": -0.0101,
+       "significant": false,
+       "resamples_with_hours": 1705
+      },
+      "ace_delay0h minus omni": {
+       "rmse": -1.3931,
+       "rmse_ci95": [
+        -1.623,
+        0.114
+       ],
+       "mse_change_percent": -21.79,
+       "mse_change_percent_ci95": [
+        -22.06,
+        10.92
+       ],
+       "skill_change": 0.2215,
+       "significant": false,
+       "resamples_with_hours": 1705
+      }
+     }
+    }
+   },
+   "gru": {
+    "all": {
+     "n_hours": 9681,
+     "rmse_persistence": 2.9327,
+     "inputs": {
+      "omni": {
+       "rmse": 2.3257,
+       "rmse_ci95": [
+        2.219,
+        2.442
+       ],
+       "skill": 0.3711
+      },
+      "ace_delay1h": {
+       "rmse": 2.409,
+       "rmse_ci95": [
+        2.269,
+        2.585
+       ],
+       "skill": 0.3253
+      },
+      "ace_delay0h": {
+       "rmse": 2.6313,
+       "rmse_ci95": [
+        2.498,
+        2.791
+       ],
+       "skill": 0.1949
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 0.0832,
+       "rmse_ci95": [
+        0.028,
+        0.157
+       ],
+       "mse_change_percent": 7.28,
+       "mse_change_percent_ci95": [
+        2.44,
+        13.43
+       ],
+       "skill_change": -0.0458,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 0.3056,
+       "rmse_ci95": [
+        0.244,
+        0.368
+       ],
+       "mse_change_percent": 28.01,
+       "mse_change_percent_ci95": [
+        22.4,
+        33.92
+       ],
+       "skill_change": -0.1762,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 9650,
+     "rmse_persistence": 2.8765,
+     "inputs": {
+      "omni": {
+       "rmse": 2.276,
+       "rmse_ci95": [
+        2.196,
+        2.364
+       ],
+       "skill": 0.374
+      },
+      "ace_delay1h": {
+       "rmse": 2.3457,
+       "rmse_ci95": [
+        2.25,
+        2.452
+       ],
+       "skill": 0.335
+      },
+      "ace_delay0h": {
+       "rmse": 2.576,
+       "rmse_ci95": [
+        2.473,
+        2.679
+       ],
+       "skill": 0.198
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 0.0697,
+       "rmse_ci95": [
+        0.028,
+        0.118
+       ],
+       "mse_change_percent": 6.22,
+       "mse_change_percent_ci95": [
+        2.47,
+        10.64
+       ],
+       "skill_change": -0.039,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 0.3,
+       "rmse_ci95": [
+        0.242,
+        0.362
+       ],
+       "mse_change_percent": 28.1,
+       "mse_change_percent_ci95": [
+        22.39,
+        34.31
+       ],
+       "skill_change": -0.176,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 31,
+     "rmse_persistence": 10.4942,
+     "inputs": {
+      "omni": {
+       "rmse": 8.7578,
+       "rmse_ci95": [
+        4.417,
+        13.055
+       ],
+       "skill": 0.3036
+      },
+      "ace_delay1h": {
+       "rmse": 9.9722,
+       "rmse_ci95": [
+        4.233,
+        15.477
+       ],
+       "skill": 0.097
+      },
+      "ace_delay0h": {
+       "rmse": 9.8318,
+       "rmse_ci95": [
+        4.525,
+        14.773
+       ],
+       "skill": 0.1223
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 1.2144,
+       "rmse_ci95": [
+        -0.46,
+        2.449
+       ],
+       "mse_change_percent": 29.66,
+       "mse_change_percent_ci95": [
+        -17.33,
+        43.56
+       ],
+       "skill_change": -0.2066,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_delay0h minus omni": {
+       "rmse": 1.074,
+       "rmse_ci95": [
+        -0.367,
+        1.914
+       ],
+       "mse_change_percent": 26.03,
+       "mse_change_percent_ci95": [
+        -13.34,
+        50.53
+       ],
+       "skill_change": -0.1813,
+       "significant": false,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 4,
+     "rmse_persistence": 11.9478,
+     "inputs": {
+      "omni": {
+       "rmse": 12.4143,
+       "rmse_ci95": [
+        0.105,
+        14.335
+       ],
+       "skill": -0.0796
+      },
+      "ace_delay1h": {
+       "rmse": 12.8504,
+       "rmse_ci95": [
+        1.117,
+        14.824
+       ],
+       "skill": -0.1568
+      },
+      "ace_delay0h": {
+       "rmse": 12.0415,
+       "rmse_ci95": [
+        5.662,
+        13.515
+       ],
+       "skill": -0.0158
+      }
+     },
+     "differences": {
+      "ace_delay1h minus omni": {
+       "rmse": 0.4361,
+       "rmse_ci95": [
+        0.376,
+        1.012
+       ],
+       "mse_change_percent": 7.15,
+       "mse_change_percent_ci95": [
+        6.95,
+        11315.55
+       ],
+       "skill_change": -0.0772,
+       "significant": true,
+       "resamples_with_hours": 1705
+      },
+      "ace_delay0h minus omni": {
+       "rmse": -0.3728,
+       "rmse_ci95": [
+        -0.82,
+        5.557
+       ],
+       "mse_change_percent": -5.92,
+       "mse_change_percent_ci95": [
+        -11.11,
+        293332.7
+       ],
+       "skill_change": 0.0638,
+       "significant": false,
+       "resamples_with_hours": 1705
+      }
+     }
+    }
+   }
+  }
+ },
+ "seconds": 13
+}
