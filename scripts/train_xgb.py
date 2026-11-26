@@ -2,8 +2,8 @@
 
 Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-current] [--driver-memory]
        [--n-lags N] [--max-depth D] [--min-child-weight W] [--learning-rate R] [--subsample S]
-       [--colsample-bytree C] [--n-estimators T] [--seed S] [--validation-only]
-       [--dst-offset-aug K]
+       [--colsample-bytree C] [--n-estimators T] [--seed S] [--objective {squarederror,pseudohuber,absolute}]
+       [--huber-slope D] [--dst-offset-aug K] [--validation-only]
 Writes: models/xgb_dst_{H}h{_swK}{variant}.ubj, reports/xgb_baseline{_Hh}{_swK}{variant}.json,
 reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -49,6 +49,22 @@ TUNABLE = {
     "max_depth": int, "min_child_weight": float, "learning_rate": float, "subsample": float,
     "colsample_bytree": float, "n_estimators": int, "random_state": int,
 }
+
+# Loss of the change model: name -> (XGBoost objective, early stopping metric). The default
+# squared error is left out of the params so the production configuration is unchanged.
+OBJECTIVES = {
+    "squarederror": None,
+    "pseudohuber": ("reg:pseudohubererror", "mphe"),
+    "absolute": ("reg:absoluteerror", "mae"),
+}
+
+
+def objective_params(objective: str, huber_slope: float = 3.0) -> dict:
+    """Extra XGBoost params for a robust loss, empty for the default squared error."""
+    if OBJECTIVES[objective] is None:
+        return {}
+    name, metric = OBJECTIVES[objective]
+    return {"objective": name, "eval_metric": metric, **({"huber_slope": huber_slope} if objective == "pseudohuber" else {})}
 
 
 def offset_copies(df: pd.DataFrame, copies: int, horizon: int, ring_current: bool = False, n_lags: int = N_LAGS, seed: int = 1, memory: tuple[float, ...] = ()) -> tuple[pd.DataFrame, pd.Series]:
@@ -104,6 +120,8 @@ def build_parser() -> argparse.ArgumentParser:
     for name, kind in TUNABLE.items():
         flag = "--seed" if name == "random_state" else "--" + name.replace("_", "-")
         parser.add_argument(flag, dest=name, type=kind, default=PARAMS[name], help=f"XGBoost {name} (default {PARAMS[name]})")
+    parser.add_argument("--objective", choices=list(OBJECTIVES), default="squarederror", help="loss of the change model (default squarederror)")
+    parser.add_argument("--huber-slope", type=float, default=3.0, help="pseudo-Huber slope in nT, only with --objective pseudohuber")
     parser.add_argument("--dst-offset-aug", type=int, default=0, metavar="K", help="train on K extra copies of the train years with a random Dst offset per 168 hours (0 = off)")
     parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never predict the test years")
     return parser
@@ -112,7 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     h, peak, n_lags = args.horizon, args.storm_weight, args.n_lags
-    params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}}
+    params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}, **objective_params(args.objective, args.huber_slope)}
     rc = "_rc" if args.ring_current else ""
     memory = MEMORY_TAUS if args.driver_memory else ()
     variant = rc + ("_mem" if memory else "") + (f"_l{n_lags}" if n_lags != N_LAGS else "") + ("_hp" if params != PARAMS else "")
@@ -123,7 +141,7 @@ def main() -> None:
     (_, X_va, X_te), (_, y_va, y_te) = split(X), split(y)
     print(f"horizon: {h}h  storm weight: {peak:g}  ring current: {args.ring_current}  lags: {n_lags}  features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}")
     if params != PARAMS:
-        print("params:", {k: v for k, v in params.items() if v != PARAMS[k]})
+        print("params:", {k: v for k, v in params.items() if v != PARAMS.get(k)})
 
     extra = offset_copies(df, args.dst_offset_aug, h, args.ring_current, n_lags, memory=memory) if args.dst_offset_aug else None
     if extra is not None:

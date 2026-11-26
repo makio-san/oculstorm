@@ -35,3 +35,39 @@ def test_fit_without_test_never_predicts_the_test_years():
     assert len(val_pred) == len(train_xgb.split(X)[1])
     _, _, test_pred = train_xgb.fit(X, y, params=params)
     assert len(test_pred) == len(train_xgb.split(X)[2])
+
+
+def test_default_objective_leaves_params_unchanged():
+    args = train_xgb.build_parser().parse_args([])
+    assert args.objective == "squarederror"
+    assert train_xgb.objective_params(args.objective, args.huber_slope) == {}
+
+
+def test_robust_objectives_set_loss_and_matching_early_stopping_metric():
+    assert train_xgb.objective_params("absolute") == {"objective": "reg:absoluteerror", "eval_metric": "mae"}
+    assert train_xgb.objective_params("pseudohuber", 2.0) == {"objective": "reg:pseudohubererror", "eval_metric": "mphe", "huber_slope": 2.0}
+
+
+def test_robust_objective_fits():
+    X, y = _frame()
+    keep = y.notna()
+    X, y = X[keep], y[keep]
+    for objective in ("pseudohuber", "absolute"):
+        params = {**train_xgb.PARAMS, "n_estimators": 5, "early_stopping_rounds": 2, **train_xgb.objective_params(objective)}
+        _, val_pred, _ = train_xgb.fit(X, y, params=params, test=False)
+        assert np.isfinite(val_pred).all()
+
+
+def test_main_validation_only_runs_with_a_robust_objective(monkeypatch, capsys):
+    X, y = _frame()
+    keep = y.notna()
+    X, y = X[keep], y[keep]
+    monkeypatch.setitem(train_xgb.PARAMS, "n_estimators", 5)
+    monkeypatch.setitem(train_xgb.PARAMS, "early_stopping_rounds", 2)
+    monkeypatch.setattr(train_xgb, "load_hourly", lambda: None)
+    monkeypatch.setattr(train_xgb, "build_features", lambda *a, **k: (X, y))
+    for objective in ("absolute", "pseudohuber"):
+        monkeypatch.setattr(train_xgb.sys, "argv", ["train_xgb.py", "--validation-only", "--objective", objective])
+        train_xgb.main()
+        out = capsys.readouterr().out
+        assert "reg:" in out and "Validation:" in out

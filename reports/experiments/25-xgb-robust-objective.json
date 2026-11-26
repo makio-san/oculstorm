@@ -1,0 +1,304 @@
+{
+  "issue": 25,
+  "title": "Robust pseudo-Huber or absolute error objective for XGBoost",
+  "result": "no-gain",
+  "split": "validation only, 2017-01-01 .. 2020-12-31; train 1995 .. 2016; test years not used",
+  "horizon_hours": 1,
+  "configuration": {
+    "option": "--objective {squarederror,pseudohuber,absolute} and --huber-slope in scripts/train_xgb.py; default squarederror, params unchanged",
+    "models": "production hyperparameters, storm weight 1, early stopping on validation with the matching eval_metric (mphe or mae), 3000 tree cap"
+  },
+  "bootstrap": {
+    "method": "oculstorm.metrics.block_bootstrap_rmse, paired against the squared error baseline",
+    "block_hours": 168,
+    "resamples": 2000,
+    "seed": 0,
+    "intervals": "95% for the MSE change in percent and for candidate minus baseline RMSE"
+  },
+  "baseline_check": "retrained squared error baseline reproduces validation RMSE 2.6565 in reports/xgb_baseline.json",
+  "note": "intense interval is NaN: resamples without an intense hour in any block give 0/0 (35 hours only)",
+  "runs": {
+    "baseline": {
+      "objective": "squarederror",
+      "huber_slope": null,
+      "trees": 2151,
+      "seconds": 123,
+      "hit_cap": false,
+      "pred_change_std_quiet": 1.9989500045776367
+    },
+    "absolute": {
+      "objective": "absolute",
+      "huber_slope": null,
+      "trees": 2993,
+      "seconds": 149,
+      "hit_cap": false,
+      "pred_change_std_quiet": 1.9778650999069214
+    },
+    "pseudohuber_s2": {
+      "objective": "pseudohuber",
+      "huber_slope": 2.0,
+      "trees": 2109,
+      "seconds": 97,
+      "hit_cap": false,
+      "pred_change_std_quiet": 1.9957654476165771
+    },
+    "pseudohuber_s3": {
+      "objective": "pseudohuber",
+      "huber_slope": 3.0,
+      "trees": 2762,
+      "seconds": 126,
+      "hit_cap": false,
+      "pred_change_std_quiet": 2.003279685974121
+    },
+    "pseudohuber_s5": {
+      "objective": "pseudohuber",
+      "huber_slope": 5.0,
+      "trees": 2229,
+      "seconds": 102,
+      "hit_cap": false,
+      "pred_change_std_quiet": 1.9948890209197998
+    }
+  },
+  "regimes": {
+    "all": {
+      "n_hours": 35064,
+      "rmse_persistence": 3.3704090118408203,
+      "baseline": {
+        "rmse": 2.656461000442505,
+        "mae": 1.8763426542282104
+      },
+      "absolute": {
+        "rmse": 2.6568961143493652,
+        "mae": 1.8737698793411255,
+        "mse_change_pct": 0.032761598339825504,
+        "mse_change_pct_ci95": [
+          -0.41754730944277435,
+          0.5240846932411992
+        ],
+        "rmse_diff_ci95": [
+          -0.005497774249339504,
+          0.006911175132093471
+        ]
+      },
+      "pseudohuber_s2": {
+        "rmse": 2.660775899887085,
+        "mae": 1.8747018575668335,
+        "mse_change_pct": 0.32512457720534904,
+        "mse_change_pct_ci95": [
+          -0.18643831463979293,
+          0.858544851569456
+        ],
+        "rmse_diff_ci95": [
+          -0.0024202823232094325,
+          0.011455302404971012
+        ]
+      },
+      "pseudohuber_s3": {
+        "rmse": 2.659391164779663,
+        "mae": 1.8739160299301147,
+        "mse_change_pct": 0.22072828253487664,
+        "mse_change_pct_ci95": [
+          -0.2170172715668661,
+          0.6767787744412236
+        ],
+        "rmse_diff_ci95": [
+          -0.0029132848041995563,
+          0.008950441110004738
+        ]
+      },
+      "pseudohuber_s5": {
+        "rmse": 2.6548683643341064,
+        "mae": 1.8726342916488647,
+        "mse_change_pct": -0.1198706616930334,
+        "mse_change_pct_ci95": [
+          -0.5319328657875082,
+          0.29432576554610623
+        ],
+        "rmse_diff_ci95": [
+          -0.00701776261862086,
+          0.003926412988501293
+        ]
+      }
+    },
+    "quiet (Dst > -50)": {
+      "n_hours": 34702,
+      "rmse_persistence": 3.2359118461608887,
+      "baseline": {
+        "rmse": 2.567821741104126,
+        "mae": 1.8404698371887207
+      },
+      "absolute": {
+        "rmse": 2.569119930267334,
+        "mae": 1.8388774394989014,
+        "mse_change_pct": 0.10113765289725407,
+        "mse_change_pct_ci95": [
+          -0.388913538376758,
+          0.6097796365853153
+        ],
+        "rmse_diff_ci95": [
+          -0.0049722270631128666,
+          0.007873231416287294
+        ]
+      },
+      "pseudohuber_s2": {
+        "rmse": 2.572592258453369,
+        "mae": 1.8396533727645874,
+        "mse_change_pct": 0.3719065559111723,
+        "mse_change_pct_ci95": [
+          -0.17250385757456638,
+          0.9248395199060236
+        ],
+        "rmse_diff_ci95": [
+          -0.0021892587396899143,
+          0.011983811073480065
+        ]
+      },
+      "pseudohuber_s3": {
+        "rmse": 2.5676090717315674,
+        "mae": 1.8377002477645874,
+        "mse_change_pct": -0.016563499125921144,
+        "mse_change_pct_ci95": [
+          -0.5197977120256575,
+          0.47035029025578173
+        ],
+        "rmse_diff_ci95": [
+          -0.006595828212222632,
+          0.006048807130601401
+        ]
+      },
+      "pseudohuber_s5": {
+        "rmse": 2.563133478164673,
+        "mae": 1.8366491794586182,
+        "mse_change_pct": -0.36482151463115287,
+        "mse_change_pct_ci95": [
+          -0.7532357317915789,
+          0.008900261742297324
+        ],
+        "rmse_diff_ci95": [
+          -0.00961924950694184,
+          0.0001195152730150578
+        ]
+      }
+    },
+    "storm (Dst <= -50)": {
+      "n_hours": 362,
+      "rmse_persistence": 9.825268745422363,
+      "baseline": {
+        "rmse": 7.172729015350342,
+        "mae": 5.315162181854248
+      },
+      "absolute": {
+        "rmse": 7.1437201499938965,
+        "mae": 5.218613624572754,
+        "mse_change_pct": -0.8072298456622051,
+        "mse_change_pct_ci95": [
+          -4.298606855368456,
+          2.672547843565946
+        ],
+        "rmse_diff_ci95": [
+          -0.15223583395925064,
+          0.0967333498452335
+        ]
+      },
+      "pseudohuber_s2": {
+        "rmse": 7.163776874542236,
+        "mae": 5.234527587890625,
+        "mse_change_pct": -0.2494602624544595,
+        "mse_change_pct_ci95": [
+          -3.099415298282911,
+          3.144413008321561
+        ],
+        "rmse_diff_ci95": [
+          -0.11350506577347104,
+          0.11280675833267466
+        ]
+      },
+      "pseudohuber_s3": {
+        "rmse": 7.284341335296631,
+        "mae": 5.345625877380371,
+        "mse_change_pct": 3.136343218420201,
+        "mse_change_pct_ci95": [
+          0.7325961054453806,
+          6.308094395414171
+        ],
+        "rmse_diff_ci95": [
+          0.02573175001825858,
+          0.21796527091256038
+        ]
+      },
+      "pseudohuber_s5": {
+        "rmse": 7.275628566741943,
+        "mae": 5.32222843170166,
+        "mse_change_pct": 2.8897689190826803,
+        "mse_change_pct_ci95": [
+          -0.008114136121707635,
+          5.4453060693505435
+        ],
+        "rmse_diff_ci95": [
+          -0.0002815739531654581,
+          0.19622226069694218
+        ]
+      }
+    },
+    "intense (Dst <= -100)": {
+      "n_hours": 35,
+      "rmse_persistence": 15.955294609069824,
+      "baseline": {
+        "rmse": 11.68671989440918,
+        "mae": 9.760302543640137
+      },
+      "absolute": {
+        "rmse": 11.728094100952148,
+        "mae": 9.771928787231445,
+        "mse_change_pct": 0.7093084280198614,
+        "mse_change_pct_ci95": [
+          NaN,
+          NaN
+        ],
+        "rmse_diff_ci95": [
+          NaN,
+          NaN
+        ]
+      },
+      "pseudohuber_s2": {
+        "rmse": 11.58004093170166,
+        "mae": 9.64055347442627,
+        "mse_change_pct": -1.8173117707919406,
+        "mse_change_pct_ci95": [
+          NaN,
+          NaN
+        ],
+        "rmse_diff_ci95": [
+          NaN,
+          NaN
+        ]
+      },
+      "pseudohuber_s3": {
+        "rmse": 11.645350456237793,
+        "mae": 9.652936935424805,
+        "mse_change_pct": -0.7067204037195629,
+        "mse_change_pct_ci95": [
+          NaN,
+          NaN
+        ],
+        "rmse_diff_ci95": [
+          NaN,
+          NaN
+        ]
+      },
+      "pseudohuber_s5": {
+        "rmse": 11.699603080749512,
+        "mae": 9.619815826416016,
+        "mse_change_pct": 0.22059718260192263,
+        "mse_change_pct_ci95": [
+          NaN,
+          NaN
+        ],
+        "rmse_diff_ci95": [
+          NaN,
+          NaN
+        ]
+      }
+    }
+  }
+}
