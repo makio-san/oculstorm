@@ -22,3 +22,6 @@ One line per pull request the release-merger considered. Appended by the merger 
 | 2026-11-24T17:50Z | #17 | agents/feature-builder-2026-11-23-2 | b8ed2ef | merged | all gates hold; full tests pass, live forecast finite, live run 45452729895 succeeded |
 | 2026-11-24T17:50Z | #28 | agents/experimenter-2026-11-24 | 7a717f7 | skipped | conflicts with main in scripts/train_xgb.py after #20; commented |
 | 2026-11-24T17:50Z | #29 | agents/experimenter-2026-11-24-2 | 257a235 | skipped | conflicts with main in scripts/train_xgb.py after #20; commented |
+| 2026-11-25T17:27Z | #29 | agents/experimenter-2026-11-24-2 | efd078a | merged | all gates hold; validation only, full tests pass, live forecast finite, live run 45664931625 succeeded |
+| 2026-11-25T17:32Z | #28 | agents/experimenter-2026-11-24 | 2e6ec37 | skipped | conflicts with main in scripts/train_xgb.py after #29; commented |
+| 2026-11-25T17:32Z | #33 | agents/experimenter-2026-11-25 | 08e2c01 | skipped | conflicts with main in oculstorm/augment.py, scripts/train_xgb.py and tests/test_augment.py after #29; commented |
