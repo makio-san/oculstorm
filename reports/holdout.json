@@ -1,35 +1,57 @@
 {
   "cutoff": "2026-10-30T13:00",
-  "newest_omni_hour": "2026-11-16T12:00",
-  "first_target_hour": null,
-  "last_target_hour": null,
+  "newest_omni_hour": "2026-11-25T17:00",
+  "first_target_hour": "2026-10-31T14:00",
+  "last_target_hour": "2026-11-12T01:00",
   "horizon_hours": 1,
   "warmup_hours": 23,
   "input_rule": "issue hour scored only if every solar wind input is observed in each of the last 6 hours",
   "input_coverage": {
-    "issue_hours": 384,
+    "issue_hours": 605,
     "observed_share": {
-      "bz_gsm": 0.0,
-      "by_gsm": 0.0,
-      "b_mag_avg": 0.0,
-      "flow_speed": 0.284,
-      "proton_density": 0.284,
-      "flow_pressure": 0.284,
-      "electric_field": 0.0,
-      "proton_temp": 0.284
+      "bz_gsm": 0.456,
+      "by_gsm": 0.456,
+      "b_mag_avg": 0.456,
+      "flow_speed": 0.894,
+      "proton_density": 0.894,
+      "flow_pressure": 0.894,
+      "electric_field": 0.456,
+      "proton_temp": 0.894
     },
-    "issue_hours_with_inputs": 0,
-    "issue_hours_without_inputs": 384
+    "issue_hours_with_inputs": 276,
+    "issue_hours_without_inputs": 329
   },
-  "hours": 0,
-  "storm_hours": 0,
+  "hours": 276,
+  "storm_hours": 2,
   "storm_threshold_nt": -50.0,
   "skill": "1 - MSE_model / MSE_persistence",
   "all": {
-    "hours": 0
+    "hours": 276,
+    "persistence": {
+      "rmse": 3.985
+    },
+    "gru": {
+      "rmse": 3.02,
+      "skill": 0.4257
+    },
+    "xgb": {
+      "rmse": 3.097,
+      "skill": 0.3959
+    }
   },
   "storm": {
-    "hours": 0
+    "hours": 2,
+    "persistence": {
+      "rmse": 8.0
+    },
+    "gru": {
+      "rmse": 6.708,
+      "skill": 0.2969
+    },
+    "xgb": {
+      "rmse": 5.709,
+      "skill": 0.4908
+    }
   },
   "models": {
     "models/xgb_dst_1h.ubj": "d5dcfffe5161a1a76a8ed26499fd364b9a852d13",
