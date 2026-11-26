@@ -93,3 +93,24 @@ def test_no_solar_wind_inputs_gives_no_scored_hours():
     result = score_holdout.scores(frame, ["model"])
     assert result["all"]["hours"] == result["storm"]["hours"] == 0
     assert score_holdout.coverage(holdout)["issue_hours_with_inputs"] == 0
+
+
+def test_a_model_with_seed_members_is_scored_on_their_mean():
+    holdout = score_holdout.after_cutoff(_table(), CUTOFF)
+    members = lambda t: pd.DataFrame({"gru_seed0": t["dst"] - 2.0, "gru_seed1": t["dst"] + 2.0})  # noqa: E731
+    a = score_holdout.forecasts(holdout, {"model": members})
+    b = score_holdout.forecasts(holdout, {"model": lambda t: t["dst"]})
+    pd.testing.assert_frame_equal(a, b)
+
+
+def test_an_hour_with_a_missing_seed_member_is_not_scored():
+    holdout = score_holdout.after_cutoff(_table(), CUTOFF)
+    gap = holdout.index[WINDOW + 5]
+
+    def members(t: pd.DataFrame) -> pd.DataFrame:
+        out = pd.DataFrame({"gru_seed0": t["dst"], "gru_seed1": t["dst"]})
+        out.loc[gap, "gru_seed1"] = np.nan
+        return out
+
+    frame = score_holdout.forecasts(holdout, {"model": members})
+    assert gap + pd.Timedelta(hours=1) not in frame.index
