@@ -3,13 +3,14 @@
  "title": "Gap aware XGBoost training: IMF and plasma spans blanked at the real-time gap rates, plus gap age features",
  "date": "2026-11-27",
  "part": "XGBoost only; the GRU part is split into its own issue",
- "result": "promising",
+ "result": "no-gain",
+ "label_basis": "agents/retrain-policy.md judges against the current production configuration, which is seed 0. For seed 0 the candidate changes storm hour MSE by -1.03% (95% interval -5.0 to 3.78) and overall MSE by -0.24% (-0.73 to 0.28): both intervals include zero, so the bar is not met. Rate 0.5 fails the same way (seed 0 storm -0.30%, -4.29 to 3.50). The 3 seed average (storm -3.61%) is driven by seed 1 (-7.91%); seeds 0 and 2 give -1.03% and -1.88% with intervals that include zero. The averaged interval resamples hours only and treats the 3 seeds as fixed, so it leaves out the seed to seed spread and does not support a claim. A larger seed study could settle it; until then the result is no-gain on clean validation, with a possible storm effect that this run cannot separate from seed noise.",
  "reading": [
-  "On clean validation, one gap blanked copy of the train years at the issue 31 rates plus imf_age and plasma_age lowers storm hour MSE by 3.61% (95% interval -5.25 to -1.86), averaged over 3 seeds, while overall MSE moves -0.33% (-0.71 to 0.04) and quiet hours -0.05%. This meets the retrain policy storm bar (at least 3% lower storm MSE with overall at most 1% higher, interval excluding zero).",
-  "The storm gain depends on the seed: -1.03%, -7.91% and -1.88% for seeds 0, 1 and 2; only seed 1 has a per seed interval that excludes zero. Seed 0 is the production configuration. The trainer's validation comparison should confirm the gain before any look at test.",
-  "Half the rate passes too (storm -3.15%, interval -5.83 to -1.15; overall -0.38%, -0.71 to -0.05).",
-  "Diagnostic only: on validation with synthetic gaps from the same gap model (seed 2024, not the real ACE mask), the baseline MSE is 15.6% above its clean value and the candidate removes about half of that (all hours -8.45%, -9.60 to -7.26). The real ACE mask (issue 41 scoring b) and the real ACE inputs (c) were not run.",
-  "Gap augmentation and the age features were measured together, not one by one."
+  "Clean validation, production seed 0: storm hour MSE -1.03% (-5.0 to 3.78), overall -0.24% (-0.73 to 0.28), intense -0.14% (-7.25 to 17.7). No regime gain excludes zero, so the retrain policy bar is not met.",
+  "Averaged over seeds 0, 1 and 2 the storm change is -3.61%, but it comes almost entirely from seed 1 (-7.91%); seeds 0 and 2 give -1.03% and -1.88% with intervals that include zero. The averaged intervals below treat the seeds as fixed and are not evidence for a gain.",
+  "Half the rate behaves the same way: seed 0 storm -0.30% (-4.29 to 3.50), overall -0.29% (-0.79 to 0.15).",
+  "Diagnostic only: on validation with synthetic gaps from the same gap model (seed 2024, not the real ACE mask), the baseline MSE is 15.6% above its clean value and the candidate removes about half of that (seed 0 all hours -8.89%, -10.13 to -7.53). This does not decide the label. The real ACE mask (issue 41 scoring b) and the real ACE inputs (c) were not run.",
+  "Gap augmentation and the age features were measured together, not one by one. The code stays behind options that are off by default."
  ],
  "horizon_hours": 1,
  "split": "train 1995-01-01 .. 2017-01-01 (exclusive), validation 2017-01-01 .. 2021-01-01 (exclusive); rows from 2021 onwards dropped from the table before anything was built or fitted, test years not used",
@@ -75,7 +76,8 @@
   "n_boot": 2000,
   "block_hours": 168,
   "seed": 0,
-  "statistic": "MSE change of candidate vs baseline in percent (negative is better), paired, per seed on the same resamples and then averaged over the 3 seeds; 95% percentile interval. three_seed_average_model compares the mean prediction of the 3 candidate seeds with that of the 3 baseline seeds"
+  "statistic": "MSE change of candidate vs baseline in percent (negative is better), paired, per seed on the same resamples and then averaged over the 3 seeds; 95% percentile interval. three_seed_average_model compares the mean prediction of the 3 candidate seeds with that of the 3 baseline seeds",
+  "reproducibility": "Per seed validation RMSEs and best iterations reproduce directly with scripts/train_xgb.py --validation-only on a table cut before 2021 (reviewer spot check: seed 0 baseline 2.6565, candidate 2.6534, storm RMSE 7.1727 to 7.1356). The bootstrap intervals, seed averages and the synthetic gap diagnostic were computed by an analysis script that is not tracked in the repository, so they cannot be rerun from the repository alone."
  },
  "runs": {
   "base_seed0": {
