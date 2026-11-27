@@ -28,6 +28,8 @@ SOLAR_WIND = [
     "bz_gsm", "by_gsm", "b_mag_avg", "flow_speed", "proton_density",
     "flow_pressure", "electric_field", "proton_temp",
 ]
+# Plasma moments left out with drop_plasma=True: the real-time feed measures them worst (issue 42).
+PLASMA_MOMENTS = ("proton_density", "proton_temp", "flow_pressure", "sqrt_pressure")
 
 
 def _coupling(df: pd.DataFrame) -> pd.DataFrame:
@@ -80,7 +82,7 @@ def _ring_current(df: pd.DataFrame) -> pd.DataFrame:
 def build_features(
     df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON,
     memory: tuple[float, ...] = (),
-    ring_current: bool = False, n_lags: int = N_LAGS,
+    ring_current: bool = False, n_lags: int = N_LAGS, drop_plasma: bool = False,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y) where y is Dst at t+horizon and X only looks backwards from t.
 
@@ -95,9 +97,14 @@ def build_features(
     With ring_current=True the O'Brien and McPherron (2000) terms are added (needs the solar wind).
     n_lags sets how many hours of history (lag 0 .. n_lags-1) the lag columns cover; the
     default N_LAGS is what the production models and the live forecast use.
+    With drop_plasma=True the PLASMA_MOMENTS (density, temperature, pressure and sqrt pressure)
+    are left out of the driver block; electric_field, the IMF and the speed stay. It cannot be
+    combined with ring_current, whose terms need the pressure.
     """
     if n_lags < 1:
         raise ValueError("n_lags must be at least 1")
+    if drop_plasma and ring_current:
+        raise ValueError("ring_current needs the pressure, so it cannot be used with drop_plasma")
     cols: dict[str, pd.Series] = {}
     dst = df["dst"]
 
@@ -110,6 +117,8 @@ def build_features(
 
     if use_solar_wind:
         drivers = pd.concat([df[SOLAR_WIND], _coupling(df)], axis=1)
+        if drop_plasma:
+            drivers = drivers.drop(columns=list(PLASMA_MOMENTS))
         for name in drivers:
             for lag in range(n_lags):
                 cols[f"{name}_lag{lag}"] = drivers[name].shift(lag)
