@@ -1,0 +1,1101 @@
+{
+ "issue": 44,
+ "title": "Refit on train plus validation with a fixed tree count and epoch schedule, measured by a four year backtest inside 1995 to 2020, XGBoost and GRU, 1 hour",
+ "result": "no-gain",
+ "result_note": "label by the retrain policy bar against A (mean of 3 seeds): XGBoost B changes overall MSE by +0.03% (95% -0.24 .. +0.30) and B2 by -0.26% (-0.54 .. +0.02); GRU B by -0.25% (-0.75 .. +0.21) and B2 by +0.01% (-0.40 .. +0.39). Storm hour changes are within -0.4 .. +0.3% with intervals spanning zero. Far from the 2% overall or 3% storm bar, so refitting on more recent years with the inner tree and epoch counts gives no measurable gain. The optimistic production reference P (early stopped on the scored years) is 0.64% lower in overall MSE than A for XGBoost.",
+ "date": "2026-11-27",
+ "split": "validation only. Fit and early stopping years end before 2017-01-01; 2017-01-01 .. 2020-12-31 is only scored. The table was cut after 2021-01-01 00:00, used only as the target of the last validation hour, so no test row existed in either run (XGBoost fit(..., test=False), GRU backtest_parts).",
+ "horizon_hours": 1,
+ "configuration": {
+  "A": "current protocol shifted four years back: fit 1995 .. 2012, early stopping on 2013 .. 2016 (scripts/train_xgb.py --backtest-shift 4, scripts/train_gru.py --backtest-shift 4); GRU scaling statistics and target scale from 1995 .. 2012 only. Trees kept: best_iteration + 1; GRU: best epoch and the epochs after which ReduceLROnPlateau halved the learning rate",
+  "B": "refit: fit 1995 .. 2016 with exactly A's tree count per seed (--fixed-trees N), GRU exactly A's best epoch count per seed with A's learning rate halvings before that epoch replayed (--fixed-epochs N --lr-drops ...), no early stopping, no look at 2017 .. 2020",
+  "B2": "as B with round(1.2 x) the trees and epochs; the GRU halving epochs are stretched by 1.2 as well",
+  "P": "optimistic reference only, not a candidate: the production protocol, fit 1995 .. 2016 and early stopped on 2017 .. 2020, the hours it is scored on. XGBoost: rerun here, seed 0 reproduces 2151 trees and validation RMSE 2.6565 of reports/xgb_baseline.json. GRU: not rerun, the mean of 3 seeds from validation_scores in reports/gru_baseline.json (no paired interval)",
+  "C": "optional recency weighting variant of the issue not run; the assignment lists A, B and B2",
+  "params": "XGBoost PARAMS of scripts/train_xgb.py (89 features, 6 lags, storm weight 1), GRU constants of scripts/train_gru.py (hidden 64, batch 512, lr 0.002, max 40 epochs, patience 6)",
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "regimes": "by the observed Dst at the target hour"
+ },
+ "bootstrap": {
+  "method": "oculstorm.metrics.block_bootstrap_rmse, paired",
+  "block_hours": 168,
+  "resamples": 2000,
+  "seed": 0,
+  "intervals": "95% for the MSE change of each candidate against A in percent, seedN is seed N against seed N, seedmean is the mean prediction of seeds 0 1 2 on both sides"
+ },
+ "xgboost": {
+  "fits": {
+   "A_0": {
+    "trees": 1402,
+    "seconds": 178
+   },
+   "B_0": {
+    "trees": 1402,
+    "seconds": 102
+   },
+   "B2_0": {
+    "trees": 1682,
+    "seconds": 106
+   },
+   "P_0": {
+    "trees": 2151,
+    "seconds": 143
+   },
+   "A_1": {
+    "trees": 972,
+    "seconds": 62
+   },
+   "B_1": {
+    "trees": 972,
+    "seconds": 34
+   },
+   "B2_1": {
+    "trees": 1166,
+    "seconds": 42
+   },
+   "P_1": {
+    "trees": 1838,
+    "seconds": 115
+   },
+   "A_2": {
+    "trees": 1153,
+    "seconds": 67
+   },
+   "B_2": {
+    "trees": 1153,
+    "seconds": 41
+   },
+   "B2_2": {
+    "trees": 1384,
+    "seconds": 54
+   },
+   "P_2": {
+    "trees": 1980,
+    "seconds": 121
+   }
+  },
+  "run_time_seconds": 1065,
+  "rmse": {
+   "all": {
+    "n_hours": 35064,
+    "persistence": 3.3704,
+    "A_seed0": 2.662,
+    "A_seed1": 2.6673,
+    "A_seed2": 2.6682,
+    "A_seedmean": 2.662,
+    "B_seed0": 2.6622,
+    "B_seed1": 2.6715,
+    "B_seed2": 2.6642,
+    "B_seedmean": 2.6624,
+    "B2_seed0": 2.659,
+    "B2_seed1": 2.6676,
+    "B2_seed2": 2.6607,
+    "B2_seedmean": 2.6586,
+    "P_seed0": 2.6565,
+    "P_seed1": 2.6613,
+    "P_seed2": 2.656,
+    "P_seedmean": 2.6535
+   },
+   "quiet (Dst > -50)": {
+    "n_hours": 34702,
+    "persistence": 3.2359,
+    "A_seed0": 2.5721,
+    "A_seed1": 2.579,
+    "A_seed2": 2.5795,
+    "A_seedmean": 2.5737,
+    "B_seed0": 2.5745,
+    "B_seed1": 2.5811,
+    "B_seed2": 2.5762,
+    "B_seedmean": 2.5744,
+    "B2_seed0": 2.5713,
+    "B2_seed1": 2.5774,
+    "B2_seed2": 2.5724,
+    "B2_seedmean": 2.5705,
+    "P_seed0": 2.5678,
+    "P_seed1": 2.5699,
+    "P_seed2": 2.5668,
+    "P_seedmean": 2.5645
+   },
+   "storm (Dst <= -50)": {
+    "n_hours": 362,
+    "persistence": 9.8253,
+    "A_seed0": 7.2255,
+    "A_seed1": 7.1801,
+    "A_seed2": 7.191,
+    "A_seedmean": 7.1721,
+    "B_seed0": 7.1492,
+    "B_seed1": 7.255,
+    "B_seed2": 7.1622,
+    "B_seedmean": 7.1623,
+    "B2_seed0": 7.1441,
+    "B2_seed1": 7.2427,
+    "B2_seed2": 7.1686,
+    "B2_seedmean": 7.1573,
+    "P_seed0": 7.1727,
+    "P_seed1": 7.2734,
+    "P_seed2": 7.1906,
+    "P_seedmean": 7.1824
+   },
+   "intense (Dst <= -100)": {
+    "n_hours": 35,
+    "persistence": 15.9553,
+    "A_seed0": 12.1186,
+    "A_seed1": 11.7416,
+    "A_seed2": 11.7569,
+    "A_seedmean": 11.8125,
+    "B_seed0": 11.6684,
+    "B_seed1": 12.0329,
+    "B_seed2": 11.6968,
+    "B_seedmean": 11.7332,
+    "B2_seed0": 11.6609,
+    "B2_seed1": 11.9942,
+    "B2_seed2": 11.7271,
+    "B2_seedmean": 11.7249,
+    "P_seed0": 11.6867,
+    "P_seed1": 11.9009,
+    "P_seed2": 11.6388,
+    "P_seedmean": 11.6674
+   }
+  },
+  "skill_vs_persistence": {
+   "all": {
+    "A_seed0": 0.3762,
+    "A_seed1": 0.3737,
+    "A_seed2": 0.3733,
+    "A_seedmean": 0.3762,
+    "B_seed0": 0.3761,
+    "B_seed1": 0.3718,
+    "B_seed2": 0.3752,
+    "B_seedmean": 0.376,
+    "B2_seed0": 0.3776,
+    "B2_seed1": 0.3736,
+    "B2_seed2": 0.3768,
+    "B2_seedmean": 0.3778,
+    "P_seed0": 0.3788,
+    "P_seed1": 0.3765,
+    "P_seed2": 0.379,
+    "P_seedmean": 0.3802
+   },
+   "quiet (Dst > -50)": {
+    "A_seed0": 0.3682,
+    "A_seed1": 0.3648,
+    "A_seed2": 0.3645,
+    "A_seedmean": 0.3674,
+    "B_seed0": 0.367,
+    "B_seed1": 0.3638,
+    "B_seed2": 0.3662,
+    "B_seedmean": 0.3671,
+    "B2_seed0": 0.3686,
+    "B2_seed1": 0.3656,
+    "B2_seed2": 0.3681,
+    "B2_seedmean": 0.369,
+    "P_seed0": 0.3703,
+    "P_seed1": 0.3693,
+    "P_seed2": 0.3708,
+    "P_seedmean": 0.3719
+   },
+   "storm (Dst <= -50)": {
+    "A_seed0": 0.4592,
+    "A_seed1": 0.466,
+    "A_seed2": 0.4643,
+    "A_seedmean": 0.4672,
+    "B_seed0": 0.4705,
+    "B_seed1": 0.4548,
+    "B_seed2": 0.4686,
+    "B_seedmean": 0.4686,
+    "B2_seed0": 0.4713,
+    "B2_seed1": 0.4566,
+    "B2_seed2": 0.4677,
+    "B2_seedmean": 0.4693,
+    "P_seed0": 0.4671,
+    "P_seed1": 0.452,
+    "P_seed2": 0.4644,
+    "P_seedmean": 0.4656
+   },
+   "intense (Dst <= -100)": {
+    "A_seed0": 0.4231,
+    "A_seed1": 0.4584,
+    "A_seed2": 0.457,
+    "A_seedmean": 0.4519,
+    "B_seed0": 0.4652,
+    "B_seed1": 0.4312,
+    "B_seed2": 0.4626,
+    "B_seedmean": 0.4592,
+    "B2_seed0": 0.4659,
+    "B2_seed1": 0.4349,
+    "B2_seed2": 0.4598,
+    "B2_seedmean": 0.46,
+    "P_seed0": 0.4635,
+    "P_seed1": 0.4436,
+    "P_seed2": 0.4679,
+    "P_seedmean": 0.4653
+   }
+  },
+  "mse_change_vs_A_percent": {
+   "all": {
+    "B_seed0": {
+     "point": 0.01,
+     "ci95": [
+      -0.39,
+      0.43
+     ]
+    },
+    "B_seed1": {
+     "point": 0.31,
+     "ci95": [
+      -0.06,
+      0.65
+     ]
+    },
+    "B_seed2": {
+     "point": -0.3,
+     "ci95": [
+      -0.69,
+      0.1
+     ]
+    },
+    "B_seedmean": {
+     "point": 0.03,
+     "ci95": [
+      -0.24,
+      0.3
+     ]
+    },
+    "B2_seed0": {
+     "point": -0.23,
+     "ci95": [
+      -0.64,
+      0.21
+     ]
+    },
+    "B2_seed1": {
+     "point": 0.02,
+     "ci95": [
+      -0.34,
+      0.37
+     ]
+    },
+    "B2_seed2": {
+     "point": -0.56,
+     "ci95": [
+      -0.97,
+      -0.12
+     ]
+    },
+    "B2_seedmean": {
+     "point": -0.26,
+     "ci95": [
+      -0.54,
+      0.02
+     ]
+    },
+    "P_seed0": {
+     "point": -0.42,
+     "ci95": [
+      -0.86,
+      0.06
+     ]
+    },
+    "P_seed1": {
+     "point": -0.45,
+     "ci95": [
+      -0.88,
+      -0.05
+     ]
+    },
+    "P_seed2": {
+     "point": -0.91,
+     "ci95": [
+      -1.43,
+      -0.38
+     ]
+    },
+    "P_seedmean": {
+     "point": -0.64,
+     "ci95": [
+      -0.99,
+      -0.28
+     ]
+    }
+   },
+   "quiet (Dst > -50)": {
+    "B_seed0": {
+     "point": 0.18,
+     "ci95": [
+      -0.19,
+      0.59
+     ]
+    },
+    "B_seed1": {
+     "point": 0.17,
+     "ci95": [
+      -0.22,
+      0.52
+     ]
+    },
+    "B_seed2": {
+     "point": -0.25,
+     "ci95": [
+      -0.63,
+      0.11
+     ]
+    },
+    "B_seedmean": {
+     "point": 0.05,
+     "ci95": [
+      -0.21,
+      0.32
+     ]
+    },
+    "B2_seed0": {
+     "point": -0.07,
+     "ci95": [
+      -0.45,
+      0.35
+     ]
+    },
+    "B2_seed1": {
+     "point": -0.12,
+     "ci95": [
+      -0.5,
+      0.22
+     ]
+    },
+    "B2_seed2": {
+     "point": -0.55,
+     "ci95": [
+      -0.94,
+      -0.17
+     ]
+    },
+    "B2_seedmean": {
+     "point": -0.25,
+     "ci95": [
+      -0.51,
+      0.02
+     ]
+    },
+    "P_seed0": {
+     "point": -0.33,
+     "ci95": [
+      -0.74,
+      0.09
+     ]
+    },
+    "P_seed1": {
+     "point": -0.7,
+     "ci95": [
+      -1.12,
+      -0.33
+     ]
+    },
+    "P_seed2": {
+     "point": -0.98,
+     "ci95": [
+      -1.42,
+      -0.54
+     ]
+    },
+    "P_seedmean": {
+     "point": -0.71,
+     "ci95": [
+      -1.02,
+      -0.42
+     ]
+    }
+   },
+   "storm (Dst <= -50)": {
+    "B_seed0": {
+     "point": -2.1,
+     "ci95": [
+      -5.82,
+      1.57
+     ]
+    },
+    "B_seed1": {
+     "point": 2.1,
+     "ci95": [
+      0.19,
+      4.38
+     ]
+    },
+    "B_seed2": {
+     "point": -0.8,
+     "ci95": [
+      -3.73,
+      2.52
+     ]
+    },
+    "B_seedmean": {
+     "point": -0.27,
+     "ci95": [
+      -2.06,
+      1.8
+     ]
+    },
+    "B2_seed0": {
+     "point": -2.24,
+     "ci95": [
+      -6.01,
+      1.43
+     ]
+    },
+    "B2_seed1": {
+     "point": 1.75,
+     "ci95": [
+      -0.15,
+      4.06
+     ]
+    },
+    "B2_seed2": {
+     "point": -0.62,
+     "ci95": [
+      -3.72,
+      3.09
+     ]
+    },
+    "B2_seedmean": {
+     "point": -0.41,
+     "ci95": [
+      -2.28,
+      1.84
+     ]
+    },
+    "P_seed0": {
+     "point": -1.45,
+     "ci95": [
+      -5.51,
+      3.06
+     ]
+    },
+    "P_seed1": {
+     "point": 2.62,
+     "ci95": [
+      -0.26,
+      6.44
+     ]
+    },
+    "P_seed2": {
+     "point": -0.01,
+     "ci95": [
+      -4.22,
+      5.16
+     ]
+    },
+    "P_seedmean": {
+     "point": 0.29,
+     "ci95": [
+      -2.46,
+      4.07
+     ]
+    }
+   },
+   "intense (Dst <= -100)": {
+    "B_seed0": {
+     "point": -7.29,
+     "ci95": [
+      -22.85,
+      -2.14
+     ]
+    },
+    "B_seed1": {
+     "point": 5.02,
+     "ci95": [
+      -0.95,
+      10.13
+     ]
+    },
+    "B_seed2": {
+     "point": -1.02,
+     "ci95": [
+      -7.93,
+      7.21
+     ]
+    },
+    "B_seedmean": {
+     "point": -1.34,
+     "ci95": [
+      -8.14,
+      2.49
+     ]
+    },
+    "B2_seed0": {
+     "point": -7.41,
+     "ci95": [
+      -21.72,
+      -2.1
+     ]
+    },
+    "B2_seed1": {
+     "point": 4.35,
+     "ci95": [
+      -1.3,
+      9.07
+     ]
+    },
+    "B2_seed2": {
+     "point": -0.51,
+     "ci95": [
+      -7.53,
+      8.08
+     ]
+    },
+    "B2_seedmean": {
+     "point": -1.48,
+     "ci95": [
+      -7.44,
+      2.27
+     ]
+    },
+    "P_seed0": {
+     "point": -7.0,
+     "ci95": [
+      -21.9,
+      -0.98
+     ]
+    },
+    "P_seed1": {
+     "point": 2.73,
+     "ci95": [
+      -3.46,
+      7.61
+     ]
+    },
+    "P_seed2": {
+     "point": -2.0,
+     "ci95": [
+      -9.81,
+      7.37
+     ]
+    },
+    "P_seedmean": {
+     "point": -2.44,
+     "ci95": [
+      -8.71,
+      1.85
+     ]
+    }
+   }
+  }
+ },
+ "gru": {
+  "runs": {
+   "scale_A": 4.480111122131348,
+   "scale_B": 4.404335021972656,
+   "A_0": {
+    "seed": 0,
+    "epochs": 15,
+    "best_epoch": 9,
+    "lr_drops": [
+     12,
+     15
+    ],
+    "best_val_rmse": 3.0029,
+    "val_rmse_history": [
+     3.1297,
+     3.0624,
+     3.0471,
+     3.0266,
+     3.0173,
+     3.0179,
+     3.0078,
+     3.0197,
+     3.0029,
+     3.0262,
+     3.0256,
+     3.0259,
+     3.0069,
+     3.0363,
+     3.0196
+    ],
+    "seconds": 458
+   },
+   "B_0": {
+    "seed": 0,
+    "epochs": 9,
+    "lr_drops": [],
+    "seconds": 379
+   },
+   "B2_0": {
+    "seed": 0,
+    "epochs": 11,
+    "lr_drops": [],
+    "seconds": 74
+   },
+   "A_1": {
+    "seed": 1,
+    "epochs": 23,
+    "best_epoch": 17,
+    "lr_drops": [
+     7,
+     12,
+     20,
+     23
+    ],
+    "best_val_rmse": 2.9844,
+    "val_rmse_history": [
+     3.1312,
+     3.0596,
+     3.0396,
+     3.0055,
+     3.0136,
+     3.0282,
+     3.0127,
+     3.003,
+     2.9926,
+     2.9931,
+     2.9998,
+     2.995,
+     2.9938,
+     2.9886,
+     2.9998,
+     2.9968,
+     2.9844,
+     2.9852,
+     2.9972,
+     2.9891,
+     2.992,
+     2.9912,
+     2.9989
+    ],
+    "seconds": 139
+   },
+   "B_1": {
+    "seed": 1,
+    "epochs": 17,
+    "lr_drops": [
+     7,
+     12
+    ],
+    "seconds": 114
+   },
+   "B2_1": {
+    "seed": 1,
+    "epochs": 20,
+    "lr_drops": [
+     8,
+     14
+    ],
+    "seconds": 133
+   },
+   "A_2": {
+    "seed": 2,
+    "epochs": 17,
+    "best_epoch": 11,
+    "lr_drops": [
+     10,
+     14,
+     17
+    ],
+    "best_val_rmse": 2.9973,
+    "val_rmse_history": [
+     3.111,
+     3.0524,
+     3.0347,
+     3.0241,
+     3.0061,
+     3.027,
+     3.0025,
+     3.0049,
+     3.067,
+     3.0164,
+     2.9973,
+     3.0109,
+     3.0095,
+     3.0077,
+     3.005,
+     3.0033,
+     3.0141
+    ],
+    "seconds": 100
+   },
+   "B_2": {
+    "seed": 2,
+    "epochs": 11,
+    "lr_drops": [
+     10
+    ],
+    "seconds": 73
+   },
+   "B2_2": {
+    "seed": 2,
+    "epochs": 13,
+    "lr_drops": [
+     12
+    ],
+    "seconds": 87
+   }
+  },
+  "run_time_seconds": 1557,
+  "rmse": {
+   "all": {
+    "n_hours": 35064,
+    "persistence": 3.3704,
+    "A_seed0": 2.6561,
+    "A_seed1": 2.6378,
+    "A_seed2": 2.6435,
+    "A_seedmean": 2.6316,
+    "B_seed0": 2.6532,
+    "B_seed1": 2.6403,
+    "B_seed2": 2.6363,
+    "B_seedmean": 2.6283,
+    "B2_seed0": 2.6558,
+    "B2_seed1": 2.6387,
+    "B2_seed2": 2.6514,
+    "B2_seedmean": 2.6317
+   },
+   "quiet (Dst > -50)": {
+    "n_hours": 34702,
+    "persistence": 3.2359,
+    "A_seed0": 2.5658,
+    "A_seed1": 2.5496,
+    "A_seed2": 2.5552,
+    "A_seedmean": 2.5444,
+    "B_seed0": 2.5642,
+    "B_seed1": 2.5504,
+    "B_seed2": 2.5463,
+    "B_seedmean": 2.5406,
+    "B2_seed0": 2.5674,
+    "B2_seed1": 2.5497,
+    "B2_seed2": 2.5616,
+    "B2_seedmean": 2.5449
+   },
+   "storm (Dst <= -50)": {
+    "n_hours": 362,
+    "persistence": 9.8253,
+    "A_seed0": 7.2285,
+    "A_seed1": 7.1265,
+    "A_seed2": 7.1395,
+    "A_seedmean": 7.086,
+    "B_seed0": 7.179,
+    "B_seed1": 7.1909,
+    "B_seed2": 7.1874,
+    "B_seedmean": 7.0978,
+    "B2_seed0": 7.1653,
+    "B2_seed1": 7.1559,
+    "B2_seed2": 7.2027,
+    "B2_seedmean": 7.0722
+   },
+   "intense (Dst <= -100)": {
+    "n_hours": 35,
+    "persistence": 15.9553,
+    "A_seed0": 10.7346,
+    "A_seed1": 10.7727,
+    "A_seed2": 10.6731,
+    "A_seedmean": 10.5072,
+    "B_seed0": 11.2335,
+    "B_seed1": 10.8061,
+    "B_seed2": 10.6884,
+    "B_seedmean": 10.6745,
+    "B2_seed0": 11.1974,
+    "B2_seed1": 10.7181,
+    "B2_seed2": 10.9983,
+    "B2_seedmean": 10.6871
+   }
+  },
+  "skill_vs_persistence": {
+   "all": {
+    "A_seed0": 0.379,
+    "A_seed1": 0.3875,
+    "A_seed2": 0.3848,
+    "A_seedmean": 0.3903,
+    "B_seed0": 0.3803,
+    "B_seed1": 0.3863,
+    "B_seed2": 0.3882,
+    "B_seedmean": 0.3919,
+    "B2_seed0": 0.3791,
+    "B2_seed1": 0.3871,
+    "B2_seed2": 0.3812,
+    "B2_seedmean": 0.3903
+   },
+   "quiet (Dst > -50)": {
+    "A_seed0": 0.3713,
+    "A_seed1": 0.3792,
+    "A_seed2": 0.3765,
+    "A_seedmean": 0.3817,
+    "B_seed0": 0.3721,
+    "B_seed1": 0.3788,
+    "B_seed2": 0.3808,
+    "B_seedmean": 0.3836,
+    "B2_seed0": 0.3705,
+    "B2_seed1": 0.3791,
+    "B2_seed2": 0.3733,
+    "B2_seedmean": 0.3815
+   },
+   "storm (Dst <= -50)": {
+    "A_seed0": 0.4587,
+    "A_seed1": 0.4739,
+    "A_seed2": 0.472,
+    "A_seedmean": 0.4799,
+    "B_seed0": 0.4661,
+    "B_seed1": 0.4644,
+    "B_seed2": 0.4649,
+    "B_seedmean": 0.4781,
+    "B2_seed0": 0.4682,
+    "B2_seed1": 0.4696,
+    "B2_seed2": 0.4626,
+    "B2_seedmean": 0.4819
+   },
+   "intense (Dst <= -100)": {
+    "A_seed0": 0.5473,
+    "A_seed1": 0.5441,
+    "A_seed2": 0.5525,
+    "A_seedmean": 0.5663,
+    "B_seed0": 0.5043,
+    "B_seed1": 0.5413,
+    "B_seed2": 0.5512,
+    "B_seedmean": 0.5524,
+    "B2_seed0": 0.5075,
+    "B2_seed1": 0.5487,
+    "B2_seed2": 0.5248,
+    "B2_seedmean": 0.5513
+   }
+  },
+  "mse_change_vs_A_percent": {
+   "all": {
+    "B_seed0": {
+     "point": -0.22,
+     "ci95": [
+      -0.88,
+      0.4
+     ]
+    },
+    "B_seed1": {
+     "point": 0.19,
+     "ci95": [
+      -0.41,
+      0.78
+     ]
+    },
+    "B_seed2": {
+     "point": -0.54,
+     "ci95": [
+      -1.54,
+      0.36
+     ]
+    },
+    "B_seedmean": {
+     "point": -0.25,
+     "ci95": [
+      -0.75,
+      0.21
+     ]
+    },
+    "B2_seed0": {
+     "point": -0.02,
+     "ci95": [
+      -0.79,
+      0.76
+     ]
+    },
+    "B2_seed1": {
+     "point": 0.07,
+     "ci95": [
+      -0.51,
+      0.62
+     ]
+    },
+    "B2_seed2": {
+     "point": 0.6,
+     "ci95": [
+      -0.4,
+      1.62
+     ]
+    },
+    "B2_seedmean": {
+     "point": 0.01,
+     "ci95": [
+      -0.4,
+      0.39
+     ]
+    }
+   },
+   "quiet (Dst > -50)": {
+    "B_seed0": {
+     "point": -0.12,
+     "ci95": [
+      -0.7,
+      0.43
+     ]
+    },
+    "B_seed1": {
+     "point": 0.06,
+     "ci95": [
+      -0.48,
+      0.53
+     ]
+    },
+    "B_seed2": {
+     "point": -0.69,
+     "ci95": [
+      -1.38,
+      0.0
+     ]
+    },
+    "B_seedmean": {
+     "point": -0.3,
+     "ci95": [
+      -0.68,
+      0.06
+     ]
+    },
+    "B2_seed0": {
+     "point": 0.12,
+     "ci95": [
+      -0.58,
+      0.83
+     ]
+    },
+    "B2_seed1": {
+     "point": 0.01,
+     "ci95": [
+      -0.51,
+      0.48
+     ]
+    },
+    "B2_seed2": {
+     "point": 0.5,
+     "ci95": [
+      -0.13,
+      1.17
+     ]
+    },
+    "B2_seedmean": {
+     "point": 0.04,
+     "ci95": [
+      -0.31,
+      0.38
+     ]
+    }
+   },
+   "storm (Dst <= -50)": {
+    "B_seed0": {
+     "point": -1.36,
+     "ci95": [
+      -7.87,
+      3.05
+     ]
+    },
+    "B_seed1": {
+     "point": 1.82,
+     "ci95": [
+      -2.72,
+      6.59
+     ]
+    },
+    "B_seed2": {
+     "point": 1.34,
+     "ci95": [
+      -8.43,
+      9.73
+     ]
+    },
+    "B_seedmean": {
+     "point": 0.33,
+     "ci95": [
+      -4.34,
+      4.14
+     ]
+    },
+    "B2_seed0": {
+     "point": -1.74,
+     "ci95": [
+      -7.99,
+      5.02
+     ]
+    },
+    "B2_seed1": {
+     "point": 0.83,
+     "ci95": [
+      -3.38,
+      5.25
+     ]
+    },
+    "B2_seed2": {
+     "point": 1.78,
+     "ci95": [
+      -9.58,
+      12.04
+     ]
+    },
+    "B2_seedmean": {
+     "point": -0.39,
+     "ci95": [
+      -3.82,
+      2.23
+     ]
+    }
+   },
+   "intense (Dst <= -100)": {
+    "B_seed0": {
+     "point": 9.51,
+     "ci95": [
+      -0.73,
+      20.4
+     ]
+    },
+    "B_seed1": {
+     "point": 0.62,
+     "ci95": [
+      -29.07,
+      15.52
+     ]
+    },
+    "B_seed2": {
+     "point": 0.29,
+     "ci95": [
+      -11.26,
+      12.99
+     ]
+    },
+    "B_seedmean": {
+     "point": 3.21,
+     "ci95": [
+      -10.19,
+      10.67
+     ]
+    },
+    "B2_seed0": {
+     "point": 8.81,
+     "ci95": [
+      -5.25,
+      42.91
+     ]
+    },
+    "B2_seed1": {
+     "point": -1.01,
+     "ci95": [
+      -33.07,
+      11.88
+     ]
+    },
+    "B2_seed2": {
+     "point": 6.19,
+     "ci95": [
+      -20.1,
+      33.24
+     ]
+    },
+    "B2_seedmean": {
+     "point": 3.45,
+     "ci95": [
+      -1.57,
+      9.4
+     ]
+    }
+   }
+  },
+  "production_reference_from_reports_gru_baseline_json": {
+   "all": 2.6205,
+   "quiet (Dst > -50)": 2.5324,
+   "storm (Dst <= -50)": 7.0968,
+   "intense (Dst <= -100)": 10.5678
+  }
+ },
+ "threads": 3,
+ "follow_up": "a production --refit-train-val option was not built: neither B nor B2 met the promotion bar against A. If it is ever wanted, the owner must decide how the retrain gate and champion_challenger.py --split val treat a model fitted on the validation years."
+}
