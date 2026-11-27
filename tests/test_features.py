@@ -126,3 +126,27 @@ def test_decaying_memory_is_a_causal_exponential_filter():
     a = 1 - np.exp(-1 / 8)
     assert (m.iloc[:10] == 0).all()
     assert np.allclose(m.iloc[10:].to_numpy(), a * (1 - a) ** np.arange(38))
+
+
+@pytest.mark.parametrize("future", [-1234.0, np.nan])
+def test_gap_age_features_do_not_depend_on_the_future(future):
+    """imf_age and plasma_age count backwards from t: a corrupted or missing future changes nothing."""
+    df = load_hourly("2024-01-01")
+    X, _ = build_features(df, gap_age=True)
+    assert {"imf_age", "plasma_age"} <= set(X.columns)
+
+    corrupted = df.copy()
+    floats = corrupted.select_dtypes("float").columns.drop("dst")
+    corrupted.loc[corrupted.index > CUT, floats] = future
+    X_corrupted, _ = build_features(corrupted, gap_age=True)
+
+    past = X[X.index <= CUT]
+    assert past.equals(X_corrupted.loc[past.index])
+
+
+def test_gap_age_is_off_by_default():
+    df = load_hourly("2024-01-01")
+    X, _ = build_features(df)
+    X_age, _ = build_features(df, gap_age=True)
+    assert "imf_age" not in X.columns and "plasma_age" not in X.columns
+    assert X.equals(X_age[X.columns])

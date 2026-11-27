@@ -71,3 +71,8 @@ def test_main_validation_only_runs_with_a_robust_objective(monkeypatch, capsys):
         train_xgb.main()
         out = capsys.readouterr().out
         assert "reg:" in out and "Validation:" in out
+
+
+def test_gap_options_are_off_by_default():
+    args = train_xgb.build_parser().parse_args([])
+    assert args.gap_aug == 0 and args.gap_aug_rate == 1.0 and not args.gap_age

@@ -1,0 +1,968 @@
+{
+ "issue": 41,
+ "title": "Gap aware XGBoost training: IMF and plasma spans blanked at the real-time gap rates, plus gap age features",
+ "date": "2026-11-27",
+ "part": "XGBoost only; the GRU part is split into its own issue",
+ "result": "no-gain",
+ "label_basis": "agents/retrain-policy.md judges against the current production configuration, which is seed 0. For seed 0 the candidate changes storm hour MSE by -1.03% (95% interval -5.0 to 3.78) and overall MSE by -0.24% (-0.73 to 0.28): both intervals include zero, so the bar is not met. Rate 0.5 fails the same way (seed 0 storm -0.30%, -4.29 to 3.50). The 3 seed average (storm -3.61%) is driven by seed 1 (-7.91%); seeds 0 and 2 give -1.03% and -1.88% with intervals that include zero. The averaged interval resamples hours only and treats the 3 seeds as fixed, so it leaves out the seed to seed spread and does not support a claim. A larger seed study could settle it; until then the result is no-gain on clean validation, with a possible storm effect that this run cannot separate from seed noise.",
+ "reading": [
+  "Clean validation, production seed 0: storm hour MSE -1.03% (-5.0 to 3.78), overall -0.24% (-0.73 to 0.28), intense -0.14% (-7.25 to 17.7). No regime gain excludes zero, so the retrain policy bar is not met.",
+  "Averaged over seeds 0, 1 and 2 the storm change is -3.61%, but it comes almost entirely from seed 1 (-7.91%); seeds 0 and 2 give -1.03% and -1.88% with intervals that include zero. The averaged intervals below treat the seeds as fixed and are not evidence for a gain.",
+  "Half the rate behaves the same way: seed 0 storm -0.30% (-4.29 to 3.50), overall -0.29% (-0.79 to 0.15).",
+  "Diagnostic only: on validation with synthetic gaps from the same gap model (seed 2024, not the real ACE mask), the baseline MSE is 15.6% above its clean value and the candidate removes about half of that (seed 0 all hours -8.89%, -10.13 to -7.53). This does not decide the label. The real ACE mask (issue 41 scoring b) and the real ACE inputs (c) were not run.",
+  "Gap augmentation and the age features were measured together, not one by one. The code stays behind options that are off by default."
+ ],
+ "horizon_hours": 1,
+ "split": "train 1995-01-01 .. 2017-01-01 (exclusive), validation 2017-01-01 .. 2021-01-01 (exclusive); rows from 2021 onwards dropped from the table before anything was built or fitted, test years not used",
+ "option": {
+  "xgboost": "scripts/train_xgb.py --gap-aug K [--gap-aug-rate R] [--gap-aug-seed S] [--gap-age]",
+  "functions": "oculstorm.augment.blank_gaps(df, rate, seed), gap_copies(df, copies, rate, seed), gap_mask; oculstorm.features.build_features(..., gap_age=True), observation_age",
+  "gap_model": "per block, observed runs and gaps alternate; observed runs geometric with the mean that gives the missing share; gaps are 1 to 3 hours with probability p_short (weights 1, 0.5, 0.25, an assumption) or 4 hours plus a geometric tail with mean long_mean, capped at the longest measured gap; p_short and long_mean solved from the issue 31 mean gap length and short gap share",
+  "gap_model_source": "reports/experiments/31-realtime-ace-inputs.json coverage: IMF 18.62% missing, 1,629 gaps, 22.12% of missing hours in gaps up to 3 h, longest 145 h; plasma 26.95%, 3,641 gaps, 40.11%, longest 23 h (35,064 validation hours); only these summary numbers are used, never the validation mask",
+  "gap_models": {
+   "imf": {
+    "missing_share": 0.1862,
+    "mean_gap": 4.0079,
+    "p_short": 0.5642,
+    "short_weights": [
+     0.5714,
+     0.2857,
+     0.1429
+    ],
+    "long_mean": 7.1619,
+    "longest": 145
+   },
+   "plasma": {
+    "missing_share": 0.2695,
+    "mean_gap": 2.5954,
+    "p_short": 0.6625,
+    "short_weights": [
+     0.5714,
+     0.2857,
+     0.1429
+    ],
+    "long_mean": 4.6049,
+    "longest": 23
+   }
+  },
+  "blocks": {
+   "imf": [
+    "bz_gsm",
+    "by_gsm",
+    "b_mag_avg",
+    "electric_field"
+   ],
+   "plasma": [
+    "flow_speed",
+    "proton_density",
+    "proton_temp",
+    "flow_pressure",
+    "electric_field"
+   ],
+   "masks": "independent; electric_field is missing when either is"
+  },
+  "age_features": "imf_age and plasma_age: hours since bz_gsm and flow_speed were last observed at or before t, capped at 48",
+  "default": "off (--gap-aug 0, no --gap-age); defaults leave features and fits unchanged",
+  "leakage_tests": "tests/test_features.py: gap age features up to t do not change when later hours are corrupted or set missing; tests/test_augment.py: blank_gaps only removes values, keeps Dst, its result up to t does not depend on later hours, copies hold train hours only, observation_age counts back from t only"
+ },
+ "candidate": "--gap-aug 1 --gap-age (rate 1, gap copy seed = XGBoost seed); also rate 0.5",
+ "baseline": "current configuration (PARAMS, 6 lags) refitted in this run with seeds 0, 1, 2 and the table cut before 2021; seed 0 clean validation RMSE 2.6565 equals validation_scores in reports/xgb_baseline.json",
+ "evaluation_sets": {
+  "clean": "validation years as they are (decides the label)",
+  "gapped_synthetic": "blank_gaps(table before 2021, rate 1, seed 2024), validation rows; targets and persistence are the clean Dst; diagnostic only"
+ },
+ "bootstrap": {
+  "function": "oculstorm.metrics.block_bootstrap_rmse",
+  "n_boot": 2000,
+  "block_hours": 168,
+  "seed": 0,
+  "statistic": "MSE change of candidate vs baseline in percent (negative is better), paired, per seed on the same resamples and then averaged over the 3 seeds; 95% percentile interval. three_seed_average_model compares the mean prediction of the 3 candidate seeds with that of the 3 baseline seeds",
+  "reproducibility": "Per seed validation RMSEs and best iterations reproduce directly with scripts/train_xgb.py --validation-only on a table cut before 2021 (reviewer spot check: seed 0 baseline 2.6565, candidate 2.6534, storm RMSE 7.1727 to 7.1356). The bootstrap intervals, seed averages and the synthetic gap diagnostic were computed by an analysis script that is not tracked in the repository, so they cannot be rerun from the repository alone."
+ },
+ "runs": {
+  "base_seed0": {
+   "seed": 0,
+   "gaps": 0,
+   "rate": 1.0,
+   "age": false,
+   "train_rows": 192864,
+   "best_iteration": 2151,
+   "seconds": 119
+  },
+  "ga1_r1_age_seed0": {
+   "seed": 0,
+   "gaps": 1,
+   "rate": 1.0,
+   "age": true,
+   "train_rows": 385727,
+   "best_iteration": 2024,
+   "seconds": 113
+  },
+  "ga1_r0.5_age_seed0": {
+   "seed": 0,
+   "gaps": 1,
+   "rate": 0.5,
+   "age": true,
+   "train_rows": 385727,
+   "best_iteration": 2325,
+   "seconds": 183
+  },
+  "base_seed1": {
+   "seed": 1,
+   "gaps": 0,
+   "rate": 1.0,
+   "age": false,
+   "train_rows": 192864,
+   "best_iteration": 1838,
+   "seconds": 108
+  },
+  "ga1_r1_age_seed1": {
+   "seed": 1,
+   "gaps": 1,
+   "rate": 1.0,
+   "age": true,
+   "train_rows": 385727,
+   "best_iteration": 2001,
+   "seconds": 113
+  },
+  "ga1_r0.5_age_seed1": {
+   "seed": 1,
+   "gaps": 1,
+   "rate": 0.5,
+   "age": true,
+   "train_rows": 385727,
+   "best_iteration": 2336,
+   "seconds": 131
+  },
+  "base_seed2": {
+   "seed": 2,
+   "gaps": 0,
+   "rate": 1.0,
+   "age": false,
+   "train_rows": 192864,
+   "best_iteration": 1980,
+   "seconds": 85
+  },
+  "ga1_r1_age_seed2": {
+   "seed": 2,
+   "gaps": 1,
+   "rate": 1.0,
+   "age": true,
+   "train_rows": 385727,
+   "best_iteration": 2027,
+   "seconds": 116
+  },
+  "ga1_r0.5_age_seed2": {
+   "seed": 2,
+   "gaps": 1,
+   "rate": 0.5,
+   "age": true,
+   "train_rows": 385727,
+   "best_iteration": 2322,
+   "seconds": 132
+  }
+ },
+ "vs_baseline": {
+  "ga1_r1_age": {
+   "clean": {
+    "all": {
+     "n_hours": 35063,
+     "rmse_persistence": 3.3704,
+     "rmse_baseline_mean_of_seeds": 2.6579,
+     "rmse_candidate_mean_of_seeds": 2.6536,
+     "skill_baseline": 0.3781,
+     "skill_candidate": 0.3801,
+     "mse_change_pct": -0.33,
+     "mse_change_pct_ci95": [
+      -0.71,
+      0.04
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -0.37,
+      "mse_change_pct_ci95": [
+       -0.76,
+       0.0
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 2.6565,
+       "rmse_candidate": 2.6534,
+       "mse_change_pct": -0.24,
+       "mse_change_pct_ci95": [
+        -0.73,
+        0.28
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 2.6613,
+       "rmse_candidate": 2.653,
+       "mse_change_pct": -0.62,
+       "mse_change_pct_ci95": [
+        -1.35,
+        0.12
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 2.656,
+       "rmse_candidate": 2.6544,
+       "mse_change_pct": -0.12,
+       "mse_change_pct_ci95": [
+        -0.55,
+        0.24
+       ]
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 34701,
+     "rmse_persistence": 3.2359,
+     "rmse_baseline_mean_of_seeds": 2.5682,
+     "rmse_candidate_mean_of_seeds": 2.5675,
+     "skill_baseline": 0.3701,
+     "skill_candidate": 0.3705,
+     "mse_change_pct": -0.05,
+     "mse_change_pct_ci95": [
+      -0.36,
+      0.25
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -0.1,
+      "mse_change_pct_ci95": [
+       -0.42,
+       0.2
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 2.5679,
+       "rmse_candidate": 2.5657,
+       "mse_change_pct": -0.17,
+       "mse_change_pct_ci95": [
+        -0.55,
+        0.21
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 2.5699,
+       "rmse_candidate": 2.5698,
+       "mse_change_pct": -0.01,
+       "mse_change_pct_ci95": [
+        -0.55,
+        0.53
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 2.5668,
+       "rmse_candidate": 2.5671,
+       "mse_change_pct": 0.02,
+       "mse_change_pct_ci95": [
+        -0.34,
+        0.34
+       ]
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 362,
+     "rmse_persistence": 9.8253,
+     "rmse_baseline_mean_of_seeds": 7.2122,
+     "rmse_candidate_mean_of_seeds": 7.0793,
+     "skill_baseline": 0.4612,
+     "skill_candidate": 0.4809,
+     "mse_change_pct": -3.61,
+     "mse_change_pct_ci95": [
+      -5.25,
+      -1.86
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -3.61,
+      "mse_change_pct_ci95": [
+       -5.34,
+       -1.93
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 7.1727,
+       "rmse_candidate": 7.1356,
+       "mse_change_pct": -1.03,
+       "mse_change_pct_ci95": [
+        -5.0,
+        3.78
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 7.2734,
+       "rmse_candidate": 6.9796,
+       "mse_change_pct": -7.91,
+       "mse_change_pct_ci95": [
+        -10.73,
+        -4.65
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 7.1906,
+       "rmse_candidate": 7.1226,
+       "mse_change_pct": -1.88,
+       "mse_change_pct_ci95": [
+        -5.7,
+        1.65
+       ]
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 35,
+     "rmse_persistence": 15.9553,
+     "rmse_baseline_mean_of_seeds": 11.7421,
+     "rmse_candidate_mean_of_seeds": 11.306,
+     "skill_baseline": 0.4584,
+     "skill_candidate": 0.4979,
+     "mse_change_pct": -7.12,
+     "mse_change_pct_ci95": [
+      -8.7,
+      -1.12
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -6.97,
+      "mse_change_pct_ci95": [
+       -9.01,
+       -2.3
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 11.6867,
+       "rmse_candidate": 11.6786,
+       "mse_change_pct": -0.14,
+       "mse_change_pct_ci95": [
+        -7.25,
+        17.7
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 11.9009,
+       "rmse_candidate": 10.9252,
+       "mse_change_pct": -15.73,
+       "mse_change_pct_ci95": [
+        -19.94,
+        -10.32
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 11.6388,
+       "rmse_candidate": 11.3141,
+       "mse_change_pct": -5.5,
+       "mse_change_pct_ci95": [
+        -10.82,
+        0.06
+       ]
+      }
+     },
+     "resamples_without_hours": 78
+    }
+   },
+   "gapped": {
+    "all": {
+     "n_hours": 35063,
+     "rmse_persistence": 3.3704,
+     "rmse_baseline_mean_of_seeds": 2.8571,
+     "rmse_candidate_mean_of_seeds": 2.7337,
+     "skill_baseline": 0.2814,
+     "skill_candidate": 0.3421,
+     "mse_change_pct": -8.45,
+     "mse_change_pct_ci95": [
+      -9.6,
+      -7.26
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -7.54,
+      "mse_change_pct_ci95": [
+       -8.67,
+       -6.37
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 2.8669,
+       "rmse_candidate": 2.7366,
+       "mse_change_pct": -8.89,
+       "mse_change_pct_ci95": [
+        -10.13,
+        -7.53
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 2.8514,
+       "rmse_candidate": 2.7321,
+       "mse_change_pct": -8.19,
+       "mse_change_pct_ci95": [
+        -9.37,
+        -6.98
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 2.8531,
+       "rmse_candidate": 2.7325,
+       "mse_change_pct": -8.27,
+       "mse_change_pct_ci95": [
+        -9.61,
+        -7.0
+       ]
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 34701,
+     "rmse_persistence": 3.2359,
+     "rmse_baseline_mean_of_seeds": 2.7596,
+     "rmse_candidate_mean_of_seeds": 2.6373,
+     "skill_baseline": 0.2727,
+     "skill_candidate": 0.3358,
+     "mse_change_pct": -8.67,
+     "mse_change_pct_ci95": [
+      -9.76,
+      -7.51
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -7.72,
+      "mse_change_pct_ci95": [
+       -8.81,
+       -6.6
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 2.7642,
+       "rmse_candidate": 2.6359,
+       "mse_change_pct": -9.07,
+       "mse_change_pct_ci95": [
+        -10.27,
+        -7.76
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 2.7571,
+       "rmse_candidate": 2.6377,
+       "mse_change_pct": -8.47,
+       "mse_change_pct_ci95": [
+        -9.59,
+        -7.32
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 2.7577,
+       "rmse_candidate": 2.6383,
+       "mse_change_pct": -8.47,
+       "mse_change_pct_ci95": [
+        -9.66,
+        -7.29
+       ]
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 362,
+     "rmse_persistence": 9.8253,
+     "rmse_baseline_mean_of_seeds": 7.7865,
+     "rmse_candidate_mean_of_seeds": 7.5573,
+     "skill_baseline": 0.372,
+     "skill_candidate": 0.4084,
+     "mse_change_pct": -5.78,
+     "mse_change_pct_ci95": [
+      -12.4,
+      0.84
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -5.37,
+      "mse_change_pct_ci95": [
+       -12.13,
+       1.26
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 7.9783,
+       "rmse_candidate": 7.7037,
+       "mse_change_pct": -6.76,
+       "mse_change_pct_ci95": [
+        -13.85,
+        -0.19
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 7.6699,
+       "rmse_candidate": 7.4875,
+       "mse_change_pct": -4.7,
+       "mse_change_pct_ci95": [
+        -9.52,
+        2.02
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 7.7112,
+       "rmse_candidate": 7.4808,
+       "mse_change_pct": -5.89,
+       "mse_change_pct_ci95": [
+        -14.65,
+        3.32
+       ]
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 35,
+     "rmse_persistence": 15.9553,
+     "rmse_baseline_mean_of_seeds": 12.6736,
+     "rmse_candidate_mean_of_seeds": 12.0539,
+     "skill_baseline": 0.3691,
+     "skill_candidate": 0.4293,
+     "mse_change_pct": -9.58,
+     "mse_change_pct_ci95": [
+      -29.04,
+      16.63
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -8.91,
+      "mse_change_pct_ci95": [
+       -28.78,
+       17.51
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 13.1422,
+       "rmse_candidate": 13.0169,
+       "mse_change_pct": -1.9,
+       "mse_change_pct_ci95": [
+        -24.2,
+        25.48
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 12.5429,
+       "rmse_candidate": 11.5153,
+       "mse_change_pct": -15.71,
+       "mse_change_pct_ci95": [
+        -27.56,
+        -1.17
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 12.3356,
+       "rmse_candidate": 11.6294,
+       "mse_change_pct": -11.12,
+       "mse_change_pct_ci95": [
+        -35.37,
+        24.34
+       ]
+      }
+     },
+     "resamples_without_hours": 78
+    }
+   }
+  },
+  "ga1_r0.5_age": {
+   "clean": {
+    "all": {
+     "n_hours": 35063,
+     "rmse_persistence": 3.3704,
+     "rmse_baseline_mean_of_seeds": 2.6579,
+     "rmse_candidate_mean_of_seeds": 2.6528,
+     "skill_baseline": 0.3781,
+     "skill_candidate": 0.3805,
+     "mse_change_pct": -0.38,
+     "mse_change_pct_ci95": [
+      -0.71,
+      -0.05
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -0.44,
+      "mse_change_pct_ci95": [
+       -0.78,
+       -0.1
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 2.6565,
+       "rmse_candidate": 2.6526,
+       "mse_change_pct": -0.29,
+       "mse_change_pct_ci95": [
+        -0.79,
+        0.15
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 2.6613,
+       "rmse_candidate": 2.6532,
+       "mse_change_pct": -0.61,
+       "mse_change_pct_ci95": [
+        -1.21,
+        -0.02
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 2.656,
+       "rmse_candidate": 2.6527,
+       "mse_change_pct": -0.25,
+       "mse_change_pct_ci95": [
+        -0.79,
+        0.27
+       ]
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 34701,
+     "rmse_persistence": 3.2359,
+     "rmse_baseline_mean_of_seeds": 2.5682,
+     "rmse_candidate_mean_of_seeds": 2.5662,
+     "skill_baseline": 0.3701,
+     "skill_candidate": 0.3711,
+     "mse_change_pct": -0.15,
+     "mse_change_pct_ci95": [
+      -0.44,
+      0.13
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -0.22,
+      "mse_change_pct_ci95": [
+       -0.51,
+       0.07
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 2.5679,
+       "rmse_candidate": 2.5641,
+       "mse_change_pct": -0.29,
+       "mse_change_pct_ci95": [
+        -0.68,
+        0.09
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 2.5699,
+       "rmse_candidate": 2.568,
+       "mse_change_pct": -0.15,
+       "mse_change_pct_ci95": [
+        -0.63,
+        0.34
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 2.5668,
+       "rmse_candidate": 2.5666,
+       "mse_change_pct": -0.02,
+       "mse_change_pct_ci95": [
+        -0.48,
+        0.43
+       ]
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 362,
+     "rmse_persistence": 9.8253,
+     "rmse_baseline_mean_of_seeds": 7.2122,
+     "rmse_candidate_mean_of_seeds": 7.0968,
+     "skill_baseline": 0.4612,
+     "skill_candidate": 0.4783,
+     "mse_change_pct": -3.15,
+     "mse_change_pct_ci95": [
+      -5.83,
+      -1.15
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -3.15,
+      "mse_change_pct_ci95": [
+       -6.02,
+       -1.0
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 7.1727,
+       "rmse_candidate": 7.1621,
+       "mse_change_pct": -0.3,
+       "mse_change_pct_ci95": [
+        -4.29,
+        3.5
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 7.2734,
+       "rmse_candidate": 7.0503,
+       "mse_change_pct": -6.04,
+       "mse_change_pct_ci95": [
+        -9.7,
+        -2.43
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 7.1906,
+       "rmse_candidate": 7.0781,
+       "mse_change_pct": -3.1,
+       "mse_change_pct_ci95": [
+        -7.63,
+        0.99
+       ]
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 35,
+     "rmse_persistence": 15.9553,
+     "rmse_baseline_mean_of_seeds": 11.7421,
+     "rmse_candidate_mean_of_seeds": 11.393,
+     "skill_baseline": 0.4584,
+     "skill_candidate": 0.4901,
+     "mse_change_pct": -5.82,
+     "mse_change_pct_ci95": [
+      -10.88,
+      -1.46
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -5.55,
+      "mse_change_pct_ci95": [
+       -10.96,
+       -0.8
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 11.6867,
+       "rmse_candidate": 11.3538,
+       "mse_change_pct": -5.62,
+       "mse_change_pct_ci95": [
+        -21.64,
+        -0.41
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 11.9009,
+       "rmse_candidate": 11.3634,
+       "mse_change_pct": -8.83,
+       "mse_change_pct_ci95": [
+        -15.19,
+        -2.59
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 11.6388,
+       "rmse_candidate": 11.4618,
+       "mse_change_pct": -3.02,
+       "mse_change_pct_ci95": [
+        -17.05,
+        9.97
+       ]
+      }
+     },
+     "resamples_without_hours": 78
+    }
+   },
+   "gapped": {
+    "all": {
+     "n_hours": 35063,
+     "rmse_persistence": 3.3704,
+     "rmse_baseline_mean_of_seeds": 2.8571,
+     "rmse_candidate_mean_of_seeds": 2.7339,
+     "skill_baseline": 0.2814,
+     "skill_candidate": 0.3421,
+     "mse_change_pct": -8.44,
+     "mse_change_pct_ci95": [
+      -9.55,
+      -7.27
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -7.63,
+      "mse_change_pct_ci95": [
+       -8.74,
+       -6.45
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 2.8669,
+       "rmse_candidate": 2.7338,
+       "mse_change_pct": -9.07,
+       "mse_change_pct_ci95": [
+        -10.25,
+        -7.83
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 2.8514,
+       "rmse_candidate": 2.7332,
+       "mse_change_pct": -8.11,
+       "mse_change_pct_ci95": [
+        -9.23,
+        -6.97
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 2.8531,
+       "rmse_candidate": 2.7346,
+       "mse_change_pct": -8.13,
+       "mse_change_pct_ci95": [
+        -9.53,
+        -6.73
+       ]
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 34701,
+     "rmse_persistence": 3.2359,
+     "rmse_baseline_mean_of_seeds": 2.7596,
+     "rmse_candidate_mean_of_seeds": 2.6395,
+     "skill_baseline": 0.2727,
+     "skill_candidate": 0.3346,
+     "mse_change_pct": -8.51,
+     "mse_change_pct_ci95": [
+      -9.57,
+      -7.43
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -7.69,
+      "mse_change_pct_ci95": [
+       -8.73,
+       -6.6
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 2.7642,
+       "rmse_candidate": 2.6371,
+       "mse_change_pct": -8.99,
+       "mse_change_pct_ci95": [
+        -10.15,
+        -7.78
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 2.7571,
+       "rmse_candidate": 2.6387,
+       "mse_change_pct": -8.4,
+       "mse_change_pct_ci95": [
+        -9.45,
+        -7.35
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 2.7577,
+       "rmse_candidate": 2.6428,
+       "mse_change_pct": -8.16,
+       "mse_change_pct_ci95": [
+        -9.34,
+        -6.91
+       ]
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 362,
+     "rmse_persistence": 9.8253,
+     "rmse_baseline_mean_of_seeds": 7.7865,
+     "rmse_candidate_mean_of_seeds": 7.4877,
+     "skill_baseline": 0.372,
+     "skill_candidate": 0.4192,
+     "mse_change_pct": -7.48,
+     "mse_change_pct_ci95": [
+      -13.52,
+      -1.16
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -6.92,
+      "mse_change_pct_ci95": [
+       -13.27,
+       -0.54
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 7.9783,
+       "rmse_candidate": 7.5681,
+       "mse_change_pct": -10.02,
+       "mse_change_pct_ci95": [
+        -14.69,
+        -4.36
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 7.6699,
+       "rmse_candidate": 7.4929,
+       "mse_change_pct": -4.56,
+       "mse_change_pct_ci95": [
+        -10.83,
+        4.24
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 7.7112,
+       "rmse_candidate": 7.402,
+       "mse_change_pct": -7.86,
+       "mse_change_pct_ci95": [
+        -16.79,
+        1.19
+       ]
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 35,
+     "rmse_persistence": 15.9553,
+     "rmse_baseline_mean_of_seeds": 12.6736,
+     "rmse_candidate_mean_of_seeds": 11.4449,
+     "skill_baseline": 0.3691,
+     "skill_candidate": 0.4855,
+     "mse_change_pct": -18.31,
+     "mse_change_pct_ci95": [
+      -31.14,
+      -1.68
+     ],
+     "three_seed_average_model": {
+      "mse_change_pct": -17.72,
+      "mse_change_pct_ci95": [
+       -31.12,
+       0.16
+      ]
+     },
+     "per_seed": {
+      "seed0": {
+       "rmse_baseline": 13.1422,
+       "rmse_candidate": 11.4877,
+       "mse_change_pct": -23.59,
+       "mse_change_pct_ci95": [
+        -28.97,
+        -15.96
+       ]
+      },
+      "seed1": {
+       "rmse_baseline": 12.5429,
+       "rmse_candidate": 11.586,
+       "mse_change_pct": -14.68,
+       "mse_change_pct_ci95": [
+        -30.29,
+        7.48
+       ]
+      },
+      "seed2": {
+       "rmse_baseline": 12.3356,
+       "rmse_candidate": 11.2609,
+       "mse_change_pct": -16.67,
+       "mse_change_pct_ci95": [
+        -34.8,
+        7.14
+       ]
+      }
+     },
+     "resamples_without_hours": 78
+    }
+   }
+  }
+ },
+ "seconds": 1100
+}
