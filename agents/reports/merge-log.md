@@ -39,3 +39,7 @@ One line per pull request the release-merger considered. Appended by the merger 
 | 2026-11-27T08:29Z | #40 | agents/experimenter-2026-11-26 | 198dc78 | merged | approved head, gates ok, 101 tests passed with data, live forecast finite, live run 45965868123 succeeded |
 | 2026-11-27T08:29Z | #45 | agents/experimenter-2026-11-27 | be281aa | skipped | conflicts with main after #40 (scripts/train_xgb.py) |
 | 2026-11-27T08:29Z | #47 | agents/experimenter-2026-11-27-3 | 6182272 | skipped | conflicts with main after #40 (oculstorm/augment.py, oculstorm/features.py, scripts/train_xgb.py) |
+| 2026-11-27T18:28Z | #47 | agents/experimenter-2026-11-27-3 | 9aa4dab | merged | approved head, gates ok, 111 tests passed with data, live forecast finite, live run 46049719330 succeeded |
+| 2026-11-27T18:35Z | #45 | agents/experimenter-2026-11-27 | 9976bef | skipped | conflicts with main after #47 (oculstorm/features.py, scripts/train_xgb.py, tests/test_train_xgb.py); commented |
+| 2026-11-27T18:35Z | #52 | agents/experimenter-2026-11-27-4 | ec73609 | skipped | conflicts with main after #47 (scripts/train_xgb.py, tests/test_train_xgb.py); commented |
+| 2026-11-27T18:35Z | #53 | agents/experimenter-2026-11-27-5 | 50b85c1 | skipped | conflicts with main after #47 (scripts/train_xgb.py, tests/test_train_xgb.py); commented |
