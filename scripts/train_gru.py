@@ -2,6 +2,7 @@
 
 Usage: python scripts/train_gru.py [--horizon H] [--storm-weight K] [--ring-current] [--driver-memory]
        [--sw-noise-aug LEVEL] [--sw-noise-copies K] [--sw-noise-seed S]
+       [--validation-only] [--backtest-shift S] [--fixed-epochs N [--lr-drops E ...]] [--seeds S ...]
 Writes: models/gru_dst_{H}h{_swK}{_rc}{_mem}_seed*.pt, models/gru_channels{_rc}{_mem}.json,
 reports/gru_baseline{_Hh}{_swK}{_rc}{_mem}.json, reports/gru_test_predictions{_Hh}{_swK}{_rc}{_mem}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -9,7 +10,10 @@ reports/gru_baseline{_Hh}{_swK}{_rc}{_mem}.json, reports/gru_test_predictions{_H
 _mem only with --driver-memory, which adds decaying means of VBs and Newell;
 --sw-noise-aug LEVEL (off at 0, the default) adds K real-time like perturbed copies of the
 training years, see oculstorm/augment.py, and the tag _swnLEVEL after the other tags;
-scaling statistics, validation and test stay those of the clean table)
+scaling statistics, validation and test stay those of the clean table;
+--validation-only, --backtest-shift S and --fixed-epochs N [--lr-drops E ...] write nothing and
+never read the test years: the refit backtest of issue 44 fits up to S years before validation
+and early stops on those S years, or trains all train years N epochs with a replayed schedule)
 """
 import argparse
 import json
@@ -26,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from oculstorm.augment import train_copies  # noqa: E402
-from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
+from oculstorm.data import TEST_START, VAL_START, backtest_split, backtest_start, load_hourly, split  # noqa: E402
 from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, suffix, weight_tag  # noqa: E402
 from oculstorm.gru import DstGRU  # noqa: E402
 from oculstorm.metrics import evaluate, rmse, storm_weights  # noqa: E402
@@ -49,11 +53,18 @@ def predict(model: nn.Module, windows: np.ndarray, rows: np.ndarray) -> np.ndarr
     return np.concatenate(out)
 
 
-def train_one(seed: int, windows: np.ndarray, parts: dict[str, pd.DataFrame], scale: float, peak: float = 1.0) -> tuple[nn.Module, dict]:
+def train_one(
+    seed: int, windows: np.ndarray, parts: dict[str, pd.DataFrame], scale: float, peak: float = 1.0,
+    fixed_epochs: int | None = None, lr_drops: tuple[int, ...] = (),
+) -> tuple[nn.Module, dict]:
     """Train one seed with early stopping on validation RMSE. Targets are delta / scale.
 
     With `peak` > 1 storm hours weigh more, in the loss and in the validation RMSE used for
-    early stopping alike.
+    early stopping alike. The result records the best epoch and `lr_drops`, the epochs after
+    which ReduceLROnPlateau halved the learning rate.
+    With `fixed_epochs` N (issue 44) the model trains exactly N epochs without looking at
+    parts["val"] (which may be absent), halves the learning rate after each epoch in `lr_drops`
+    (the schedule replayed from an early stopped run) and keeps the last state.
     """
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
@@ -62,15 +73,13 @@ def train_one(seed: int, windows: np.ndarray, parts: dict[str, pd.DataFrame], sc
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=0.5, patience=2)
     loss_fn = nn.HuberLoss(delta=3.0, reduction="none")  # robust to the rare, very large storm-time jumps
 
-    tr, va = parts["train"], parts["val"]
+    tr = parts["train"]
     tr_rows = tr["row"].to_numpy()
     tr_target = ((tr["dst_target"] - tr["dst_lag0"]) / scale).to_numpy("float32")
     tr_weight = storm_weights(tr["dst_target"], peak).astype("float32")
-    va_delta = (va["dst_target"] - va["dst_lag0"]).to_numpy()
-    va_weight = storm_weights(va["dst_target"], peak)
 
-    best, best_state, bad, history = np.inf, None, 0, []
-    for epoch in range(1, MAX_EPOCHS + 1):
+    best, best_state, bad, history, best_epoch, drops = np.inf, None, 0, [], 0, []
+    for epoch in range(1, (fixed_epochs or MAX_EPOCHS) + 1):
         model.train()
         order = rng.permutation(len(tr_rows))
         for start in range(0, len(order), BATCH):
@@ -82,19 +91,32 @@ def train_one(seed: int, windows: np.ndarray, parts: dict[str, pd.DataFrame], sc
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimiser.step()
-        val_error = va_delta - predict(model, windows, va["row"].to_numpy()) * scale
+        if fixed_epochs:
+            if epoch in lr_drops:
+                for group in optimiser.param_groups:
+                    group["lr"] *= 0.5
+            continue
+        va = parts["val"]
+        va_weight = storm_weights(va["dst_target"], peak)
+        val_error = (va["dst_target"] - va["dst_lag0"]).to_numpy() - predict(model, windows, va["row"].to_numpy()) * scale
         val_rmse = float(np.sqrt(np.average(val_error**2, weights=va_weight)))
+        lr = optimiser.param_groups[0]["lr"]
         scheduler.step(val_rmse)
+        if optimiser.param_groups[0]["lr"] < lr:
+            drops.append(epoch)
         history.append(round(val_rmse, 4))
         if val_rmse < best - 1e-4:
-            best, bad = val_rmse, 0
+            best, bad, best_epoch = val_rmse, 0, epoch
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
         else:
             bad += 1
             if bad >= PATIENCE:
                 break
+    if fixed_epochs:
+        return model, {"seed": seed, "epochs": epoch, "lr_drops": [e for e in lr_drops if e < epoch]}
     model.load_state_dict(best_state)
-    return model, {"seed": seed, "epochs": epoch, "best_val_rmse": round(best, 4), "val_rmse_history": history}
+    return model, {"seed": seed, "epochs": epoch, "best_epoch": best_epoch, "lr_drops": drops,
+                   "best_val_rmse": round(best, 4), "val_rmse_history": history}
 
 
 def add_train_copies(
@@ -116,6 +138,53 @@ def add_train_copies(
     return windows, dict(zip(["train", "val", "test"], split(meta)))
 
 
+def backtest_parts(
+    df: pd.DataFrame, horizon: int = HORIZON, shift: int = 0, ring_current: bool = False, memory: tuple[float, ...] = (),
+) -> tuple[np.ndarray, dict[str, pd.DataFrame]]:
+    """Windows and parts of a validation only run: train, val (early stopping) and score.
+
+    The table is cut at TEST_START, whose Dst is only the target of the last validation hour,
+    so no test year is read. Without `shift` train is the train years, val and score are the
+    validation years, as in production. With `shift` S (issue 44) the fit ends S years before
+    VAL_START, val is those S years, score is the validation years, and the scaling statistics
+    come from the fit years alone.
+    """
+    df = df[df.index <= pd.Timestamp(TEST_START)]
+    end = backtest_start(shift) if shift else VAL_START
+    stats = channel_stats(df, ring_current, memory, end=end)
+    windows, meta = build_windows(df, stats, horizon=horizon, ring_current=ring_current, memory=memory)
+    if shift:
+        train, val, score = backtest_split(meta, shift)
+    else:
+        train, val, _ = split(meta)
+        score = val
+    return windows, {"train": train, "val": val, "score": score}
+
+
+def validation_run(args: argparse.Namespace, df: pd.DataFrame) -> list[np.ndarray]:
+    """Train the seeds without writing anything and print validation scores; never sees the test years."""
+    h, peak = args.horizon, args.storm_weight
+    memory = MEMORY_TAUS if args.driver_memory else ()
+    windows, parts = backtest_parts(df, h, args.backtest_shift, args.ring_current, memory)
+    scale = float((parts["train"]["dst_target"] - parts["train"]["dst_lag0"]).std())
+    sc = parts["score"]
+    sc_rows, sc_lag0 = sc["row"].to_numpy(), sc["dst_lag0"].to_numpy()
+    print(f"validation only: fit {parts['train'].index.min():%Y-%m-%d} .. {parts['train'].index.max():%Y-%m-%d}, "
+          + ("no early stopping" if args.fixed_epochs else f"early stopping {parts['val'].index.min():%Y-%m-%d} .. {parts['val'].index.max():%Y-%m-%d}")
+          + f", scored {sc.index.min():%Y-%m-%d} .. {sc.index.max():%Y-%m-%d}")
+    preds = []
+    for seed in args.seeds:
+        started = time.time()
+        model, info = train_one(seed, windows, parts, scale, peak, args.fixed_epochs or None, tuple(args.lr_drops))
+        preds.append(sc_lag0 + predict(model, windows, sc_rows) * scale)
+        info["seconds"] = round(time.time() - started)
+        print({k: v for k, v in info.items() if k != "val_rmse_history"})
+    scores = evaluate(sc["dst_target"], {"persistence": sc_lag0, f"gru (mean of {len(preds)} seeds)": np.mean(preds, axis=0)})
+    print("\nValidation:")
+    print(scores.round(4).to_string(index=False))
+    return preds
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--horizon", type=int, default=HORIZON, choices=HORIZONS, help="hours ahead")
@@ -127,7 +196,27 @@ def main() -> None:
                         help="add real-time like perturbed copies of the training years; 1 is the recipe of issue 24, 0 (default) is off")
     parser.add_argument("--sw-noise-copies", type=int, default=1, help="perturbed copies of the training years added with --sw-noise-aug")
     parser.add_argument("--sw-noise-seed", type=int, default=0, help="seed of the first perturbed copy")
+    parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never read the test years")
+    parser.add_argument("--backtest-shift", type=int, default=0, metavar="S",
+                        help="fit up to S years before validation and early stop on those S years (0 = off); implies --validation-only")
+    parser.add_argument("--fixed-epochs", type=int, default=0, metavar="N",
+                        help="train all train years exactly N epochs, no early stopping (0 = off); implies --validation-only")
+    parser.add_argument("--lr-drops", type=int, nargs="*", default=[], metavar="E",
+                        help="with --fixed-epochs: halve the learning rate after these epochs")
+    parser.add_argument("--seeds", type=int, nargs="+", default=SEEDS, help="seeds of a validation only run")
     args = parser.parse_args()
+    if args.backtest_shift and args.fixed_epochs:
+        parser.error("--backtest-shift and --fixed-epochs are separate runs")
+    if args.lr_drops and not args.fixed_epochs:
+        parser.error("--lr-drops needs --fixed-epochs")
+    if args.backtest_shift or args.fixed_epochs or args.validation_only:
+        if args.sw_noise_aug:
+            parser.error("a validation only run takes no augmentation")
+        if args.backtest_shift:
+            backtest_start(args.backtest_shift)  # raises on a shift that leaves no fit years
+        torch.set_num_threads(4)
+        validation_run(args, load_hourly())
+        return
     h, peak = args.horizon, args.storm_weight
     noise = args.sw_noise_aug if args.sw_noise_copies > 0 else 0.0
     noise_tag = f"_swn{noise:g}" if noise > 0 else ""

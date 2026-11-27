@@ -5,6 +5,7 @@ Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-curr
        [--colsample-bytree C] [--n-estimators T] [--seed S] [--objective {squarederror,pseudohuber,absolute}]
        [--huber-slope D] [--dst-offset-aug K] [--sw-noise-aug LEVEL] [--sw-noise-copies K]
        [--sw-noise-seed S] [--dst-skip S] [--dst-newest-noise K] [--validation-only]
+       [--backtest-shift S] [--fixed-trees N]
 Writes: models/xgb_dst_{H}h{_swK}{variant}.ubj, reports/xgb_baseline{_Hh}{_swK}{variant}.json,
 reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -19,7 +20,10 @@ an AR(1) error and adds _nnK.
 --sw-noise-aug LEVEL (off at 0, the default) adds K real-time like perturbed copies of the
 training years, see oculstorm/augment.py, and the tag _swnLEVEL; validation and test stay clean.
 --validation-only fits, prints the validation scores and writes nothing; the test years are
-not predicted)
+not predicted;
+--backtest-shift S and --fixed-trees N are the refit backtest of issue 44 and imply --validation-only:
+the first fits on the train years up to S years before validation and early stops on those S years,
+the second fits on all train years with N trees and no early stopping; both are scored on validation)
 """
 import argparse
 import json
@@ -34,7 +38,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from oculstorm.augment import consistent_rows, newest_hour_error, offset_table, train_copies  # noqa: E402
-from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
+from oculstorm.data import TEST_START, VAL_START, backtest_split, backtest_start, load_hourly, split  # noqa: E402
 from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, N_LAGS, build_features, suffix, weight_tag  # noqa: E402
 from oculstorm.metrics import evaluate, persistence, storm_weights, trend_persistence  # noqa: E402
 
@@ -111,7 +115,7 @@ def noisy_copies(df: pd.DataFrame, copies: int, horizon: int, n_lags: int = N_LA
 
 def fit(
     X: pd.DataFrame, y: pd.Series, peak: float = 1.0, params: dict | None = None, test: bool = True,
-    extra: list[tuple[pd.DataFrame, pd.Series]] | None = None,
+    extra: list[tuple[pd.DataFrame, pd.Series]] | None = None, backtest_shift: int = 0, fixed_trees: int | None = None,
 ) -> tuple[xgb.XGBRegressor, np.ndarray, np.ndarray | None]:
     """Fit on train, early stop on validation, return the model and validation and test predictions.
 
@@ -122,19 +126,46 @@ def fit(
     `extra` holds more (X, y) training rows, for example the Dst offset copies of offset_copies,
     perturbed solar wind copies of the training years or the newest hour copies of noisy_copies;
     only their rows before VAL_START are used and validation and test are never extended.
+    With `backtest_shift` S > 0 (issue 44) the fit ends S years before VAL_START and early stopping
+    uses those S years, so the validation years are scored by a model that never saw them.
+    With `fixed_trees` N the model is fitted on all training years with exactly N trees, without
+    an eval set and without early stopping. Both options predict the validation years only.
     """
+    if backtest_shift and fixed_trees:
+        raise ValueError("backtest_shift and fixed_trees are separate runs of the backtest")
+    if backtest_shift or fixed_trees:
+        if extra:
+            raise ValueError("the backtest options take no extra training rows")
+        test = False
     delta = y - X["dst_lag0"]
     (X_tr, X_va, X_te), (d_tr, d_va, _), (y_tr, y_va, _) = split(X), split(delta), split(y)
     for X_more, y_more in extra or []:
         X_more, y_more = split(X_more)[0][X_tr.columns], split(y_more)[0]
         X_tr, y_tr = pd.concat([X_tr, X_more]), pd.concat([y_tr, y_more])
         d_tr = pd.concat([d_tr, y_more - X_more["dst_lag0"]])
-    model = xgb.XGBRegressor(**(PARAMS if params is None else params))
-    model.fit(X_tr, d_tr, sample_weight=storm_weights(y_tr, peak), eval_set=[(X_va, d_va)],
-              sample_weight_eval_set=[storm_weights(y_va, peak)], verbose=False)
+    params = PARAMS if params is None else params
+    if fixed_trees:
+        params = {k: v for k, v in params.items() if k != "early_stopping_rounds"} | {"n_estimators": fixed_trees}
+        model = xgb.XGBRegressor(**params)
+        model.fit(X_tr, d_tr, sample_weight=storm_weights(y_tr, peak), verbose=False)
+    else:
+        X_es, d_es, y_es = X_va, d_va, y_va
+        if backtest_shift:
+            (X_tr, X_es, _), (d_tr, d_es, _), (y_tr, y_es, _) = (backtest_split(f, backtest_shift) for f in (X, delta, y))
+        model = xgb.XGBRegressor(**params)
+        model.fit(X_tr, d_tr, sample_weight=storm_weights(y_tr, peak), eval_set=[(X_es, d_es)],
+                  sample_weight_eval_set=[storm_weights(y_es, peak)], verbose=False)
     val_pred = X_va["dst_lag0"].to_numpy() + model.predict(X_va)
     test_pred = X_te["dst_lag0"].to_numpy() + model.predict(X_te) if test else None
     return model, val_pred, test_pred
+
+
+def n_trees(model: xgb.XGBRegressor) -> int:
+    """Trees the model predicts with: best_iteration + 1 after early stopping, else all of them."""
+    try:
+        return int(model.best_iteration + 1)
+    except AttributeError:
+        return int(model.get_booster().num_boosted_rounds())
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -159,6 +190,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dst-newest-noise", type=int, default=0, metavar="K", choices=range(len(NOISE_LEVELS) + 1),
                         help="train on K extra copies of the train years with an AR(1) error on the newest Dst hour (0 = off)")
     parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never predict the test years")
+    parser.add_argument("--backtest-shift", type=int, default=0, metavar="S",
+                        help="fit on the train years up to S years before validation and early stop on those S years (0 = off); implies --validation-only")
+    parser.add_argument("--fixed-trees", type=int, default=0, metavar="N",
+                        help="fit on all train years with exactly N trees, no early stopping (0 = off); implies --validation-only")
     return parser
 
 
@@ -169,6 +204,14 @@ def main() -> None:
         parser.error("--ring-current cannot be combined with --dst-skip or --dst-newest-noise")
     if args.dst_skip and (args.dst_newest_noise or args.dst_offset_aug):
         parser.error("--dst-skip cannot be combined with --dst-newest-noise or --dst-offset-aug")
+    if args.backtest_shift and args.fixed_trees:
+        parser.error("--backtest-shift and --fixed-trees are separate runs")
+    backtest = args.backtest_shift or args.fixed_trees
+    if backtest and (args.dst_offset_aug or args.sw_noise_aug or args.dst_newest_noise):
+        parser.error("--backtest-shift and --fixed-trees take no augmentation")
+    if args.backtest_shift:
+        backtest_start(args.backtest_shift)  # raises on a shift that leaves no fit years
+    args.validation_only = args.validation_only or bool(backtest)
     skip, newest = args.dst_skip, args.dst_newest_noise
     h, peak, n_lags = args.horizon, args.storm_weight, args.n_lags
     params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}, **objective_params(args.objective, args.huber_slope)}
@@ -202,8 +245,11 @@ def main() -> None:
     extra = offset + noisy + newest_rows
 
     if args.validation_only:
-        model, val_pred, _ = fit(X, y, peak, params, test=False, extra=extra)
-        print(f"trees: {model.best_iteration + 1} of {params['n_estimators']}")
+        model, val_pred, _ = fit(X, y, peak, params, test=False, extra=extra,
+                                 backtest_shift=args.backtest_shift, fixed_trees=args.fixed_trees or None)
+        if args.backtest_shift:
+            print(f"backtest: fit before {backtest_start(args.backtest_shift):%Y-%m-%d}, early stopping until {VAL_START}, scored on validation")
+        print(f"trees: {n_trees(model)} of {args.fixed_trees or params['n_estimators']}")
         val_scores = evaluate(y_va, {"persistence": persistence(X_va), "xgboost (solar wind + Dst)": val_pred})
         print("\nValidation:")
         print(val_scores.round(4).to_string(index=False))

@@ -71,3 +71,53 @@ def test_main_validation_only_runs_with_a_robust_objective(monkeypatch, capsys):
         train_xgb.main()
         out = capsys.readouterr().out
         assert "reg:" in out and "Validation:" in out
+
+
+def _long_frame() -> tuple[pd.DataFrame, pd.Series]:
+    hours = pd.date_range("2011-06-01", "2021-01-10", freq="6h")
+    rng = np.random.default_rng(1)
+    dst = pd.Series(-20 + 30 * np.sin(np.arange(len(hours)) / 7) + rng.normal(0, 2, len(hours)), index=hours)
+    X = pd.DataFrame({"dst_lag0": dst, "dst_lag1": dst.shift(1)}, index=hours).astype("float32")
+    y = dst.shift(-1).rename("dst_target")
+    keep = y.notna()
+    return X[keep], y[keep]
+
+
+def test_backtest_split_keeps_validation_and_test_out_of_fit_and_early_stopping():
+    X, _ = _long_frame()
+    fit_rows, early_rows, scored = train_xgb.backtest_split(X, 4)
+    assert fit_rows.index.max() < pd.Timestamp("2013-01-01") <= early_rows.index.min()
+    assert early_rows.index.max() < pd.Timestamp(train_xgb.VAL_START) <= scored.index.min()
+    assert scored.index.max() < pd.Timestamp(train_xgb.TEST_START)
+
+
+def test_backtest_defaults_are_off():
+    args = train_xgb.build_parser().parse_args([])
+    assert args.backtest_shift == 0 and args.fixed_trees == 0
+
+
+def test_backtest_options_never_see_the_scored_or_test_targets():
+    X, y = _long_frame()
+    params = {**train_xgb.PARAMS, "n_estimators": 20, "early_stopping_rounds": 3}
+    hidden = y.copy()
+    hidden[hidden.index >= train_xgb.VAL_START] = 500.0  # validation and test targets changed
+    for options in ({"backtest_shift": 4}, {"fixed_trees": 7}):
+        model, val_pred, test_pred = train_xgb.fit(X, y, params=params, **options)
+        _, val_hidden, _ = train_xgb.fit(X, hidden, params=params, **options)
+        assert test_pred is None
+        assert len(val_pred) == len(train_xgb.split(X)[1])
+        np.testing.assert_array_equal(val_pred, val_hidden)
+    assert train_xgb.n_trees(model) == 7
+
+
+def test_backtest_early_stopping_ignores_the_years_it_scores():
+    X, y = _long_frame()
+    params = {**train_xgb.PARAMS, "n_estimators": 20, "early_stopping_rounds": 3}
+    model, _, _ = train_xgb.fit(X, y, params=params, backtest_shift=4)
+    early = train_xgb.backtest_split(X, 4)[1]
+    assert len(model.evals_result()["validation_0"]["rmse"]) >= train_xgb.n_trees(model)
+    hidden = y.copy()
+    hidden[(hidden.index >= train_xgb.VAL_START)] = 500.0
+    model_hidden, _, _ = train_xgb.fit(X, hidden, params=params, backtest_shift=4)
+    assert train_xgb.n_trees(model_hidden) == train_xgb.n_trees(model)
+    assert len(early) > 0

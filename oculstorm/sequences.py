@@ -34,11 +34,15 @@ def _memory_in(stats: dict) -> tuple[float, ...]:
 
 
 def channel_stats(
-    df: pd.DataFrame, ring_current: bool = False, memory: tuple[float, ...] = ()
+    df: pd.DataFrame, ring_current: bool = False, memory: tuple[float, ...] = (), end=VAL_START,
 ) -> dict[str, dict[str, float]]:
-    """Mean and standard deviation of every scaled channel over the training years only."""
+    """Mean and standard deviation of every scaled channel over the training years only.
+
+    `end` (exclusive) defaults to VAL_START; a backtest that fits on fewer years passes the
+    end of its fit years, so its early stopping years do not shape the scaling either.
+    """
     train = _raw_channels(df, ring_current, memory)
-    train = train[train.index < VAL_START]
+    train = train[train.index < end]
     return {"mean": train.mean().to_dict(), "std": train.std().to_dict()}
 
 
