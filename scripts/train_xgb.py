@@ -4,7 +4,7 @@ Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-curr
        [--n-lags N] [--max-depth D] [--min-child-weight W] [--learning-rate R] [--subsample S]
        [--colsample-bytree C] [--n-estimators T] [--seed S] [--objective {squarederror,pseudohuber,absolute}]
        [--huber-slope D] [--dst-offset-aug K] [--sw-noise-aug LEVEL] [--sw-noise-copies K]
-       [--sw-noise-seed S] [--validation-only]
+       [--sw-noise-seed S] [--dst-skip S] [--dst-newest-noise K] [--validation-only]
 Writes: models/xgb_dst_{H}h{_swK}{variant}.ubj, reports/xgb_baseline{_Hh}{_swK}{variant}.json,
 reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -12,6 +12,10 @@ reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 --driver-memory adds decaying means of VBs and Newell and the tag _mem;
 a lag count other than N_LAGS adds _lN and any other model option that differs from PARAMS
 adds _hp, and --dst-offset-aug K adds _oaK, so a tuned run never overwrites the production files.
+--dst-skip S ends the Dst history at t-S and adds _dsS: persistence and the learned change then
+start from Dst(t-S), so the persistence rows are S+H hour persistence;
+--dst-newest-noise K trains on K extra copies of the train years whose newest Dst hour carries
+an AR(1) error and adds _nnK.
 --sw-noise-aug LEVEL (off at 0, the default) adds K real-time like perturbed copies of the
 training years, see oculstorm/augment.py, and the tag _swnLEVEL; validation and test stay clean.
 --validation-only fits, prints the validation scores and writes nothing; the test years are
@@ -29,7 +33,7 @@ import xgboost as xgb
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from oculstorm.augment import consistent_rows, offset_table, train_copies  # noqa: E402
+from oculstorm.augment import consistent_rows, newest_hour_error, offset_table, train_copies  # noqa: E402
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
 from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, N_LAGS, build_features, suffix, weight_tag  # noqa: E402
 from oculstorm.metrics import evaluate, persistence, storm_weights, trend_persistence  # noqa: E402
@@ -86,6 +90,25 @@ def offset_copies(df: pd.DataFrame, copies: int, horizon: int, ring_current: boo
     return pd.concat([p[0] for p in parts]), pd.concat([p[1] for p in parts])
 
 
+NOISE_LEVELS = (1.0, 0.5)  # share of the newest hour error in the first and the second noisy copy
+
+
+def noisy_copies(df: pd.DataFrame, copies: int, horizon: int, n_lags: int = N_LAGS, seed: int = 1, memory: tuple[float, ...] = ()) -> tuple[pd.DataFrame, pd.Series]:
+    """Train years of `copies` copies whose newest Dst hour carries an AR(1) error (issue 30), features and target.
+
+    Copy k uses NOISE_LEVELS[k] of the error. Only the Dst(t) seen from row t is wrong; the
+    older lags and the target are clean. Only rows before the validation years are returned.
+    """
+    if not 0 <= copies <= len(NOISE_LEVELS):
+        raise ValueError(f"at most {len(NOISE_LEVELS)} noisy copies")
+    parts = []
+    for k in range(copies):
+        error = newest_hour_error(df.index, seed + k, NOISE_LEVELS[k])
+        X_k, y_k = build_features(df, horizon=horizon, n_lags=n_lags, memory=memory, newest_dst_error=error)
+        parts.append((split(X_k)[0], split(y_k)[0]))
+    return pd.concat([p[0] for p in parts]), pd.concat([p[1] for p in parts])
+
+
 def fit(
     X: pd.DataFrame, y: pd.Series, peak: float = 1.0, params: dict | None = None, test: bool = True,
     extra: list[tuple[pd.DataFrame, pd.Series]] | None = None,
@@ -96,9 +119,9 @@ def fit(
     persistence and anything it learns is skill on top of it. With `peak` > 1 storm hours
     weigh more in the loss, on validation as well, so early stopping follows the same goal.
     `params` defaults to PARAMS. With test=False the test years are not predicted (None).
-    `extra` holds more (X, y) training rows, for example the Dst offset copies of offset_copies
-    or perturbed solar wind copies of the training years; only their rows before VAL_START are
-    used and validation and test are never extended.
+    `extra` holds more (X, y) training rows, for example the Dst offset copies of offset_copies,
+    perturbed solar wind copies of the training years or the newest hour copies of noisy_copies;
+    only their rows before VAL_START are used and validation and test are never extended.
     """
     delta = y - X["dst_lag0"]
     (X_tr, X_va, X_te), (d_tr, d_va, _), (y_tr, y_va, _) = split(X), split(delta), split(y)
@@ -132,12 +155,21 @@ def build_parser() -> argparse.ArgumentParser:
                         help="add real-time like perturbed copies of the training years; 1 is the recipe of issue 24, 0 (default) is off")
     parser.add_argument("--sw-noise-copies", type=int, default=1, help="perturbed copies of the training years added with --sw-noise-aug")
     parser.add_argument("--sw-noise-seed", type=int, default=0, help="seed of the first perturbed copy")
+    parser.add_argument("--dst-skip", type=int, default=0, metavar="S", help="end the Dst history at t-S instead of t (0 = off)")
+    parser.add_argument("--dst-newest-noise", type=int, default=0, metavar="K", choices=range(len(NOISE_LEVELS) + 1),
+                        help="train on K extra copies of the train years with an AR(1) error on the newest Dst hour (0 = off)")
     parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never predict the test years")
     return parser
 
 
 def main() -> None:
-    args = build_parser().parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
+    if args.ring_current and (args.dst_skip or args.dst_newest_noise):
+        parser.error("--ring-current cannot be combined with --dst-skip or --dst-newest-noise")
+    if args.dst_skip and (args.dst_newest_noise or args.dst_offset_aug):
+        parser.error("--dst-skip cannot be combined with --dst-newest-noise or --dst-offset-aug")
+    skip, newest = args.dst_skip, args.dst_newest_noise
     h, peak, n_lags = args.horizon, args.storm_weight, args.n_lags
     params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}, **objective_params(args.objective, args.huber_slope)}
     rc = "_rc" if args.ring_current else ""
@@ -146,9 +178,10 @@ def main() -> None:
     variant = rc + ("_mem" if memory else "") + (f"_l{n_lags}" if n_lags != N_LAGS else "") + ("_hp" if params != PARAMS else "")
     variant += f"_oa{args.dst_offset_aug}" if args.dst_offset_aug else ""
     variant += f"_swn{noise:g}" if noise > 0 else ""
+    variant += (f"_ds{skip}" if skip else "") + (f"_nn{newest}" if newest else "")
     tag = suffix(h) + weight_tag(peak) + variant
     df = load_hourly()
-    X, y = build_features(df, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory)
+    X, y = build_features(df, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, dst_skip=skip)
     (_, X_va, X_te), (_, y_va, y_te) = split(X), split(y)
     print(f"horizon: {h}h  storm weight: {peak:g}  ring current: {args.ring_current}  lags: {n_lags}  features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}")
     if params != PARAMS:
@@ -157,11 +190,16 @@ def main() -> None:
     offset = [offset_copies(df, args.dst_offset_aug, h, args.ring_current, n_lags, memory=memory)] if args.dst_offset_aug else []
     if offset:
         print(f"offset augmentation: {args.dst_offset_aug} copies, {len(offset[0][0]):,} extra train rows")
-    noisy = [build_features(copy, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory)
+    noisy = [build_features(copy, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, dst_skip=skip)
              for copy in train_copies(df, noise, args.sw_noise_copies, args.sw_noise_seed)]
     if noisy:
         print(f"solar wind noise: level {noise:g}, {len(noisy)} perturbed copies of the training years, {sum(len(x) for x, _ in noisy):,} extra rows")
-    extra = offset + noisy
+    newest_rows = [noisy_copies(df, newest, h, n_lags, memory=memory)] if newest else []
+    if newest_rows:
+        print(f"newest hour noise: {newest} copies, {len(newest_rows[0][0]):,} extra train rows")
+    if skip:
+        print(f"Dst history ends at t-{skip}: persistence below is Dst(t-{skip}), {skip + h} hours before the target")
+    extra = offset + noisy + newest_rows
 
     if args.validation_only:
         model, val_pred, _ = fit(X, y, peak, params, test=False, extra=extra)
@@ -171,9 +209,10 @@ def main() -> None:
         print(val_scores.round(4).to_string(index=False))
         return
 
-    X_dst, _ = build_features(df, use_solar_wind=False, horizon=h, n_lags=n_lags)
+    X_dst, _ = build_features(df, use_solar_wind=False, horizon=h, n_lags=n_lags, dst_skip=skip)
     model, val_pred, pred = fit(X, y, peak, params, extra=extra)
     extra_dst = [offset_copies(df, args.dst_offset_aug, h, False, n_lags)] if args.dst_offset_aug else []
+    extra_dst += newest_rows  # fit keeps only the Dst only columns
     model_dst, _, pred_dst = fit(X_dst, y, peak, params, extra=extra_dst)
     print(f"test: {len(X_te):,}  trees: full={model.best_iteration + 1}, dst-only={model_dst.best_iteration + 1}")
 
@@ -208,6 +247,8 @@ def main() -> None:
         "n_lags": n_lags,
         "dst_offset_aug": args.dst_offset_aug,
         "sw_noise_aug": {"level": noise, "copies": len(noisy), "seed": args.sw_noise_seed},
+        "dst_skip": skip,
+        "dst_newest_noise": newest,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
         "test": f"{TEST_START} .. {y_te.index.max()}",
