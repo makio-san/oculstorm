@@ -82,7 +82,8 @@ def _ring_current(df: pd.DataFrame) -> pd.DataFrame:
 def build_features(
     df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON,
     memory: tuple[float, ...] = (),
-    ring_current: bool = False, n_lags: int = N_LAGS, drop_plasma: bool = False,
+    ring_current: bool = False, n_lags: int = N_LAGS,
+    dst_skip: int = 0, newest_dst_error: pd.Series | None = None, drop_plasma: bool = False,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y) where y is Dst at t+horizon and X only looks backwards from t.
 
@@ -97,16 +98,32 @@ def build_features(
     With ring_current=True the O'Brien and McPherron (2000) terms are added (needs the solar wind).
     n_lags sets how many hours of history (lag 0 .. n_lags-1) the lag columns cover; the
     default N_LAGS is what the production models and the live forecast use.
+    dst_skip=S (issue 30) builds every Dst feature from Dst shifted by S hours, so the Dst
+    history of row t ends at t-S: dst_lag0 is Dst(t-S), and persistence and the learned change
+    start from that hour. Solar wind features and the target stay where they are. The default
+    0 is the production layout. Not available together with ring_current.
+    newest_dst_error (issue 30) is an error in nT, indexed like df, added to Dst(t) as seen
+    from row t only: dst_lag0, both differences and the 24 hour minimum and mean of row t see
+    the erroneous newest hour, while the older lags, the same hour seen from later rows and
+    the target stay clean. It imitates a quick-look value that is not settled when the
+    forecast is issued. None, the default, adds nothing.
     With drop_plasma=True the PLASMA_MOMENTS (density, temperature, pressure and sqrt pressure)
     are left out of the driver block; electric_field, the IMF and the speed stay. It cannot be
     combined with ring_current, whose terms need the pressure.
     """
     if n_lags < 1:
         raise ValueError("n_lags must be at least 1")
+    if dst_skip < 0:
+        raise ValueError("dst_skip must be 0 or more")
+    if ring_current and (dst_skip or newest_dst_error is not None):
+        raise ValueError("ring_current cannot be combined with dst_skip or newest_dst_error")
+    if dst_skip and newest_dst_error is not None:
+        raise ValueError("dst_skip and newest_dst_error cannot be combined")
     if drop_plasma and ring_current:
         raise ValueError("ring_current needs the pressure, so it cannot be used with drop_plasma")
     cols: dict[str, pd.Series] = {}
-    dst = df["dst"]
+    target_source = df["dst"]
+    dst = target_source.shift(dst_skip) if dst_skip else target_source
 
     for lag in range(n_lags):
         cols[f"dst_lag{lag}"] = dst.shift(lag)
@@ -114,6 +131,15 @@ def build_features(
     cols["dst_diff3"] = dst - dst.shift(3)
     cols["dst_min24"] = dst.rolling(24, min_periods=1).min()
     cols["dst_mean24"] = dst.rolling(24, min_periods=1).mean()
+    if newest_dst_error is not None:
+        error = newest_dst_error.reindex(df.index).astype("float64")
+        if error.isna().any():
+            raise ValueError("newest_dst_error must cover every hour of the table")
+        for name in ["dst_lag0", "dst_diff1", "dst_diff3"]:
+            cols[name] = cols[name] + error
+        # The window of row t is the clean hours t-23 .. t-1 and the erroneous hour t.
+        cols["dst_min24"] = np.fmin(dst + error, dst.shift(1).rolling(23, min_periods=1).min())
+        cols["dst_mean24"] = cols["dst_mean24"] + error / dst.rolling(24, min_periods=1).count()
 
     if use_solar_wind:
         drivers = pd.concat([df[SOLAR_WIND], _coupling(df)], axis=1)
@@ -146,7 +172,7 @@ def build_features(
     cols["doy_cos"] = pd.Series(np.cos(2 * np.pi * doy / 365.25), index=df.index)
 
     X = pd.DataFrame(cols).astype("float32")
-    y = dst.shift(-horizon).rename("dst_target")
+    y = target_source.shift(-horizon).rename("dst_target")
 
     keep = X["dst_lag0"].notna()
     if require_target:
