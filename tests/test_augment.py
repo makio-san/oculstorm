@@ -266,3 +266,83 @@ def test_copies_stay_in_the_train_years():
 
 def test_off_by_default():
     assert _script("train_xgb").build_parser().parse_args([]).dst_offset_aug == 0
+
+
+# Real-time like IMF and plasma gaps (issue 41)
+
+from oculstorm.augment import GAP_MODELS, IMF_COLUMNS, PLASMA_COLUMNS, blank_gaps, gap_copies, gap_mask  # noqa: E402
+from oculstorm.features import AGE_CAP, observation_age  # noqa: E402
+
+
+def _runs(mask: np.ndarray) -> np.ndarray:
+    edges = np.diff(np.concatenate([[0], mask.astype(int), [0]]))
+    return np.flatnonzero(edges == -1) - np.flatnonzero(edges == 1)
+
+
+@pytest.mark.parametrize("block, share, short", [("imf", 0.1862, 0.2212), ("plasma", 0.2695, 0.4011)])
+def test_gap_masks_match_the_issue_31_rates_and_lengths(block, share, short):
+    model = GAP_MODELS[block]
+    mask = gap_mask(400_000, model, np.random.default_rng(1))
+    runs = _runs(mask)
+    assert abs(mask.mean() - share) < 0.01
+    assert abs(runs[runs <= 3].sum() / runs.sum() - short) < 0.02
+    assert abs(runs.mean() - model["mean_gap"]) < 0.1
+    assert runs.max() <= model["longest"]
+    half = gap_mask(400_000, model, np.random.default_rng(1), rate=0.5)
+    assert abs(half.mean() - share / 2) < 0.01
+    assert not gap_mask(1000, model, np.random.default_rng(1), rate=0.0).any()
+
+
+def test_blank_gaps_only_removes_values_and_keeps_the_blocks_apart():
+    df = _table("2010-01-01", "2012-01-01")
+    pd.testing.assert_frame_equal(blank_gaps(df, rate=0.0, seed=2), df)
+    out = blank_gaps(df, seed=2)
+    assert out.index.equals(df.index) and out.dtypes.equals(df.dtypes)
+    pd.testing.assert_frame_equal(out[["dst", "f107"]], df[["dst", "f107"]])
+    seen = out.notna()
+    pd.testing.assert_frame_equal(out[seen], df[seen])  # every value left is the clean one
+    imf, plasma = out["bz_gsm"].isna(), out["flow_speed"].isna()
+    assert out.loc[imf, IMF_COLUMNS].isna().all().all() and out.loc[plasma, PLASMA_COLUMNS].isna().all().all()
+    assert out.loc[~imf, ["bz_gsm", "by_gsm", "b_mag_avg"]].notna().all().all()
+    assert out.loc[~plasma, ["flow_speed", "proton_density", "proton_temp", "flow_pressure"]].notna().all().all()
+    assert (out["electric_field"].isna() == (imf | plasma)).all()
+    assert 0.15 < imf.mean() < 0.22 and 0.23 < plasma.mean() < 0.31
+    assert 0.02 < (imf & ~plasma).mean() and 0.02 < (plasma & ~imf).mean()  # independent masks
+    with pytest.raises(ValueError):
+        blank_gaps(df, rate=-1.0)
+
+
+def test_blank_gaps_up_to_t_does_not_depend_on_the_future():
+    df = _table()
+    cut = df.index[len(df) // 2]
+    out = blank_gaps(df, seed=7)
+    pd.testing.assert_frame_equal(blank_gaps(df[df.index <= cut], seed=7), out[out.index <= cut])
+    corrupted = df.copy()
+    corrupted.loc[corrupted.index > cut, SW_COLUMNS] = np.nan
+    pd.testing.assert_frame_equal(blank_gaps(corrupted, seed=7)[out.index <= cut], out[out.index <= cut])
+
+
+def test_observation_age_counts_back_from_t_only():
+    hours = pd.date_range("2016-01-01", periods=10, freq="h")
+    observed = pd.Series([False, True, True, False, False, False, True, False, False, False], index=hours)
+    age = observation_age(observed, cap=2)
+    assert age.tolist() == [2, 0, 0, 1, 2, 2, 0, 1, 2, 2]
+    # Changing hours after t never changes the age at t.
+    for t in range(len(observed)):
+        flipped = observed.copy()
+        flipped.iloc[t + 1 :] = ~flipped.iloc[t + 1 :]
+        assert observation_age(flipped, cap=2).iloc[: t + 1].equals(age.iloc[: t + 1])
+    df = blank_gaps(_table(), seed=3)
+    X, _ = build_features(df, gap_age=True)
+    assert X["imf_age"].max() <= AGE_CAP and (X["imf_age"] > 0).mean() > 0.1
+    assert ((X["plasma_age"] == 0) == df["flow_speed"].notna().reindex(X.index)).all()
+
+
+def test_gap_copies_hold_training_hours_only_and_are_off_by_default():
+    df = _table("2016-10-01", "2021-03-01")
+    assert gap_copies(df, copies=0) == [] and gap_copies(df, copies=2, rate=0.0) == []
+    copies = gap_copies(df, copies=2, seed=4)
+    for copy in copies:
+        assert copy.index.equals(df.index[df.index < VAL_START])
+    assert not copies[0]["bz_gsm"].isna().equals(copies[1]["bz_gsm"].isna())
+    pd.testing.assert_frame_equal(copies[1], blank_gaps(df[df.index < VAL_START], 1.0, 5))

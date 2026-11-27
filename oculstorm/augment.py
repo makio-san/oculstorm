@@ -1,4 +1,4 @@
-"""Training set augmentations of the hourly table. Both are off by default.
+"""Training set augmentations of the hourly table. All are off by default.
 
 Dst baseline offset augmentation (issue 23). Quick-look Dst has a quiet time baseline that
 drifts by tens of nT, while the models learn a recovery toward the final Dst baseline.
@@ -14,6 +14,12 @@ training years can be seen a second time the way a live feed would show them. No
 looks ahead: the perturbed solar wind at hour t is made from the clean values at hour t or at
 hour t-1 (a delay, never an advance) and from random numbers. Dst, F10.7 and every other column
 are left alone.
+
+Real-time like IMF and plasma gaps (experiment, issue 41). The real-time feed loses the field
+and the plasma instrument separately, often for hours at a time, which OMNI almost never does.
+`blank_gaps` removes spans of each block from a copy of the table at the rates and lengths
+measured in issue 31, without any noise, so XGBoost learns its missing value branches on
+gaps that look like the live ones.
 """
 import numpy as np
 import pandas as pd
@@ -146,3 +152,103 @@ def train_copies(df: pd.DataFrame, level: float, copies: int = 1, seed: int = 0)
         return []
     train = df[df.index < VAL_START]
     return [perturb_solar_wind(train, level, seed + k) for k in range(copies)]
+
+
+# Real-time like IMF and plasma gaps (issue 41)
+#
+# Issue 31 (reports/experiments/31-realtime-ace-inputs.json, "coverage") measured the real-time
+# ACE gaps on the validation years 2017 to 2020 (35,064 hours): IMF 18.62% of hours missing in
+# 1,629 gaps, 22.12% of the missing hours in gaps of at most 3 hours, longest 145 hours; plasma
+# 26.95% in 3,641 gaps, 40.11% in gaps of at most 3 hours, longest 23 hours. Only these summary
+# numbers are used here, never the validation mask itself.
+
+IMF_COLUMNS = ["bz_gsm", "by_gsm", "b_mag_avg", "electric_field"]
+PLASMA_COLUMNS = ["flow_speed", "proton_density", "proton_temp", "flow_pressure", "electric_field"]
+SHORT_DECAY = 0.5  # gaps of 1, 2 and 3 hours have weights 1, 0.5, 0.25 (an assumption, not measured)
+VALIDATION_HOURS = 35064  # hours of 2017 to 2020, the base of the issue 31 counts
+
+
+def gap_model(missing_share: float, gaps: int, short_share: float, longest: int, hours: int = VALIDATION_HOURS) -> dict:
+    """Gap length model of one block, matched to the measured mean length and short gap share.
+
+    A gap is 1 to 3 hours long with probability `p_short` (weights SHORT_DECAY**k), otherwise
+    4 hours plus a geometric tail, capped at `longest`. `p_short` and the mean long length are
+    solved so that the mean gap length (missing hours / gaps) and the share of missing hours
+    in gaps of at most 3 hours equal the measured ones.
+    """
+    mean_gap = missing_share * hours / gaps
+    w = SHORT_DECAY ** np.arange(3)
+    short_mean = float(np.dot(np.arange(1, 4), w) / w.sum())
+    p_short = short_share * mean_gap / short_mean
+    long_mean = (mean_gap - p_short * short_mean) / (1 - p_short)
+    if not (0 < p_short < 1 and long_mean > 4):
+        raise ValueError("gap statistics cannot be matched by the mixture")
+    return {
+        "missing_share": missing_share, "mean_gap": mean_gap, "p_short": p_short,
+        "short_weights": w / w.sum(), "long_mean": long_mean, "longest": longest,
+    }
+
+
+GAP_MODELS = {
+    "imf": gap_model(0.1862, 1629, 0.2212, 145),
+    "plasma": gap_model(0.2695, 3641, 0.4011, 23),
+}
+
+
+def gap_mask(n: int, model: dict, rng: np.random.Generator, rate: float = 1.0) -> np.ndarray:
+    """True for missing hours: observed runs and gaps alternate over `n` hours, in time order.
+
+    Observed runs are geometric with the mean that gives the missing share of `model` times
+    `rate` (1 is the measured share, 0.5 half of it); gap lengths stay as measured. The draws
+    are made in time order, so the first m hours of the mask are the same for any n >= m.
+    """
+    if rate <= 0 or n == 0:
+        return np.zeros(n, dtype=bool)
+    share = model["missing_share"] * rate
+    observed_p = share / (model["mean_gap"] * (1 - share))  # 1 / mean observed run length
+    long_p = 1 / (model["long_mean"] - 3)  # 4 + Geometric(long_p) - 1 has the mean long_mean
+    mask = np.zeros(n, dtype=bool)
+    pos = int(rng.geometric(observed_p)) - 1  # the table starts inside an observed run
+    while pos < n:
+        if rng.random() < model["p_short"]:
+            length = int(rng.choice(np.arange(1, 4), p=model["short_weights"]))
+        else:
+            length = 3 + int(rng.geometric(long_p))
+        length = min(length, model["longest"])
+        mask[pos : pos + length] = True
+        pos += length + int(rng.geometric(observed_p))
+    return mask
+
+
+def blank_gaps(df: pd.DataFrame, rate: float = 1.0, seed: int = 0) -> pd.DataFrame:
+    """Copy of the hourly table with IMF and plasma spans set to NaN like a real-time feed.
+
+    The IMF block (bz_gsm, by_gsm, b_mag_avg, electric_field) and the plasma block (flow_speed,
+    proton_density, proton_temp, flow_pressure, electric_field) get independent masks from
+    GAP_MODELS; electric_field needs both, so it is missing when either is. Values are only
+    removed, never changed or moved in time; Dst and every other column stay as they are.
+    The coupling terms follow when build_features is run on the copy.
+    """
+    if rate < 0:
+        raise ValueError("rate must not be negative")
+    out = df.copy()
+    if rate == 0 or not len(df):
+        return out
+    r_imf, r_plasma = (np.random.default_rng(s) for s in np.random.SeedSequence(seed).spawn(2))
+    imf = gap_mask(len(df), GAP_MODELS["imf"], r_imf, rate)
+    plasma = gap_mask(len(df), GAP_MODELS["plasma"], r_plasma, rate)
+    out.loc[imf, IMF_COLUMNS] = np.nan
+    out.loc[plasma, PLASMA_COLUMNS] = np.nan
+    return out
+
+
+def gap_copies(df: pd.DataFrame, copies: int, rate: float = 1.0, seed: int = 0) -> list[pd.DataFrame]:
+    """`copies` gap blanked versions of the training years of `df` (seeds seed, seed+1, ...).
+
+    The table is cut at VAL_START first, so no validation or test hour is in a copy. Empty
+    (the option is off) for copies 0 or rate 0.
+    """
+    if copies <= 0 or rate <= 0:
+        return []
+    train = df[df.index < VAL_START]
+    return [blank_gaps(train, rate, seed + k) for k in range(copies)]
