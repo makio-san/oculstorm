@@ -4,7 +4,7 @@ Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-curr
        [--n-lags N] [--max-depth D] [--min-child-weight W] [--learning-rate R] [--subsample S]
        [--colsample-bytree C] [--n-estimators T] [--seed S] [--objective {squarederror,pseudohuber,absolute}]
        [--huber-slope D] [--dst-offset-aug K] [--sw-noise-aug LEVEL] [--sw-noise-copies K]
-       [--sw-noise-seed S] [--dst-skip S] [--dst-newest-noise K] [--validation-only]
+       [--sw-noise-seed S] [--dst-skip S] [--dst-newest-noise K] [--quantiles] [--validation-only]
 Writes: models/xgb_dst_{H}h{_swK}{variant}.ubj, reports/xgb_baseline{_Hh}{_swK}{variant}.json,
 reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -18,6 +18,9 @@ start from Dst(t-S), so the persistence rows are S+H hour persistence;
 an AR(1) error and adds _nnK.
 --sw-noise-aug LEVEL (off at 0, the default) adds K real-time like perturbed copies of the
 training years, see oculstorm/augment.py, and the tag _swnLEVEL; validation and test stay clean.
+--quantiles (off by default, needs --validation-only) fits one multi-quantile change model at
+QUANTILES 0.1, 0.5 and 0.9, prints the coverage and the mean width of the 80% interval per
+regime and scores the 0.5 quantile as the point forecast;
 --validation-only fits, prints the validation scores and writes nothing; the test years are
 not predicted)
 """
@@ -36,7 +39,7 @@ sys.path.insert(0, str(ROOT))
 from oculstorm.augment import consistent_rows, newest_hour_error, offset_table, train_copies  # noqa: E402
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
 from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, N_LAGS, build_features, suffix, weight_tag  # noqa: E402
-from oculstorm.metrics import evaluate, persistence, storm_weights, trend_persistence  # noqa: E402
+from oculstorm.metrics import REGIMES, evaluate, persistence, storm_weights, trend_persistence  # noqa: E402
 
 PARAMS = dict(
     n_estimators=3000,
@@ -64,6 +67,33 @@ OBJECTIVES = {
     "pseudohuber": ("reg:pseudohubererror", "mphe"),
     "absolute": ("reg:absoluteerror", "mae"),
 }
+
+
+QUANTILES = (0.1, 0.5, 0.9)  # lower end, median and upper end of the 80% interval of --quantiles
+
+
+def quantile_params(quantiles: tuple[float, ...] = QUANTILES) -> dict:
+    """Extra XGBoost params for one multi-quantile change model, early stopping on the pinball loss."""
+    return {"objective": "reg:quantileerror", "quantile_alpha": list(quantiles), "eval_metric": "quantile"}
+
+
+def interval_scores(y: pd.Series, quantile_pred: np.ndarray, lower: int = 0, upper: int = -1) -> pd.DataFrame:
+    """Coverage and mean width of the interval between two quantile columns, per regime.
+
+    Rows of `quantile_pred` are sorted first, so crossing quantiles never give a negative width.
+    """
+    truth, q = y.to_numpy(), np.sort(np.asarray(quantile_pred, dtype=float), axis=1)
+    rows = []
+    for regime, mask_fn in REGIMES.items():
+        mask = mask_fn(truth)
+        lo, hi = q[mask, lower], q[mask, upper]
+        rows.append({
+            "regime": regime,
+            "n_hours": int(mask.sum()),
+            "coverage": float(np.mean((truth[mask] >= lo) & (truth[mask] <= hi))) if mask.any() else float("nan"),
+            "mean_width": float(np.mean(hi - lo)) if mask.any() else float("nan"),
+        })
+    return pd.DataFrame(rows)
 
 
 def objective_params(objective: str, huber_slope: float = 3.0) -> dict:
@@ -132,9 +162,15 @@ def fit(
     model = xgb.XGBRegressor(**(PARAMS if params is None else params))
     model.fit(X_tr, d_tr, sample_weight=storm_weights(y_tr, peak), eval_set=[(X_va, d_va)],
               sample_weight_eval_set=[storm_weights(y_va, peak)], verbose=False)
-    val_pred = X_va["dst_lag0"].to_numpy() + model.predict(X_va)
-    test_pred = X_te["dst_lag0"].to_numpy() + model.predict(X_te) if test else None
+    val_pred = add_persistence(X_va, model.predict(X_va))
+    test_pred = add_persistence(X_te, model.predict(X_te)) if test else None
     return model, val_pred, test_pred
+
+
+def add_persistence(X: pd.DataFrame, change: np.ndarray) -> np.ndarray:
+    """Dst(t) plus the predicted change; a multi-quantile change has one column per quantile."""
+    base = X["dst_lag0"].to_numpy()
+    return (base[:, None] if change.ndim == 2 else base) + change
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -158,6 +194,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dst-skip", type=int, default=0, metavar="S", help="end the Dst history at t-S instead of t (0 = off)")
     parser.add_argument("--dst-newest-noise", type=int, default=0, metavar="K", choices=range(len(NOISE_LEVELS) + 1),
                         help="train on K extra copies of the train years with an AR(1) error on the newest Dst hour (0 = off)")
+    parser.add_argument("--quantiles", action="store_true",
+                        help=f"fit one multi-quantile change model at {QUANTILES} and print the 80%% interval coverage and width (needs --validation-only)")
     parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never predict the test years")
     return parser
 
@@ -169,9 +207,12 @@ def main() -> None:
         parser.error("--ring-current cannot be combined with --dst-skip or --dst-newest-noise")
     if args.dst_skip and (args.dst_newest_noise or args.dst_offset_aug):
         parser.error("--dst-skip cannot be combined with --dst-newest-noise or --dst-offset-aug")
+    if args.quantiles and (not args.validation_only or args.objective != "squarederror"):
+        parser.error("--quantiles needs --validation-only and cannot be combined with --objective")
     skip, newest = args.dst_skip, args.dst_newest_noise
     h, peak, n_lags = args.horizon, args.storm_weight, args.n_lags
-    params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}, **objective_params(args.objective, args.huber_slope)}
+    params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}, **objective_params(args.objective, args.huber_slope),
+              **(quantile_params() if args.quantiles else {})}
     rc = "_rc" if args.ring_current else ""
     memory = MEMORY_TAUS if args.driver_memory else ()
     noise = args.sw_noise_aug if args.sw_noise_copies > 0 else 0.0
@@ -204,6 +245,10 @@ def main() -> None:
     if args.validation_only:
         model, val_pred, _ = fit(X, y, peak, params, test=False, extra=extra)
         print(f"trees: {model.best_iteration + 1} of {params['n_estimators']}")
+        if args.quantiles:
+            print(f"\nValidation {QUANTILES[0]:g} to {QUANTILES[-1]:g} quantile interval:")
+            print(interval_scores(y_va, val_pred).round(4).to_string(index=False))
+            val_pred = np.sort(val_pred, axis=1)[:, QUANTILES.index(0.5)]
         val_scores = evaluate(y_va, {"persistence": persistence(X_va), "xgboost (solar wind + Dst)": val_pred})
         print("\nValidation:")
         print(val_scores.round(4).to_string(index=False))
