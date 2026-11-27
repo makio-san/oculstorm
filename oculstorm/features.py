@@ -30,6 +30,21 @@ SOLAR_WIND = [
 ]
 
 
+AGE_CAP = 48  # hours; older gaps all look the same to the gap age features
+AGE_SOURCES = {"imf_age": "bz_gsm", "plasma_age": "flow_speed"}  # block -> column that marks it observed
+
+
+def observation_age(observed: pd.Series, cap: int = AGE_CAP) -> pd.Series:
+    """Hours since the last observed hour at or before t (0 if t itself is observed), capped at `cap`.
+
+    Counts backwards from t only: the value at t depends on `observed` up to t. Hours before
+    the first observation get `cap`.
+    """
+    step = np.arange(len(observed), dtype="float64")
+    last = pd.Series(np.where(observed.to_numpy(dtype=bool), step, np.nan), index=observed.index).ffill()
+    return (step - last).fillna(cap).clip(upper=cap)
+
+
 def _coupling(df: pd.DataFrame) -> pd.DataFrame:
     """Physics based solar wind / magnetosphere coupling terms."""
     out = pd.DataFrame(index=df.index)
@@ -80,7 +95,7 @@ def _ring_current(df: pd.DataFrame) -> pd.DataFrame:
 def build_features(
     df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON,
     memory: tuple[float, ...] = (),
-    ring_current: bool = False, n_lags: int = N_LAGS,
+    ring_current: bool = False, n_lags: int = N_LAGS, gap_age: bool = False,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y) where y is Dst at t+horizon and X only looks backwards from t.
 
@@ -95,6 +110,8 @@ def build_features(
     With ring_current=True the O'Brien and McPherron (2000) terms are added (needs the solar wind).
     n_lags sets how many hours of history (lag 0 .. n_lags-1) the lag columns cover; the
     default N_LAGS is what the production models and the live forecast use.
+    With gap_age=True imf_age and plasma_age are added: hours since bz_gsm and flow_speed were
+    last observed at or before t, capped at AGE_CAP (needs the solar wind).
     """
     if n_lags < 1:
         raise ValueError("n_lags must be at least 1")
@@ -120,6 +137,9 @@ def build_features(
             for tau in memory:
                 cols[f"{name}_ewm{tau:g}"] = decaying_memory(drivers[name], tau)
         cols["f107"] = df["f107"]
+        if gap_age:
+            for name, column in AGE_SOURCES.items():
+                cols[name] = observation_age(df[column].notna())
         if ring_current:
             om = _ring_current(df)
             for name in ["dst_star", "om_step"]:
