@@ -36,3 +36,6 @@ One line per pull request the release-merger considered. Appended by the merger 
 | 2026-11-26T16:56Z | #33 | agents/experimenter-2026-11-25 | 3730893 | merged | all gates hold; validation only, full tests pass, live forecast finite, live run 45862644393 succeeded |
 | 2026-11-26T16:56Z | #36 | agents/feature-builder-2026-11-26 | 2eb4a53 | merged | all gates hold; full tests pass, live forecast finite, live run 45862954586 succeeded |
 | 2026-11-26T16:56Z | #40 | agents/experimenter-2026-11-26 | e53c631 | skipped | conflicts with main in oculstorm/augment.py and scripts/train_xgb.py after #33; commented |
+| 2026-11-27T08:29Z | #40 | agents/experimenter-2026-11-26 | 198dc78 | merged | approved head, gates ok, 101 tests passed with data, live forecast finite, live run 45965868123 succeeded |
+| 2026-11-27T08:29Z | #45 | agents/experimenter-2026-11-27 | be281aa | skipped | conflicts with main after #40 (scripts/train_xgb.py) |
+| 2026-11-27T08:29Z | #47 | agents/experimenter-2026-11-27-3 | 6182272 | skipped | conflicts with main after #40 (oculstorm/augment.py, oculstorm/features.py, scripts/train_xgb.py) |
