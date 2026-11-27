@@ -68,6 +68,16 @@ def coverage(holdout: pd.DataFrame) -> dict:
             "issue_hours_with_inputs": int(complete.sum()), "issue_hours_without_inputs": int((~complete).sum())}
 
 
+def member_mean(prediction: pd.Series | pd.DataFrame) -> pd.Series:
+    """A model's forecast: predict_gru returns one column per seed member, their mean is the GRU forecast.
+
+    An hour is missing if any member is missing, as in scripts/live_forecast.py.
+    """
+    if isinstance(prediction, pd.DataFrame):
+        return prediction.mean(axis=1, skipna=False)
+    return prediction
+
+
 def forecasts(holdout: pd.DataFrame, predictors: dict[str, Callable[[pd.DataFrame], pd.Series]]) -> pd.DataFrame:
     """Forecasts of every model and persistence, the observation, indexed by the target hour.
 
@@ -78,7 +88,7 @@ def forecasts(holdout: pd.DataFrame, predictors: dict[str, Callable[[pd.DataFram
     issued = issue_hours(holdout)
     if issued.empty:
         return pd.DataFrame(columns=[*predictors, "persistence", "observed"], dtype=float)
-    frame = pd.DataFrame({name: predict(holdout) for name, predict in predictors.items()})
+    frame = pd.DataFrame({name: member_mean(predict(holdout)) for name, predict in predictors.items()})
     frame = frame.reindex(holdout.index)
     frame["persistence"] = holdout["dst"]
     step = pd.Timedelta(hours=HORIZON)

@@ -1,0 +1,1582 @@
+{
+  "issue": 32,
+  "experiment": "shrink the predicted change in quiet conditions: forecast = Dst(t) + alpha * change",
+  "horizon_hours": 1,
+  "models": "production models/xgb_dst_1h.ubj and the mean of models/gru_dst_1h_seed*.pt, not retrained",
+  "data": "validation 2017-01-01 00:00:00 .. 2020-12-31 23:00:00, table cut before 2021-01-01, test years not used",
+  "quiet_condition": "dst_lag0 > -30 and dst_min24 > -50 and vbs_mean3 < 0.5, from the inputs as the model saw them at t; a missing vbs_mean3 (solar wind gap) is not quiet; alpha = 1 outside it",
+  "alpha": "least squares on the quiet condition hours of the fitting half, clipped to [0, 1]; 1 with fewer than 24 hours",
+  "bins": {
+    "edge_nt": 2.0,
+    "names": [
+      "abs change < 2 nT",
+      "abs change >= 2 nT"
+    ],
+    "by": "absolute predicted change"
+  },
+  "cross_fit": "fit 2017 to 2018 and score 2019 to 2020, then the reverse; scores are on the pooled out of fold hours",
+  "inputs": {
+    "clean": "validation as it is",
+    "perturbed newest Dst hour": "Dst(t) + e(t) as the newest hour of every forecast, e an AR(1) series with mean -3 nT, standard deviation 4 nT, coefficient 0.6, seed 32; earlier hours and the target are clean; the forecast and persistence start from the perturbed value",
+    "not_run": "perturbed solar wind: the issue 24 code is not on main"
+  },
+  "scoring_regimes": "by the observed target Dst, as in oculstorm.metrics.REGIMES, plus the causal quiet condition",
+  "bootstrap": {
+    "method": "oculstorm.metrics.block_bootstrap_rmse, paired against alpha 1 of the same model",
+    "block_hours": 168,
+    "resamples": 2000,
+    "seed": 0
+  },
+  "promising_bar": "retrain policy on the pooled out of fold hours: overall MSE at least 2% lower, or storm MSE at least 3% lower with overall at most 1% higher, intervals excluding zero",
+  "results": {
+    "clean": {
+      "n_hours": 35063,
+      "n_hours_quiet_condition": 25049,
+      "folds": {
+        "fit 2017-2018, score 2019-2020": {
+          "fit_hours_quiet": 11938,
+          "n_hours_scored": 17543,
+          "alpha": {
+            "gru": 1.0,
+            "xgboost": 1.0
+          },
+          "alpha_not_clipped": {
+            "gru": 1.0558,
+            "xgboost": 1.0074
+          },
+          "alpha_by_bin": {
+            "gru": {
+              "abs change < 2 nT": 1.0,
+              "abs change >= 2 nT": 1.0
+            },
+            "xgboost": {
+              "abs change < 2 nT": 1.0,
+              "abs change >= 2 nT": 1.0
+            }
+          }
+        },
+        "fit 2019-2020, score 2017-2018": {
+          "fit_hours_quiet": 13111,
+          "n_hours_scored": 17520,
+          "alpha": {
+            "gru": 1.0,
+            "xgboost": 0.9786
+          },
+          "alpha_not_clipped": {
+            "gru": 1.0167,
+            "xgboost": 0.9786
+          },
+          "alpha_by_bin": {
+            "gru": {
+              "abs change < 2 nT": 0.9915,
+              "abs change >= 2 nT": 1.0
+            },
+            "xgboost": {
+              "abs change < 2 nT": 0.978,
+              "abs change >= 2 nT": 0.9791
+            }
+          }
+        }
+      },
+      "predicted_change_sd": {
+        "gru": {
+          "all": {
+            "gru": 2.0899,
+            "gru shrunk": 2.0899,
+            "gru shrunk 2 bins": 2.0888
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "gru": 1.4042,
+            "gru shrunk": 1.4042,
+            "gru shrunk 2 bins": 1.402
+          }
+        },
+        "xgboost": {
+          "all": {
+            "xgboost": 2.0847,
+            "xgboost shrunk": 2.0765,
+            "xgboost shrunk 2 bins": 2.0765
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "xgboost": 1.4221,
+            "xgboost shrunk": 1.4053,
+            "xgboost shrunk 2 bins": 1.4054
+          }
+        }
+      },
+      "scores": {
+        "gru": {
+          "all": {
+            "n_hours": 35063,
+            "rmse": {
+              "persistence": {
+                "value": 3.3704,
+                "ci95": [
+                  3.21,
+                  3.544
+                ]
+              },
+              "gru": {
+                "value": 2.6205,
+                "ci95": [
+                  2.509,
+                  2.738
+                ]
+              },
+              "gru shrunk": {
+                "value": 2.6205,
+                "ci95": [
+                  2.509,
+                  2.738
+                ]
+              },
+              "gru shrunk 2 bins": {
+                "value": 2.6205,
+                "ci95": [
+                  2.509,
+                  2.738
+                ]
+              }
+            },
+            "differences": {
+              "gru shrunk minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "gru shrunk 2 bins minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  -0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  -0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.359
+              }
+            }
+          },
+          "quiet (Dst > -50)": {
+            "n_hours": 34701,
+            "rmse": {
+              "persistence": {
+                "value": 3.2359,
+                "ci95": [
+                  3.113,
+                  3.363
+                ]
+              },
+              "gru": {
+                "value": 2.5325,
+                "ci95": [
+                  2.443,
+                  2.624
+                ]
+              },
+              "gru shrunk": {
+                "value": 2.5325,
+                "ci95": [
+                  2.443,
+                  2.624
+                ]
+              },
+              "gru shrunk 2 bins": {
+                "value": 2.5325,
+                "ci95": [
+                  2.443,
+                  2.624
+                ]
+              }
+            },
+            "differences": {
+              "gru shrunk minus gru": {
+                "rmse_value": -0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": -0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "gru shrunk 2 bins minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  -0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  -0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.359
+              }
+            }
+          },
+          "storm (Dst <= -50)": {
+            "n_hours": 362,
+            "rmse": {
+              "persistence": {
+                "value": 9.8253,
+                "ci95": [
+                  8.406,
+                  11.053
+                ]
+              },
+              "gru": {
+                "value": 7.0968,
+                "ci95": [
+                  6.279,
+                  7.852
+                ]
+              },
+              "gru shrunk": {
+                "value": 7.0968,
+                "ci95": [
+                  6.279,
+                  7.852
+                ]
+              },
+              "gru shrunk 2 bins": {
+                "value": 7.0968,
+                "ci95": [
+                  6.279,
+                  7.852
+                ]
+              }
+            },
+            "differences": {
+              "gru shrunk minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "gru shrunk 2 bins minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              }
+            }
+          },
+          "intense (Dst <= -100)": {
+            "n_hours": 35,
+            "rmse": {
+              "persistence": {
+                "value": 15.9553,
+                "ci95": [
+                  12.895,
+                  18.319
+                ]
+              },
+              "gru": {
+                "value": 10.5678,
+                "ci95": [
+                  9.319,
+                  11.712
+                ]
+              },
+              "gru shrunk": {
+                "value": 10.5678,
+                "ci95": [
+                  9.319,
+                  11.712
+                ]
+              },
+              "gru shrunk 2 bins": {
+                "value": 10.5678,
+                "ci95": [
+                  9.319,
+                  11.712
+                ]
+              }
+            },
+            "differences": {
+              "gru shrunk minus gru": {
+                "rmse_value": -0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": -0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "gru shrunk 2 bins minus gru": {
+                "rmse_value": -0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": -0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              }
+            }
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "n_hours": 25049,
+            "rmse": {
+              "persistence": {
+                "value": 2.6826,
+                "ci95": [
+                  2.586,
+                  2.783
+                ]
+              },
+              "gru": {
+                "value": 2.2442,
+                "ci95": [
+                  2.166,
+                  2.329
+                ]
+              },
+              "gru shrunk": {
+                "value": 2.2442,
+                "ci95": [
+                  2.166,
+                  2.329
+                ]
+              },
+              "gru shrunk 2 bins": {
+                "value": 2.2442,
+                "ci95": [
+                  2.166,
+                  2.329
+                ]
+              }
+            },
+            "differences": {
+              "gru shrunk minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "gru shrunk 2 bins minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  -0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  -0.01,
+                  0.01
+                ],
+                "significant": false,
+                "share_first_better": 0.359
+              }
+            }
+          }
+        },
+        "xgboost": {
+          "all": {
+            "n_hours": 35063,
+            "rmse": {
+              "persistence": {
+                "value": 3.3704,
+                "ci95": [
+                  3.21,
+                  3.544
+                ]
+              },
+              "xgboost": {
+                "value": 2.6565,
+                "ci95": [
+                  2.541,
+                  2.778
+                ]
+              },
+              "xgboost shrunk": {
+                "value": 2.6566,
+                "ci95": [
+                  2.541,
+                  2.778
+                ]
+              },
+              "xgboost shrunk 2 bins": {
+                "value": 2.6566,
+                "ci95": [
+                  2.541,
+                  2.778
+                ]
+              }
+            },
+            "differences": {
+              "xgboost shrunk minus xgboost": {
+                "rmse_value": 0.0001,
+                "rmse_ci95": [
+                  -0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.01,
+                "mse_change_percent_ci95": [
+                  -0.01,
+                  0.03
+                ],
+                "significant": false,
+                "share_first_better": 0.204
+              },
+              "xgboost shrunk 2 bins minus xgboost": {
+                "rmse_value": 0.0001,
+                "rmse_ci95": [
+                  -0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.01,
+                "mse_change_percent_ci95": [
+                  -0.01,
+                  0.03
+                ],
+                "significant": false,
+                "share_first_better": 0.204
+              }
+            }
+          },
+          "quiet (Dst > -50)": {
+            "n_hours": 34701,
+            "rmse": {
+              "persistence": {
+                "value": 3.2359,
+                "ci95": [
+                  3.113,
+                  3.363
+                ]
+              },
+              "xgboost": {
+                "value": 2.5679,
+                "ci95": [
+                  2.476,
+                  2.663
+                ]
+              },
+              "xgboost shrunk": {
+                "value": 2.568,
+                "ci95": [
+                  2.476,
+                  2.663
+                ]
+              },
+              "xgboost shrunk 2 bins": {
+                "value": 2.568,
+                "ci95": [
+                  2.476,
+                  2.663
+                ]
+              }
+            },
+            "differences": {
+              "xgboost shrunk minus xgboost": {
+                "rmse_value": 0.0001,
+                "rmse_ci95": [
+                  -0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.01,
+                "mse_change_percent_ci95": [
+                  -0.01,
+                  0.03
+                ],
+                "significant": false,
+                "share_first_better": 0.204
+              },
+              "xgboost shrunk 2 bins minus xgboost": {
+                "rmse_value": 0.0001,
+                "rmse_ci95": [
+                  -0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.01,
+                "mse_change_percent_ci95": [
+                  -0.01,
+                  0.03
+                ],
+                "significant": false,
+                "share_first_better": 0.204
+              }
+            }
+          },
+          "storm (Dst <= -50)": {
+            "n_hours": 362,
+            "rmse": {
+              "persistence": {
+                "value": 9.8253,
+                "ci95": [
+                  8.406,
+                  11.053
+                ]
+              },
+              "xgboost": {
+                "value": 7.1727,
+                "ci95": [
+                  6.337,
+                  7.924
+                ]
+              },
+              "xgboost shrunk": {
+                "value": 7.1727,
+                "ci95": [
+                  6.337,
+                  7.924
+                ]
+              },
+              "xgboost shrunk 2 bins": {
+                "value": 7.1727,
+                "ci95": [
+                  6.337,
+                  7.924
+                ]
+              }
+            },
+            "differences": {
+              "xgboost shrunk minus xgboost": {
+                "rmse_value": -0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": -0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "xgboost shrunk 2 bins minus xgboost": {
+                "rmse_value": -0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": -0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              }
+            }
+          },
+          "intense (Dst <= -100)": {
+            "n_hours": 35,
+            "rmse": {
+              "persistence": {
+                "value": 15.9553,
+                "ci95": [
+                  12.895,
+                  18.319
+                ]
+              },
+              "xgboost": {
+                "value": 11.6867,
+                "ci95": [
+                  8.804,
+                  13.939
+                ]
+              },
+              "xgboost shrunk": {
+                "value": 11.6867,
+                "ci95": [
+                  8.804,
+                  13.939
+                ]
+              },
+              "xgboost shrunk 2 bins": {
+                "value": 11.6867,
+                "ci95": [
+                  8.804,
+                  13.939
+                ]
+              }
+            },
+            "differences": {
+              "xgboost shrunk minus xgboost": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "xgboost shrunk 2 bins minus xgboost": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              }
+            }
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "n_hours": 25049,
+            "rmse": {
+              "persistence": {
+                "value": 2.6826,
+                "ci95": [
+                  2.586,
+                  2.783
+                ]
+              },
+              "xgboost": {
+                "value": 2.2721,
+                "ci95": [
+                  2.192,
+                  2.357
+                ]
+              },
+              "xgboost shrunk": {
+                "value": 2.2723,
+                "ci95": [
+                  2.192,
+                  2.358
+                ]
+              },
+              "xgboost shrunk 2 bins": {
+                "value": 2.2723,
+                "ci95": [
+                  2.192,
+                  2.358
+                ]
+              }
+            },
+            "differences": {
+              "xgboost shrunk minus xgboost": {
+                "rmse_value": 0.0002,
+                "rmse_ci95": [
+                  -0.0,
+                  0.001
+                ],
+                "mse_change_percent": 0.02,
+                "mse_change_percent_ci95": [
+                  -0.02,
+                  0.06
+                ],
+                "significant": false,
+                "share_first_better": 0.204
+              },
+              "xgboost shrunk 2 bins minus xgboost": {
+                "rmse_value": 0.0002,
+                "rmse_ci95": [
+                  -0.0,
+                  0.001
+                ],
+                "mse_change_percent": 0.02,
+                "mse_change_percent_ci95": [
+                  -0.02,
+                  0.06
+                ],
+                "significant": false,
+                "share_first_better": 0.204
+              }
+            }
+          }
+        }
+      },
+      "skill_vs_persistence": {
+        "gru": {
+          "all": {
+            "gru": 0.3955,
+            "gru shrunk": 0.3955,
+            "gru shrunk 2 bins": 0.3955
+          },
+          "quiet (Dst > -50)": {
+            "gru": 0.3875,
+            "gru shrunk": 0.3875,
+            "gru shrunk 2 bins": 0.3875
+          },
+          "storm (Dst <= -50)": {
+            "gru": 0.4783,
+            "gru shrunk": 0.4783,
+            "gru shrunk 2 bins": 0.4783
+          },
+          "intense (Dst <= -100)": {
+            "gru": 0.5613,
+            "gru shrunk": 0.5613,
+            "gru shrunk 2 bins": 0.5613
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "gru": 0.3001,
+            "gru shrunk": 0.3001,
+            "gru shrunk 2 bins": 0.3001
+          }
+        },
+        "xgboost": {
+          "all": {
+            "xgboost": 0.3788,
+            "xgboost shrunk": 0.3787,
+            "xgboost shrunk 2 bins": 0.3787
+          },
+          "quiet (Dst > -50)": {
+            "xgboost": 0.3703,
+            "xgboost shrunk": 0.3702,
+            "xgboost shrunk 2 bins": 0.3702
+          },
+          "storm (Dst <= -50)": {
+            "xgboost": 0.4671,
+            "xgboost shrunk": 0.4671,
+            "xgboost shrunk 2 bins": 0.4671
+          },
+          "intense (Dst <= -100)": {
+            "xgboost": 0.4635,
+            "xgboost shrunk": 0.4635,
+            "xgboost shrunk 2 bins": 0.4635
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "xgboost": 0.2826,
+            "xgboost shrunk": 0.2825,
+            "xgboost shrunk 2 bins": 0.2825
+          }
+        }
+      },
+      "promising": {
+        "gru shrunk": false,
+        "gru shrunk 2 bins": false,
+        "xgboost shrunk": false,
+        "xgboost shrunk 2 bins": false
+      }
+    },
+    "perturbed newest Dst hour": {
+      "n_hours": 35063,
+      "n_hours_quiet_condition": 24746,
+      "folds": {
+        "fit 2017-2018, score 2019-2020": {
+          "fit_hours_quiet": 11751,
+          "n_hours_scored": 17543,
+          "alpha": {
+            "gru": 0.0,
+            "xgboost": 0.0
+          },
+          "alpha_not_clipped": {
+            "gru": -0.6081,
+            "xgboost": -0.5472
+          },
+          "alpha_by_bin": {
+            "gru": {
+              "abs change < 2 nT": 0.0,
+              "abs change >= 2 nT": 0.0
+            },
+            "xgboost": {
+              "abs change < 2 nT": 0.0,
+              "abs change >= 2 nT": 0.0
+            }
+          }
+        },
+        "fit 2019-2020, score 2017-2018": {
+          "fit_hours_quiet": 12995,
+          "n_hours_scored": 17520,
+          "alpha": {
+            "gru": 0.0,
+            "xgboost": 0.0
+          },
+          "alpha_not_clipped": {
+            "gru": -1.0554,
+            "xgboost": -0.9354
+          },
+          "alpha_by_bin": {
+            "gru": {
+              "abs change < 2 nT": 0.0,
+              "abs change >= 2 nT": 0.0
+            },
+            "xgboost": {
+              "abs change < 2 nT": 0.0,
+              "abs change >= 2 nT": 0.0
+            }
+          }
+        }
+      },
+      "predicted_change_sd": {
+        "gru": {
+          "all": {
+            "gru": 2.1912,
+            "gru shrunk": 1.7747,
+            "gru shrunk 2 bins": 1.7747
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "gru": 1.5648,
+            "gru shrunk": 0.0,
+            "gru shrunk 2 bins": 0.0
+          }
+        },
+        "xgboost": {
+          "all": {
+            "xgboost": 2.1418,
+            "xgboost shrunk": 1.7518,
+            "xgboost shrunk 2 bins": 1.7518
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "xgboost": 1.4997,
+            "xgboost shrunk": 0.0,
+            "xgboost shrunk 2 bins": 0.0
+          }
+        }
+      },
+      "scores": {
+        "gru": {
+          "all": {
+            "n_hours": 35063,
+            "rmse": {
+              "persistence": {
+                "value": 6.0286,
+                "ci95": [
+                  5.925,
+                  6.138
+                ]
+              },
+              "gru": {
+                "value": 6.3851,
+                "ci95": [
+                  6.303,
+                  6.464
+                ]
+              },
+              "gru shrunk": {
+                "value": 5.9982,
+                "ci95": [
+                  5.913,
+                  6.079
+                ]
+              },
+              "gru shrunk 2 bins": {
+                "value": 5.9982,
+                "ci95": [
+                  5.913,
+                  6.079
+                ]
+              }
+            },
+            "differences": {
+              "gru shrunk minus gru": {
+                "rmse_value": -0.3869,
+                "rmse_ci95": [
+                  -0.419,
+                  -0.355
+                ],
+                "mse_change_percent": -11.75,
+                "mse_change_percent_ci95": [
+                  -12.69,
+                  -10.81
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              },
+              "gru shrunk 2 bins minus gru": {
+                "rmse_value": -0.3869,
+                "rmse_ci95": [
+                  -0.419,
+                  -0.355
+                ],
+                "mse_change_percent": -11.75,
+                "mse_change_percent_ci95": [
+                  -12.69,
+                  -10.81
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              }
+            }
+          },
+          "quiet (Dst > -50)": {
+            "n_hours": 34701,
+            "rmse": {
+              "persistence": {
+                "value": 5.9656,
+                "ci95": [
+                  5.876,
+                  6.051
+                ]
+              },
+              "gru": {
+                "value": 6.3639,
+                "ci95": [
+                  6.285,
+                  6.439
+                ]
+              },
+              "gru shrunk": {
+                "value": 5.9714,
+                "ci95": [
+                  5.893,
+                  6.05
+                ]
+              },
+              "gru shrunk 2 bins": {
+                "value": 5.9714,
+                "ci95": [
+                  5.893,
+                  6.05
+                ]
+              }
+            },
+            "differences": {
+              "gru shrunk minus gru": {
+                "rmse_value": -0.3924,
+                "rmse_ci95": [
+                  -0.424,
+                  -0.362
+                ],
+                "mse_change_percent": -11.95,
+                "mse_change_percent_ci95": [
+                  -12.85,
+                  -11.05
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              },
+              "gru shrunk 2 bins minus gru": {
+                "rmse_value": -0.3924,
+                "rmse_ci95": [
+                  -0.424,
+                  -0.362
+                ],
+                "mse_change_percent": -11.95,
+                "mse_change_percent_ci95": [
+                  -12.85,
+                  -11.05
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              }
+            }
+          },
+          "storm (Dst <= -50)": {
+            "n_hours": 362,
+            "rmse": {
+              "persistence": {
+                "value": 10.4309,
+                "ci95": [
+                  8.807,
+                  11.644
+                ]
+              },
+              "gru": {
+                "value": 8.1663,
+                "ci95": [
+                  7.129,
+                  8.971
+                ]
+              },
+              "gru shrunk": {
+                "value": 8.1663,
+                "ci95": [
+                  7.129,
+                  8.971
+                ]
+              },
+              "gru shrunk 2 bins": {
+                "value": 8.1663,
+                "ci95": [
+                  7.129,
+                  8.971
+                ]
+              }
+            },
+            "differences": {
+              "gru shrunk minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "gru shrunk 2 bins minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              }
+            }
+          },
+          "intense (Dst <= -100)": {
+            "n_hours": 35,
+            "rmse": {
+              "persistence": {
+                "value": 16.6757,
+                "ci95": [
+                  12.79,
+                  19.692
+                ]
+              },
+              "gru": {
+                "value": 12.7904,
+                "ci95": [
+                  10.349,
+                  13.762
+                ]
+              },
+              "gru shrunk": {
+                "value": 12.7904,
+                "ci95": [
+                  10.349,
+                  13.762
+                ]
+              },
+              "gru shrunk 2 bins": {
+                "value": 12.7904,
+                "ci95": [
+                  10.349,
+                  13.762
+                ]
+              }
+            },
+            "differences": {
+              "gru shrunk minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "gru shrunk 2 bins minus gru": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              }
+            }
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "n_hours": 24746,
+            "rmse": {
+              "persistence": {
+                "value": 5.6716,
+                "ci95": [
+                  5.59,
+                  5.752
+                ]
+              },
+              "gru": {
+                "value": 6.2414,
+                "ci95": [
+                  6.155,
+                  6.324
+                ]
+              },
+              "gru shrunk": {
+                "value": 5.6716,
+                "ci95": [
+                  5.59,
+                  5.752
+                ]
+              },
+              "gru shrunk 2 bins": {
+                "value": 5.6716,
+                "ci95": [
+                  5.59,
+                  5.752
+                ]
+              }
+            },
+            "differences": {
+              "gru shrunk minus gru": {
+                "rmse_value": -0.5698,
+                "rmse_ci95": [
+                  -0.602,
+                  -0.535
+                ],
+                "mse_change_percent": -17.43,
+                "mse_change_percent_ci95": [
+                  -18.32,
+                  -16.48
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              },
+              "gru shrunk 2 bins minus gru": {
+                "rmse_value": -0.5698,
+                "rmse_ci95": [
+                  -0.602,
+                  -0.535
+                ],
+                "mse_change_percent": -17.43,
+                "mse_change_percent_ci95": [
+                  -18.32,
+                  -16.48
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              }
+            }
+          }
+        },
+        "xgboost": {
+          "all": {
+            "n_hours": 35063,
+            "rmse": {
+              "persistence": {
+                "value": 6.0286,
+                "ci95": [
+                  5.925,
+                  6.138
+                ]
+              },
+              "xgboost": {
+                "value": 6.3117,
+                "ci95": [
+                  6.232,
+                  6.387
+                ]
+              },
+              "xgboost shrunk": {
+                "value": 5.9796,
+                "ci95": [
+                  5.895,
+                  6.06
+                ]
+              },
+              "xgboost shrunk 2 bins": {
+                "value": 5.9796,
+                "ci95": [
+                  5.895,
+                  6.06
+                ]
+              }
+            },
+            "differences": {
+              "xgboost shrunk minus xgboost": {
+                "rmse_value": -0.3321,
+                "rmse_ci95": [
+                  -0.359,
+                  -0.303
+                ],
+                "mse_change_percent": -10.25,
+                "mse_change_percent_ci95": [
+                  -11.06,
+                  -9.39
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              },
+              "xgboost shrunk 2 bins minus xgboost": {
+                "rmse_value": -0.3321,
+                "rmse_ci95": [
+                  -0.359,
+                  -0.303
+                ],
+                "mse_change_percent": -10.25,
+                "mse_change_percent_ci95": [
+                  -11.06,
+                  -9.39
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              }
+            }
+          },
+          "quiet (Dst > -50)": {
+            "n_hours": 34701,
+            "rmse": {
+              "persistence": {
+                "value": 5.9656,
+                "ci95": [
+                  5.876,
+                  6.051
+                ]
+              },
+              "xgboost": {
+                "value": 6.29,
+                "ci95": [
+                  6.212,
+                  6.364
+                ]
+              },
+              "xgboost shrunk": {
+                "value": 5.9531,
+                "ci95": [
+                  5.874,
+                  6.031
+                ]
+              },
+              "xgboost shrunk 2 bins": {
+                "value": 5.9531,
+                "ci95": [
+                  5.874,
+                  6.031
+                ]
+              }
+            },
+            "differences": {
+              "xgboost shrunk minus xgboost": {
+                "rmse_value": -0.3369,
+                "rmse_ci95": [
+                  -0.364,
+                  -0.309
+                ],
+                "mse_change_percent": -10.42,
+                "mse_change_percent_ci95": [
+                  -11.21,
+                  -9.59
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              },
+              "xgboost shrunk 2 bins minus xgboost": {
+                "rmse_value": -0.3369,
+                "rmse_ci95": [
+                  -0.364,
+                  -0.309
+                ],
+                "mse_change_percent": -10.42,
+                "mse_change_percent_ci95": [
+                  -11.21,
+                  -9.59
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              }
+            }
+          },
+          "storm (Dst <= -50)": {
+            "n_hours": 362,
+            "rmse": {
+              "persistence": {
+                "value": 10.4309,
+                "ci95": [
+                  8.807,
+                  11.644
+                ]
+              },
+              "xgboost": {
+                "value": 8.1334,
+                "ci95": [
+                  6.958,
+                  8.994
+                ]
+              },
+              "xgboost shrunk": {
+                "value": 8.1334,
+                "ci95": [
+                  6.958,
+                  8.994
+                ]
+              },
+              "xgboost shrunk 2 bins": {
+                "value": 8.1334,
+                "ci95": [
+                  6.958,
+                  8.994
+                ]
+              }
+            },
+            "differences": {
+              "xgboost shrunk minus xgboost": {
+                "rmse_value": -0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": -0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "xgboost shrunk 2 bins minus xgboost": {
+                "rmse_value": -0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": -0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              }
+            }
+          },
+          "intense (Dst <= -100)": {
+            "n_hours": 35,
+            "rmse": {
+              "persistence": {
+                "value": 16.6757,
+                "ci95": [
+                  12.79,
+                  19.692
+                ]
+              },
+              "xgboost": {
+                "value": 13.3574,
+                "ci95": [
+                  8.675,
+                  15.053
+                ]
+              },
+              "xgboost shrunk": {
+                "value": 13.3574,
+                "ci95": [
+                  8.675,
+                  15.053
+                ]
+              },
+              "xgboost shrunk 2 bins": {
+                "value": 13.3574,
+                "ci95": [
+                  8.675,
+                  15.053
+                ]
+              }
+            },
+            "differences": {
+              "xgboost shrunk minus xgboost": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              },
+              "xgboost shrunk 2 bins minus xgboost": {
+                "rmse_value": 0.0,
+                "rmse_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "mse_change_percent": 0.0,
+                "mse_change_percent_ci95": [
+                  0.0,
+                  0.0
+                ],
+                "significant": false,
+                "share_first_better": 0.0
+              }
+            }
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "n_hours": 24746,
+            "rmse": {
+              "persistence": {
+                "value": 5.6716,
+                "ci95": [
+                  5.59,
+                  5.752
+                ]
+              },
+              "xgboost": {
+                "value": 6.1604,
+                "ci95": [
+                  6.077,
+                  6.24
+                ]
+              },
+              "xgboost shrunk": {
+                "value": 5.6716,
+                "ci95": [
+                  5.59,
+                  5.752
+                ]
+              },
+              "xgboost shrunk 2 bins": {
+                "value": 5.6716,
+                "ci95": [
+                  5.59,
+                  5.752
+                ]
+              }
+            },
+            "differences": {
+              "xgboost shrunk minus xgboost": {
+                "rmse_value": -0.4888,
+                "rmse_ci95": [
+                  -0.518,
+                  -0.457
+                ],
+                "mse_change_percent": -15.24,
+                "mse_change_percent_ci95": [
+                  -16.07,
+                  -14.31
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              },
+              "xgboost shrunk 2 bins minus xgboost": {
+                "rmse_value": -0.4888,
+                "rmse_ci95": [
+                  -0.518,
+                  -0.457
+                ],
+                "mse_change_percent": -15.24,
+                "mse_change_percent_ci95": [
+                  -16.07,
+                  -14.31
+                ],
+                "significant": true,
+                "share_first_better": 1.0
+              }
+            }
+          }
+        }
+      },
+      "skill_vs_persistence": {
+        "gru": {
+          "all": {
+            "gru": -0.1218,
+            "gru shrunk": 0.0101,
+            "gru shrunk 2 bins": 0.0101
+          },
+          "quiet (Dst > -50)": {
+            "gru": -0.138,
+            "gru shrunk": -0.002,
+            "gru shrunk 2 bins": -0.002
+          },
+          "storm (Dst <= -50)": {
+            "gru": 0.3871,
+            "gru shrunk": 0.3871,
+            "gru shrunk 2 bins": 0.3871
+          },
+          "intense (Dst <= -100)": {
+            "gru": 0.4117,
+            "gru shrunk": 0.4117,
+            "gru shrunk 2 bins": 0.4117
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "gru": -0.211,
+            "gru shrunk": 0.0,
+            "gru shrunk 2 bins": 0.0
+          }
+        },
+        "xgboost": {
+          "all": {
+            "xgboost": -0.0961,
+            "xgboost shrunk": 0.0162,
+            "xgboost shrunk 2 bins": 0.0162
+          },
+          "quiet (Dst > -50)": {
+            "xgboost": -0.1117,
+            "xgboost shrunk": 0.0042,
+            "xgboost shrunk 2 bins": 0.0042
+          },
+          "storm (Dst <= -50)": {
+            "xgboost": 0.392,
+            "xgboost shrunk": 0.392,
+            "xgboost shrunk 2 bins": 0.392
+          },
+          "intense (Dst <= -100)": {
+            "xgboost": 0.3584,
+            "xgboost shrunk": 0.3584,
+            "xgboost shrunk 2 bins": 0.3584
+          },
+          "causal quiet condition (the shrunk hours)": {
+            "xgboost": -0.1798,
+            "xgboost shrunk": 0.0,
+            "xgboost shrunk 2 bins": 0.0
+          }
+        }
+      },
+      "promising": {
+        "gru shrunk": true,
+        "gru shrunk 2 bins": true,
+        "xgboost shrunk": true,
+        "xgboost shrunk 2 bins": true
+      }
+    }
+  },
+  "seconds": 10
+}
