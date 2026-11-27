@@ -1,0 +1,183 @@
+{
+  "issue": 43,
+  "title": "Multi-quantile XGBoost for a driver dependent 80% interval",
+  "result": "worse",
+  "split": "validation only, 2017-01-01 .. 2020-12-31; train 1995 .. 2016; test years not used",
+  "horizon_hours": 1,
+  "configuration": {
+    "option": "--quantiles in scripts/train_xgb.py (needs --validation-only); off by default, params unchanged",
+    "models": "production hyperparameters and features, storm weight 1, change model Dst(t+1) - Dst(t), early stopping on validation; candidate is one multi-quantile model with reg:quantileerror, quantile_alpha [0.1, 0.5, 0.9], eval_metric quantile",
+    "crossing": "quantile predictions are sorted per hour before scoring",
+    "quantile_crossing_share": 0.0
+  },
+  "bootstrap": {
+    "method": "oculstorm.metrics.block_bootstrap_rmse, paired, 0.5 quantile against the squared error baseline",
+    "block_hours": 168,
+    "resamples": 2000,
+    "seed": 0,
+    "intervals": "95% for the MSE change in percent and for median minus baseline RMSE"
+  },
+  "fixed_band": {
+    "how": "10th and 90th percentile of the baseline's validation errors per regime of the current hour Dst(t), added to the baseline forecast",
+    "fit": {
+      "quiet": {
+        "hours": 34702,
+        "q10": -2.835,
+        "q90": 2.811
+      },
+      "storm": {
+        "hours": 327,
+        "q10": -5.9,
+        "q90": 7.003
+      },
+      "intense": {
+        "hours": 35,
+        "q10": -17.446,
+        "q90": 14.845
+      }
+    },
+    "note": "fitted and read on the same validation years, so its coverage is optimistic by construction"
+  },
+  "regimes_by": "observed Dst at the target hour (oculstorm.metrics.REGIMES)",
+  "note": "the quantile model early stops on validation pinball loss, so its coverage on the same years is mildly optimistic; intense intervals rest on 35 hours and can be NaN",
+  "runs": {
+    "baseline": {
+      "objective": "reg:squarederror",
+      "trees": 2151,
+      "seconds": 170,
+      "hit_cap": false
+    },
+    "quantiles": {
+      "objective": "reg:quantileerror",
+      "quantile_alpha": [
+        0.1,
+        0.5,
+        0.9
+      ],
+      "eval_metric": "quantile",
+      "trees": 3000,
+      "seconds": 304,
+      "hit_cap": true
+    }
+  },
+  "regimes": {
+    "all": {
+      "n_hours": 35064,
+      "rmse_persistence": 3.3704090118408203,
+      "baseline_rmse": 2.656461000442505,
+      "median_rmse": 2.6816515922546387,
+      "median_mse_change_pct": 1.9055450106058025,
+      "median_mse_change_pct_ci95": [
+        1.2069545647998503,
+        2.683743139319389
+      ],
+      "median_rmse_diff_ci95": [
+        0.015783767065717835,
+        0.03574379876660687
+      ],
+      "interval_80": {
+        "quantile_model": {
+          "coverage": 0.7677960301163587,
+          "mean_width": 5.446218013763428,
+          "pinball_q10": 0.43241214752197266,
+          "pinball_q90": 0.44327861070632935
+        },
+        "fixed_regime_band": {
+          "coverage": 0.7999087383070956,
+          "mean_width": 5.740253448486328,
+          "pinball_q10": 0.4603557586669922,
+          "pinball_q90": 0.47081899642944336
+        }
+      }
+    },
+    "quiet (Dst > -50)": {
+      "n_hours": 34702,
+      "rmse_persistence": 3.2359118461608887,
+      "baseline_rmse": 2.567821741104126,
+      "median_rmse": 2.5903501510620117,
+      "median_mse_change_pct": 1.762368038019435,
+      "median_mse_change_pct_ci95": [
+        1.1479718756784625,
+        2.3729014594730313
+      ],
+      "median_rmse_diff_ci95": [
+        0.014669833994869564,
+        0.030611143830959885
+      ],
+      "interval_80": {
+        "quantile_model": {
+          "coverage": 0.7694369200622443,
+          "mean_width": 5.385194301605225,
+          "pinball_q10": 0.4207706153392792,
+          "pinball_q90": 0.43532171845436096
+        },
+        "fixed_regime_band": {
+          "coverage": 0.8015099994236643,
+          "mean_width": 5.663964748382568,
+          "pinball_q10": 0.44527676701545715,
+          "pinball_q90": 0.464340478181839
+        }
+      }
+    },
+    "storm (Dst <= -50)": {
+      "n_hours": 362,
+      "rmse_persistence": 9.825268745422363,
+      "baseline_rmse": 7.172729015350342,
+      "median_rmse": 7.302978992462158,
+      "median_mse_change_pct": 3.664786026270117,
+      "median_mse_change_pct_ci95": [
+        -2.7556519521696625,
+        11.175834208119932
+      ],
+      "median_rmse_diff_ci95": [
+        -0.09857006838090891,
+        0.38787911728889896
+      ],
+      "interval_80": {
+        "quantile_model": {
+          "coverage": 0.6104972375690608,
+          "mean_width": 11.296051979064941,
+          "pinball_q10": 1.5483890771865845,
+          "pinball_q90": 1.2060409784317017
+        },
+        "fixed_regime_band": {
+          "coverage": 0.6464088397790055,
+          "mean_width": 13.053421974182129,
+          "pinball_q10": 1.905855417251587,
+          "pinball_q90": 1.0918623208999634
+        }
+      }
+    },
+    "intense (Dst <= -100)": {
+      "n_hours": 35,
+      "rmse_persistence": 15.955294609069824,
+      "baseline_rmse": 11.68671989440918,
+      "median_rmse": 12.205167770385742,
+      "median_mse_change_pct": 9.069227443959548,
+      "median_mse_change_pct_ci95": [
+        1.1256144299107707,
+        51.812170022363645
+      ],
+      "median_rmse_diff_ci95": [
+        0.07823128440791294,
+        2.0436735576837926
+      ],
+      "interval_80": {
+        "quantile_model": {
+          "coverage": 0.42857142857142855,
+          "mean_width": 17.53105926513672,
+          "pinball_q10": 3.295138359069824,
+          "pinball_q90": 2.095268726348877
+        },
+        "fixed_regime_band": {
+          "coverage": 0.6857142857142857,
+          "mean_width": 29.52125358581543,
+          "pinball_q10": 2.5237858295440674,
+          "pinball_q90": 1.7472690343856812
+        }
+      }
+    }
+  },
+  "baseline_check": "retrained squared error baseline reproduces validation RMSE 2.6565 in reports/xgb_baseline.json",
+  "summary": "0.5 quantile MSE is 1.9% higher than the squared error baseline overall (interval excludes zero), so the point forecast is worse. The 80% interval under-covers (77% overall, 61% storm, 43% intense) but has a lower pinball loss than the fixed regime band overall and in quiet hours; the quantile model hit the 3000 tree cap."
+}
