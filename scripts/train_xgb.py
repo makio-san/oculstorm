@@ -4,7 +4,7 @@ Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-curr
        [--n-lags N] [--max-depth D] [--min-child-weight W] [--learning-rate R] [--subsample S]
        [--colsample-bytree C] [--n-estimators T] [--seed S] [--objective {squarederror,pseudohuber,absolute}]
        [--huber-slope D] [--dst-offset-aug K] [--sw-noise-aug LEVEL] [--sw-noise-copies K]
-       [--sw-noise-seed S] [--dst-skip S] [--dst-newest-noise K] [--validation-only]
+       [--sw-noise-seed S] [--dst-skip S] [--dst-newest-noise K] [--no-density] [--validation-only]
 Writes: models/xgb_dst_{H}h{_swK}{variant}.ubj, reports/xgb_baseline{_Hh}{_swK}{variant}.json,
 reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -18,6 +18,8 @@ start from Dst(t-S), so the persistence rows are S+H hour persistence;
 an AR(1) error and adds _nnK.
 --sw-noise-aug LEVEL (off at 0, the default) adds K real-time like perturbed copies of the
 training years, see oculstorm/augment.py, and the tag _swnLEVEL; validation and test stay clean.
+--no-density leaves proton density, temperature, flow pressure and sqrt pressure out of the
+inputs (electric field, IMF and speed stay) and adds the tag _nd.
 --validation-only fits, prints the validation scores and writes nothing; the test years are
 not predicted)
 """
@@ -35,7 +37,7 @@ sys.path.insert(0, str(ROOT))
 
 from oculstorm.augment import consistent_rows, newest_hour_error, offset_table, train_copies  # noqa: E402
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
-from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, N_LAGS, build_features, suffix, weight_tag  # noqa: E402
+from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, N_LAGS, PLASMA_MOMENTS, build_features, suffix, weight_tag  # noqa: E402
 from oculstorm.metrics import evaluate, persistence, storm_weights, trend_persistence  # noqa: E402
 
 PARAMS = dict(
@@ -158,6 +160,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dst-skip", type=int, default=0, metavar="S", help="end the Dst history at t-S instead of t (0 = off)")
     parser.add_argument("--dst-newest-noise", type=int, default=0, metavar="K", choices=range(len(NOISE_LEVELS) + 1),
                         help="train on K extra copies of the train years with an AR(1) error on the newest Dst hour (0 = off)")
+    parser.add_argument("--no-density", action="store_true",
+                        help=f"leave {', '.join(PLASMA_MOMENTS)} out of the inputs (not with --ring-current)")
     parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never predict the test years")
     return parser
 
@@ -165,6 +169,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+    if args.no_density and args.ring_current:
+        parser.error("--ring-current needs the pressure, so it cannot be used with --no-density")
     if args.ring_current and (args.dst_skip or args.dst_newest_noise):
         parser.error("--ring-current cannot be combined with --dst-skip or --dst-newest-noise")
     if args.dst_skip and (args.dst_newest_noise or args.dst_offset_aug):
@@ -179,18 +185,20 @@ def main() -> None:
     variant += f"_oa{args.dst_offset_aug}" if args.dst_offset_aug else ""
     variant += f"_swn{noise:g}" if noise > 0 else ""
     variant += (f"_ds{skip}" if skip else "") + (f"_nn{newest}" if newest else "")
+    variant += "_nd" if args.no_density else ""
+    plasma = {"drop_plasma": True} if args.no_density else {}
     tag = suffix(h) + weight_tag(peak) + variant
     df = load_hourly()
-    X, y = build_features(df, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, dst_skip=skip)
+    X, y = build_features(df, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, dst_skip=skip, **plasma)
     (_, X_va, X_te), (_, y_va, y_te) = split(X), split(y)
-    print(f"horizon: {h}h  storm weight: {peak:g}  ring current: {args.ring_current}  lags: {n_lags}  features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}")
+    print(f"horizon: {h}h  storm weight: {peak:g}  ring current: {args.ring_current}  no density: {args.no_density}  lags: {n_lags}  features: {X.shape[1]}  train: {len(split(X)[0]):,}  val: {len(split(X)[1]):,}")
     if params != PARAMS:
         print("params:", {k: v for k, v in params.items() if v != PARAMS.get(k)})
 
     offset = [offset_copies(df, args.dst_offset_aug, h, args.ring_current, n_lags, memory=memory)] if args.dst_offset_aug else []
     if offset:
         print(f"offset augmentation: {args.dst_offset_aug} copies, {len(offset[0][0]):,} extra train rows")
-    noisy = [build_features(copy, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, dst_skip=skip)
+    noisy = [build_features(copy, horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, dst_skip=skip, **plasma)
              for copy in train_copies(df, noise, args.sw_noise_copies, args.sw_noise_seed)]
     if noisy:
         print(f"solar wind noise: level {noise:g}, {len(noisy)} perturbed copies of the training years, {sum(len(x) for x, _ in noisy):,} extra rows")
@@ -246,6 +254,7 @@ def main() -> None:
         "driver_memory_taus": list(memory),
         "n_lags": n_lags,
         "dst_offset_aug": args.dst_offset_aug,
+        "no_density": args.no_density,
         "sw_noise_aug": {"level": noise, "copies": len(noisy), "seed": args.sw_noise_seed},
         "dst_skip": skip,
         "dst_newest_noise": newest,

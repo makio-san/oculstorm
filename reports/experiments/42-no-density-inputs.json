@@ -1,0 +1,270 @@
+{
+  "issue": 42,
+  "title": "XGBoost without proton density, temperature and pressure inputs",
+  "result": "worse",
+  "split": "validation only, 2017-01-01 .. 2020-12-31; train 1995 .. 2016; test years not used",
+  "horizon_hours": 1,
+  "configuration": {
+    "option": "--no-density in scripts/train_xgb.py (build_features(drop_plasma=True)); default off, default feature set unchanged (89 inputs)",
+    "dropped": [
+      "proton_density",
+      "proton_temp",
+      "flow_pressure",
+      "sqrt_pressure"
+    ],
+    "kept": "electric_field, bz_gsm, by_gsm, b_mag_avg, flow_speed, vbs, newell, their lags and means, Dst history, f107, calendar",
+    "n_features": {
+      "baseline": 89,
+      "no_density": 65
+    },
+    "models": "production PARAMS, storm weight 1, early stopping on validation, seeds 0, 1, 2 for both variants, no retuning"
+  },
+  "baseline_reference": "reports/xgb_baseline.json validation_scores, all hours RMSE 2.6565; the retrained seed 0 baseline reproduces 2.6565",
+  "bootstrap": {
+    "method": "oculstorm.metrics.block_bootstrap_rmse, all 6 runs on the same resamples (paired)",
+    "block_hours": 168,
+    "resamples": 2000,
+    "seed": 0,
+    "statistic": "MSE change in percent of the seed mean MSE (no_density over baseline), 95% interval; per seed intervals as well"
+  },
+  "note": "intense interval drops resamples without an intense hour (0/0), see n_resamples_without_hours; 35 hours only. The real-time ACE input comparison suggested in the issue was not part of this run.",
+  "run_seconds": 474,
+  "runs": {
+    "baseline_s0": {
+      "seed": 0,
+      "n_features": 89,
+      "trees": 2151,
+      "hit_cap": false,
+      "seconds": 76
+    },
+    "baseline_s1": {
+      "seed": 1,
+      "n_features": 89,
+      "trees": 1838,
+      "hit_cap": false,
+      "seconds": 93
+    },
+    "baseline_s2": {
+      "seed": 2,
+      "n_features": 89,
+      "trees": 1980,
+      "hit_cap": false,
+      "seconds": 112
+    },
+    "no_density_s0": {
+      "seed": 0,
+      "n_features": 65,
+      "trees": 1867,
+      "hit_cap": false,
+      "seconds": 62
+    },
+    "no_density_s1": {
+      "seed": 1,
+      "n_features": 65,
+      "trees": 1650,
+      "hit_cap": false,
+      "seconds": 56
+    },
+    "no_density_s2": {
+      "seed": 2,
+      "n_features": 65,
+      "trees": 1730,
+      "hit_cap": false,
+      "seconds": 75
+    }
+  },
+  "regimes": {
+    "all": {
+      "label": "all",
+      "n_hours": 35064,
+      "rmse_persistence": 3.3704,
+      "baseline_rmse_seed_mean_mse": 2.6579,
+      "no_density_rmse_seed_mean_mse": 2.6808,
+      "skill_baseline": 0.3781,
+      "skill_no_density": 0.3673,
+      "mse_change_pct": 1.732,
+      "mse_change_pct_ci95": [
+        0.9178,
+        2.5823
+      ],
+      "rmse_diff_ci95": [
+        0.0121,
+        0.0341
+      ],
+      "n_resamples_without_hours": 0,
+      "per_seed": {
+        "s0": {
+          "rmse_baseline": 2.6565,
+          "rmse_no_density": 2.6839,
+          "mse_change_pct": 2.0756,
+          "mse_change_pct_ci95": [
+            1.2406,
+            2.9926
+          ]
+        },
+        "s1": {
+          "rmse_baseline": 2.6613,
+          "rmse_no_density": 2.6796,
+          "mse_change_pct": 1.3816,
+          "mse_change_pct_ci95": [
+            0.6161,
+            2.2438
+          ]
+        },
+        "s2": {
+          "rmse_baseline": 2.656,
+          "rmse_no_density": 2.679,
+          "mse_change_pct": 1.7401,
+          "mse_change_pct_ci95": [
+            0.7904,
+            2.6588
+          ]
+        }
+      }
+    },
+    "quiet": {
+      "label": "quiet (Dst > -50)",
+      "n_hours": 34702,
+      "rmse_persistence": 3.2359,
+      "baseline_rmse_seed_mean_mse": 2.5682,
+      "no_density_rmse_seed_mean_mse": 2.5864,
+      "skill_baseline": 0.3701,
+      "skill_no_density": 0.3611,
+      "mse_change_pct": 1.4273,
+      "mse_change_pct_ci95": [
+        0.7781,
+        2.1222
+      ],
+      "rmse_diff_ci95": [
+        0.0099,
+        0.0272
+      ],
+      "n_resamples_without_hours": 0,
+      "per_seed": {
+        "s0": {
+          "rmse_baseline": 2.5678,
+          "rmse_no_density": 2.5869,
+          "mse_change_pct": 1.4898,
+          "mse_change_pct_ci95": [
+            0.8375,
+            2.2213
+          ]
+        },
+        "s1": {
+          "rmse_baseline": 2.5699,
+          "rmse_no_density": 2.5865,
+          "mse_change_pct": 1.293,
+          "mse_change_pct_ci95": [
+            0.5621,
+            2.1011
+          ]
+        },
+        "s2": {
+          "rmse_baseline": 2.5668,
+          "rmse_no_density": 2.586,
+          "mse_change_pct": 1.4994,
+          "mse_change_pct_ci95": [
+            0.7181,
+            2.2576
+          ]
+        }
+      }
+    },
+    "storm": {
+      "label": "storm (Dst <= -50)",
+      "n_hours": 362,
+      "rmse_persistence": 9.8253,
+      "baseline_rmse_seed_mean_mse": 7.2124,
+      "no_density_rmse_seed_mean_mse": 7.4058,
+      "skill_baseline": 0.4612,
+      "skill_no_density": 0.4319,
+      "mse_change_pct": 5.4355,
+      "mse_change_pct_ci95": [
+        0.543,
+        10.8592
+      ],
+      "rmse_diff_ci95": [
+        0.0192,
+        0.369
+      ],
+      "n_resamples_without_hours": 0,
+      "per_seed": {
+        "s0": {
+          "rmse_baseline": 7.1727,
+          "rmse_no_density": 7.4979,
+          "mse_change_pct": 9.2727,
+          "mse_change_pct_ci95": [
+            2.7938,
+            16.9576
+          ]
+        },
+        "s1": {
+          "rmse_baseline": 7.2734,
+          "rmse_no_density": 7.3617,
+          "mse_change_pct": 2.4416,
+          "mse_change_pct_ci95": [
+            -1.1065,
+            6.6042
+          ]
+        },
+        "s2": {
+          "rmse_baseline": 7.1906,
+          "rmse_no_density": 7.3569,
+          "mse_change_pct": 4.6806,
+          "mse_change_pct_ci95": [
+            -1.238,
+            10.2647
+          ]
+        }
+      }
+    },
+    "intense": {
+      "label": "intense (Dst <= -100)",
+      "n_hours": 35,
+      "rmse_persistence": 15.9553,
+      "baseline_rmse_seed_mean_mse": 11.7427,
+      "no_density_rmse_seed_mean_mse": 12.0252,
+      "skill_baseline": 0.4583,
+      "skill_no_density": 0.432,
+      "mse_change_pct": 4.8687,
+      "mse_change_pct_ci95": [
+        -2.7495,
+        21.8918
+      ],
+      "rmse_diff_ci95": [
+        -0.1542,
+        0.9603
+      ],
+      "n_resamples_without_hours": 76,
+      "per_seed": {
+        "s0": {
+          "rmse_baseline": 11.6867,
+          "rmse_no_density": 12.2525,
+          "mse_change_pct": 9.9172,
+          "mse_change_pct_ci95": [
+            1.4723,
+            37.0725
+          ]
+        },
+        "s1": {
+          "rmse_baseline": 11.9009,
+          "rmse_no_density": 11.8493,
+          "mse_change_pct": -0.8653,
+          "mse_change_pct_ci95": [
+            -3.859,
+            8.4941
+          ]
+        },
+        "s2": {
+          "rmse_baseline": 11.6388,
+          "rmse_no_density": 11.9701,
+          "mse_change_pct": 5.7736,
+          "mse_change_pct_ci95": [
+            -6.2926,
+            22.286
+          ]
+        }
+      }
+    }
+  }
+}
