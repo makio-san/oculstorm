@@ -4,10 +4,13 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 SPEC = importlib.util.spec_from_file_location("train_xgb", Path(__file__).resolve().parent.parent / "scripts" / "train_xgb.py")
 train_xgb = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(train_xgb)
+
+from oculstorm.features import SOLAR_WIND  # noqa: E402
 
 
 def _frame() -> tuple[pd.DataFrame, pd.Series]:
@@ -71,3 +74,43 @@ def test_main_validation_only_runs_with_a_robust_objective(monkeypatch, capsys):
         train_xgb.main()
         out = capsys.readouterr().out
         assert "reg:" in out and "Validation:" in out
+
+
+def _hourly(n: int = 200) -> pd.DataFrame:
+    """A small hourly table with every column build_features reads."""
+    hours = pd.date_range("2016-12-01", periods=n, freq="h")
+    rng = np.random.default_rng(1)
+    columns = ["dst", "f107", *SOLAR_WIND]
+    df = pd.DataFrame(rng.normal(0, 3, (n, len(columns))), index=hours, columns=columns)
+    df["flow_speed"] = 400 + df["flow_speed"]
+    df["flow_pressure"] = 2 + df["flow_pressure"].abs()
+    return df
+
+
+def test_default_feature_set_is_unchanged_by_the_no_density_option():
+    assert not train_xgb.build_parser().parse_args([]).no_density
+    df = _hourly()
+    X_default, y_default = train_xgb.build_features(df)
+    X_off, y_off = train_xgb.build_features(df, drop_plasma=False)
+    pd.testing.assert_frame_equal(X_default, X_off)
+    pd.testing.assert_series_equal(y_default, y_off)
+    # The production 1 hour model has 89 inputs (reports/xgb_baseline.json), plasma moments included.
+    assert X_default.shape[1] == 89
+    for name in train_xgb.PLASMA_MOMENTS:
+        assert all(f"{name}_lag{lag}" in X_default for lag in range(train_xgb.N_LAGS))
+
+
+def test_no_density_drops_only_the_plasma_moments():
+    df = _hourly()
+    X_default, _ = train_xgb.build_features(df)
+    X_nd, _ = train_xgb.build_features(df, drop_plasma=True)
+    dropped = {f"{name}_lag{lag}" for name in train_xgb.PLASMA_MOMENTS for lag in range(train_xgb.N_LAGS)}
+    assert set(X_default.columns) - set(X_nd.columns) == dropped
+    assert set(X_nd.columns) <= set(X_default.columns)
+    pd.testing.assert_frame_equal(X_nd, X_default[X_nd.columns])
+    assert {"electric_field_lag0", "bz_gsm_lag0", "flow_speed_lag0", "vbs_lag0", "newell_lag0"} <= set(X_nd.columns)
+
+
+def test_no_density_cannot_be_combined_with_the_ring_current_terms():
+    with pytest.raises(ValueError):
+        train_xgb.build_features(_hourly(), drop_plasma=True, ring_current=True)
