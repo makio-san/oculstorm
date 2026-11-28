@@ -23,6 +23,7 @@ def test_defaults_are_the_production_params():
     assert {name: args[name] for name in train_xgb.TUNABLE} == {name: train_xgb.PARAMS[name] for name in train_xgb.TUNABLE}
     assert args["n_lags"] == train_xgb.N_LAGS
     assert not args["validation_only"]
+    assert args["timing_robust"] is None
 
 
 def test_fit_without_test_never_predicts_the_test_years():
