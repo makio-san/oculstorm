@@ -76,3 +76,24 @@ def test_main_validation_only_runs_with_a_robust_objective(monkeypatch, capsys):
 def test_gap_options_are_off_by_default():
     args = train_xgb.build_parser().parse_args([])
     assert args.gap_aug == 0 and args.gap_aug_rate == 1.0 and not args.gap_age
+
+
+def test_train_inputs_default_is_omni_and_adds_no_tag():
+    args = train_xgb.build_parser().parse_args([])
+    assert args.train_inputs == "omni" and train_xgb.TRAIN_INPUTS["omni"] == ""
+
+
+def test_fit_with_replaced_train_rows_keeps_validation_and_never_trains_on_it():
+    X, y = _frame()
+    keep = y.notna()
+    X, y = X[keep], y[keep]
+    params = {**train_xgb.PARAMS, "n_estimators": 5, "early_stopping_rounds": 2}
+    _, base, _ = train_xgb.fit(X, y, params=params, test=False)
+    X_alt = X.copy()
+    X_alt["dst_lag1"] = X_alt["dst_lag1"] + 50.0  # only the train rows of this copy may be read
+    _, val_pred, _ = train_xgb.fit(X, y, params=params, test=False, train=(X_alt, y))
+    assert len(val_pred) == len(base) == len(train_xgb.split(X)[1])
+    leaked = X_alt.copy()
+    leaked.loc[leaked.index >= train_xgb.VAL_START, "dst_lag0"] = 1e6  # validation rows of `train` are ignored
+    _, same, _ = train_xgb.fit(X, y, params=params, test=False, train=(leaked, y))
+    assert np.allclose(same, val_pred)

@@ -5,7 +5,7 @@ Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-curr
        [--colsample-bytree C] [--n-estimators T] [--seed S] [--objective {squarederror,pseudohuber,absolute}]
        [--huber-slope D] [--dst-offset-aug K] [--sw-noise-aug LEVEL] [--sw-noise-copies K]
        [--sw-noise-seed S] [--gap-aug K] [--gap-aug-rate R] [--gap-aug-seed S] [--gap-age]
-       [--dst-skip S] [--dst-newest-noise K] [--validation-only]
+       [--dst-skip S] [--dst-newest-noise K] [--train-inputs {omni,ace_rt,omni+ace_rt}] [--validation-only]
 Writes: models/xgb_dst_{H}h{_swK}{variant}.ubj, reports/xgb_baseline{_Hh}{_swK}{variant}.json,
 reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -22,6 +22,10 @@ training years, see oculstorm/augment.py, and the tag _swnLEVEL; validation and 
 --gap-aug K (off at 0, the default) adds K copies of the training years with real-time like IMF
 and plasma gaps (oculstorm.augment.blank_gaps, issue 41) and the tag _gaK (_gaK_rR for a rate
 other than 1); --gap-age adds the imf_age and plasma_age features and the tag _age.
+--train-inputs ace_rt (issue 50) trains on the 2001 to 2016 rows with the archived real-time ACE
+solar wind delayed 1 hour in place of OMNI (oculstorm.realtime_inputs, Dst and F10.7 from OMNI)
+and adds _acert; omni+ace_rt keeps the OMNI train years and adds the ACE copy, tag _omniacert.
+Early stopping, validation and test keep OMNI inputs. The default omni changes nothing.
 --validation-only fits, prints the validation scores and writes nothing; the test years are
 not predicted)
 """
@@ -119,9 +123,34 @@ def noisy_copies(
     return pd.concat([p[0] for p in parts]), pd.concat([p[1] for p in parts])
 
 
+TRAIN_INPUTS = {"omni": "", "ace_rt": "_acert", "omni+ace_rt": "_omniacert"}  # solar wind of the train years -> tag
+
+
+def ace_train_rows(df: pd.DataFrame, features: dict, cache: Path | None = None, keep: bool = False) -> tuple[pd.DataFrame, pd.Series]:
+    """Features and target of the train years 2001 .. 2016 with real-time ACE solar wind (issue 50).
+
+    The monthly files are downloaded into `cache` (default data/ace_rt) and deleted afterwards
+    unless `keep`. Only rows before VAL_START are returned.
+    """
+    import shutil
+
+    from oculstorm import realtime_inputs as rt
+
+    cache = rt.CACHE if cache is None else cache
+    try:
+        rt.download(cache, "train")
+        ace = rt.load_ace(cache, "train")
+    finally:
+        if not keep:
+            shutil.rmtree(cache, ignore_errors=True)
+    X_ace, y_ace = build_features(rt.train_table(df, ace), **features)
+    return split(X_ace)[0], split(y_ace)[0]
+
+
 def fit(
     X: pd.DataFrame, y: pd.Series, peak: float = 1.0, params: dict | None = None, test: bool = True,
     extra: list[tuple[pd.DataFrame, pd.Series]] | None = None,
+    train: tuple[pd.DataFrame, pd.Series] | None = None,
 ) -> tuple[xgb.XGBRegressor, np.ndarray, np.ndarray | None]:
     """Fit on train, early stop on validation, return the model and validation and test predictions.
 
@@ -132,9 +161,14 @@ def fit(
     `extra` holds more (X, y) training rows, for example the Dst offset copies of offset_copies,
     perturbed solar wind copies of the training years or the newest hour copies of noisy_copies;
     only their rows before VAL_START are used and validation and test are never extended.
+    `train` replaces the training rows of X and y (for example the real-time ACE rows of
+    ace_train_rows); validation and test still come from X.
     """
     delta = y - X["dst_lag0"]
     (X_tr, X_va, X_te), (d_tr, d_va, _), (y_tr, y_va, _) = split(X), split(delta), split(y)
+    if train is not None:
+        X_tr, y_tr = split(train[0])[0][X_tr.columns], split(train[1])[0]
+        d_tr = y_tr - X_tr["dst_lag0"]
     for X_more, y_more in extra or []:
         X_more, y_more = split(X_more)[0][X_tr.columns], split(y_more)[0]
         X_tr, y_tr = pd.concat([X_tr, X_more]), pd.concat([y_tr, y_more])
@@ -173,6 +207,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dst-skip", type=int, default=0, metavar="S", help="end the Dst history at t-S instead of t (0 = off)")
     parser.add_argument("--dst-newest-noise", type=int, default=0, metavar="K", choices=range(len(NOISE_LEVELS) + 1),
                         help="train on K extra copies of the train years with an AR(1) error on the newest Dst hour (0 = off)")
+    parser.add_argument("--train-inputs", choices=list(TRAIN_INPUTS), default="omni",
+                        help="solar wind of the train years: omni (default), ace_rt (real-time ACE 2001 to 2016, issue 50) or omni+ace_rt")
     parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never predict the test years")
     return parser
 
@@ -197,6 +233,7 @@ def main() -> None:
     variant += (f"_ga{gaps}" + (f"_r{args.gap_aug_rate:g}" if args.gap_aug_rate != 1 else "")) if gaps > 0 else ""
     variant += "_age" if args.gap_age else ""
     variant += (f"_ds{skip}" if skip else "") + (f"_nn{newest}" if newest else "")
+    variant += TRAIN_INPUTS[args.train_inputs]
     features = dict(horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, gap_age=args.gap_age, dst_skip=skip)
     tag = suffix(h) + weight_tag(peak) + variant
     df = load_hourly()
@@ -221,9 +258,17 @@ def main() -> None:
     if skip:
         print(f"Dst history ends at t-{skip}: persistence below is Dst(t-{skip}), {skip + h} hours before the target")
     extra = offset + noisy + gapped + newest_rows
+    train = None
+    if args.train_inputs != "omni":
+        ace_rows = ace_train_rows(df, features)
+        print(f"train inputs: {args.train_inputs}, {len(ace_rows[0]):,} real-time ACE rows of 2001 to 2016")
+        if args.train_inputs == "ace_rt":
+            train = ace_rows
+        else:
+            extra = extra + [ace_rows]
 
     if args.validation_only:
-        model, val_pred, _ = fit(X, y, peak, params, test=False, extra=extra)
+        model, val_pred, _ = fit(X, y, peak, params, test=False, extra=extra, train=train)
         print(f"trees: {model.best_iteration + 1} of {params['n_estimators']}")
         val_scores = evaluate(y_va, {"persistence": persistence(X_va), "xgboost (solar wind + Dst)": val_pred})
         print("\nValidation:")
@@ -231,7 +276,7 @@ def main() -> None:
         return
 
     X_dst, _ = build_features(df, use_solar_wind=False, horizon=h, n_lags=n_lags, dst_skip=skip)
-    model, val_pred, pred = fit(X, y, peak, params, extra=extra)
+    model, val_pred, pred = fit(X, y, peak, params, extra=extra, train=train)
     extra_dst = [offset_copies(df, args.dst_offset_aug, h, False, n_lags)] if args.dst_offset_aug else []
     extra_dst += newest_rows  # fit keeps only the Dst only columns
     model_dst, _, pred_dst = fit(X_dst, y, peak, params, extra=extra_dst)
@@ -272,6 +317,7 @@ def main() -> None:
         "gap_age": args.gap_age,
         "dst_skip": skip,
         "dst_newest_noise": newest,
+        "train_inputs": args.train_inputs,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
         "test": f"{TEST_START} .. {y_te.index.max()}",
