@@ -84,10 +84,11 @@ Three seeds were trained; the headline GRU is their average.
 | Intense (Dst <= -100) | 23.75 nT | 17.97 nT | 17.18 nT | 0.48 |
 
 - The GRU beats persistence in every regime and every test year (skill 0.36 to 0.49).
-- Against XGBoost the gain is small but consistent: 4.8% lower MSE overall
-  (95% interval 3.0% to 7.4%, paired monthly block bootstrap) and better in all six test years.
+- Against XGBoost the gain is small but consistent: 4.9% lower MSE overall, an RMSE
+  difference of -0.09 nT (95% interval -0.14 to -0.05 nT, one week block bootstrap in
+  `reports/comparison.json`) and better in all six test years.
 - For intense storms the GRU vs XGBoost difference is not statistically clear
-  (interval -6.5% to +23%), so the two models should be treated as equal there.
+  (-0.79 nT, interval -2.17 to +0.49 nT), so the two models should be treated as equal there.
 - Single seeds score 3.61 to 3.64 nT, still ahead of XGBoost; averaging the three seeds
   gives 3.58 nT, and averaging GRU with XGBoost gives 3.57 nT.
 
