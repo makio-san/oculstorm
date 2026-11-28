@@ -1,0 +1,526 @@
+{
+ "issue": 51,
+ "title": "Propagation timing robust windowed solar wind features (trailing 2 and 3 hour max and min, 2 hour mean of VBs, Newell and Bz)",
+ "date": "2026-11-28",
+ "part": "XGBoost on clean OMNI validation only; the ACE input diagnostics with 1 hour, 0 hour and ballistic delays (issue 51 scoring on #31 inputs) and the GRU were not run",
+ "result": "no-gain",
+ "label_basis": "agents/retrain-policy.md judges against the current production configuration (seed 0). Variant add: overall MSE -0.21% (-0.73 to 0.26), storm -0.66% (-4.82 to 4.53). Variant replace: overall +0.35% (-0.11 to 0.84), storm +1.31% (-2.86 to 6.96). No claimed gain has an interval that excludes zero and neither reaches 2% overall or 3% storm, so the bar is not met. The 3 seed averages agree: overall -0.01% for both variants, storm +0.42% (add) and -0.87% (replace), all intervals include zero.",
+ "reading": [
+  "Clean validation, seed 0, add: all: seed 0 MSE -0.21% (-0.73 to 0.26); quiet (Dst > -50): seed 0 MSE -0.18% (-0.55 to 0.19); storm (Dst <= -50): seed 0 MSE -0.66% (-4.82 to 4.53); intense (Dst <= -100): seed 0 MSE -7.26% (-14.62 to 12.93).",
+  "Clean validation, seed 0, replace: all: seed 0 MSE +0.35% (-0.11 to 0.84); quiet (Dst > -50): seed 0 MSE +0.27% (-0.16 to 0.72); storm (Dst <= -50): seed 0 MSE +1.31% (-2.86 to 6.96); intense (Dst <= -100): seed 0 MSE -2.91% (-10.88 to 7.62).",
+  "Intense hours (35) move by -5% to -6% on the 3 seed average for both variants, but the intervals include zero and 3.9% of the block resamples hold no intense hour at all (dropped from those intervals); not evidence.",
+  "As the issue expected for clean OMNI, the windows are neutral: the exact lags 0 to 5 already let the trees form the 2 and 3 hour extremes. Whether they help under real-time timing errors was not measured in this run.",
+  "The code stays behind an option that is off by default."
+ ],
+ "horizon_hours": 1,
+ "split": "train 1995-01-01 .. 2017-01-01 (exclusive), validation 2017-01-01 .. 2021-01-01 (exclusive); rows from 2021 onwards dropped from the table before anything was built or fitted, test years not used",
+ "option": {
+  "xgboost": "scripts/train_xgb.py --timing-robust {add,replace}",
+  "function": "oculstorm.features.build_features(..., timing_robust='add' | 'replace')",
+  "features": "for vbs, newell, bz_gsm: {name}_max2, _min2 (t-1 .. t), _max3, _min3 (t-2 .. t), _mean2 (t-1 .. t); pandas rolling(w, min_periods=1), trailing, never centred; replace also drops {name}_lag0 (variant B of the issue)",
+  "leakage_tests": "tests/test_features.py::test_timing_robust_windows_do_not_depend_on_the_future (both variants: corrupting every hour after a cut, and only the hour after it, leaves every row up to the cut unchanged), test_timing_robust_is_off_by_default_and_uses_trailing_windows"
+ },
+ "candidate": {
+  "add": "--timing-robust add (104 features)",
+  "replace": "--timing-robust replace (101 features)"
+ },
+ "baseline": "current configuration (PARAMS, 6 lags, 89 features) refitted in this run with seeds 0, 1, 2 on the table cut before 2021; seed 0 clean validation RMSE 2.6565 and best iteration 2151 equal reports/xgb_baseline.json",
+ "bootstrap": {
+  "function": "oculstorm.metrics.block_bootstrap_rmse",
+  "n_boot": 2000,
+  "block_hours": 168,
+  "seed": 0,
+  "statistic": "MSE change of candidate vs baseline in percent (negative is better), paired on the same resamples, per seed; mean_of_seeds averages the per seed changes per resample (treats the seeds as fixed); three_seed_average_model compares the mean prediction of the 3 candidate seeds with that of the 3 baseline seeds; 95% percentile interval, resamples without hours of the regime are dropped"
+ },
+ "runs": {
+  "base_seed0": {
+   "seed": 0,
+   "timing_robust": null,
+   "n_features": 89,
+   "train_rows": 192864,
+   "best_iteration": 2151,
+   "seconds": 179
+  },
+  "add_seed0": {
+   "seed": 0,
+   "timing_robust": "add",
+   "n_features": 104,
+   "train_rows": 192864,
+   "best_iteration": 2163,
+   "seconds": 141
+  },
+  "replace_seed0": {
+   "seed": 0,
+   "timing_robust": "replace",
+   "n_features": 101,
+   "train_rows": 192864,
+   "best_iteration": 1724,
+   "seconds": 85
+  },
+  "base_seed1": {
+   "seed": 1,
+   "timing_robust": null,
+   "n_features": 89,
+   "train_rows": 192864,
+   "best_iteration": 1838,
+   "seconds": 93
+  },
+  "add_seed1": {
+   "seed": 1,
+   "timing_robust": "add",
+   "n_features": 104,
+   "train_rows": 192864,
+   "best_iteration": 2168,
+   "seconds": 178
+  },
+  "replace_seed1": {
+   "seed": 1,
+   "timing_robust": "replace",
+   "n_features": 101,
+   "train_rows": 192864,
+   "best_iteration": 2027,
+   "seconds": 120
+  },
+  "base_seed2": {
+   "seed": 2,
+   "timing_robust": null,
+   "n_features": 89,
+   "train_rows": 192864,
+   "best_iteration": 1980,
+   "seconds": 100
+  },
+  "add_seed2": {
+   "seed": 2,
+   "timing_robust": "add",
+   "n_features": 104,
+   "train_rows": 192864,
+   "best_iteration": 2142,
+   "seconds": 148
+  },
+  "replace_seed2": {
+   "seed": 2,
+   "timing_robust": "replace",
+   "n_features": 101,
+   "train_rows": 192864,
+   "best_iteration": 2025,
+   "seconds": 151
+  }
+ },
+ "vs_baseline": {
+  "add": {
+   "all": {
+    "n_hours": 35063,
+    "rmse_persistence": 3.3704,
+    "rmse_baseline_seed0": 2.6565,
+    "rmse_candidate_seed0": 2.6537,
+    "skill_baseline_seed0": 0.3788,
+    "skill_candidate_seed0": 0.3801,
+    "rmse_baseline_mean_of_seeds": 2.6579,
+    "rmse_candidate_mean_of_seeds": 2.6578,
+    "mse_change_pct_mean_of_seeds": -0.01,
+    "mse_change_pct_ci95_mean_of_seeds": [
+     -0.27,
+     0.24
+    ],
+    "three_seed_average_model": {
+     "mse_change_pct": -0.03,
+     "mse_change_pct_ci95": [
+      -0.29,
+      0.21
+     ]
+    },
+    "per_seed": {
+     "seed0": {
+      "rmse_baseline": 2.6565,
+      "rmse_candidate": 2.6537,
+      "mse_change_pct": -0.21,
+      "mse_change_pct_ci95": [
+       -0.73,
+       0.26
+      ]
+     },
+     "seed1": {
+      "rmse_baseline": 2.6613,
+      "rmse_candidate": 2.6603,
+      "mse_change_pct": -0.08,
+      "mse_change_pct_ci95": [
+       -0.45,
+       0.31
+      ]
+     },
+     "seed2": {
+      "rmse_baseline": 2.656,
+      "rmse_candidate": 2.6593,
+      "mse_change_pct": 0.25,
+      "mse_change_pct_ci95": [
+       -0.1,
+       0.58
+      ]
+     }
+    }
+   },
+   "quiet (Dst > -50)": {
+    "n_hours": 34701,
+    "rmse_persistence": 3.2359,
+    "rmse_baseline_seed0": 2.5679,
+    "rmse_candidate_seed0": 2.5656,
+    "skill_baseline_seed0": 0.3703,
+    "skill_candidate_seed0": 0.3714,
+    "rmse_baseline_mean_of_seeds": 2.5682,
+    "rmse_candidate_mean_of_seeds": 2.5676,
+    "mse_change_pct_mean_of_seeds": -0.05,
+    "mse_change_pct_ci95_mean_of_seeds": [
+     -0.27,
+     0.18
+    ],
+    "three_seed_average_model": {
+     "mse_change_pct": -0.08,
+     "mse_change_pct_ci95": [
+      -0.29,
+      0.15
+     ]
+    },
+    "per_seed": {
+     "seed0": {
+      "rmse_baseline": 2.5679,
+      "rmse_candidate": 2.5656,
+      "mse_change_pct": -0.18,
+      "mse_change_pct_ci95": [
+       -0.55,
+       0.19
+      ]
+     },
+     "seed1": {
+      "rmse_baseline": 2.5699,
+      "rmse_candidate": 2.5697,
+      "mse_change_pct": -0.02,
+      "mse_change_pct_ci95": [
+       -0.38,
+       0.36
+      ]
+     },
+     "seed2": {
+      "rmse_baseline": 2.5668,
+      "rmse_candidate": 2.5674,
+      "mse_change_pct": 0.04,
+      "mse_change_pct_ci95": [
+       -0.29,
+       0.35
+      ]
+     }
+    }
+   },
+   "storm (Dst <= -50)": {
+    "n_hours": 362,
+    "rmse_persistence": 9.8253,
+    "rmse_baseline_seed0": 7.1727,
+    "rmse_candidate_seed0": 7.149,
+    "skill_baseline_seed0": 0.4671,
+    "skill_candidate_seed0": 0.4706,
+    "rmse_baseline_mean_of_seeds": 7.2122,
+    "rmse_candidate_mean_of_seeds": 7.227,
+    "mse_change_pct_mean_of_seeds": 0.42,
+    "mse_change_pct_ci95_mean_of_seeds": [
+     -1.42,
+     3.23
+    ],
+    "three_seed_average_model": {
+     "mse_change_pct": 0.52,
+     "mse_change_pct_ci95": [
+      -1.33,
+      3.26
+     ]
+    },
+    "per_seed": {
+     "seed0": {
+      "rmse_baseline": 7.1727,
+      "rmse_candidate": 7.149,
+      "mse_change_pct": -0.66,
+      "mse_change_pct_ci95": [
+       -4.82,
+       4.53
+      ]
+     },
+     "seed1": {
+      "rmse_baseline": 7.2734,
+      "rmse_candidate": 7.2439,
+      "mse_change_pct": -0.81,
+      "mse_change_pct_ci95": [
+       -3.26,
+       2.61
+      ]
+     },
+     "seed2": {
+      "rmse_baseline": 7.1906,
+      "rmse_candidate": 7.2882,
+      "mse_change_pct": 2.74,
+      "mse_change_pct_ci95": [
+       0.76,
+       5.1
+      ]
+     }
+    }
+   },
+   "intense (Dst <= -100)": {
+    "n_hours": 35,
+    "rmse_persistence": 15.9553,
+    "share_of_resamples_without_hours": 0.039,
+    "rmse_baseline_seed0": 11.6867,
+    "rmse_candidate_seed0": 11.2546,
+    "skill_baseline_seed0": 0.4635,
+    "skill_candidate_seed0": 0.5024,
+    "rmse_baseline_mean_of_seeds": 11.7421,
+    "rmse_candidate_mean_of_seeds": 11.4385,
+    "mse_change_pct_mean_of_seeds": -4.99,
+    "mse_change_pct_ci95_mean_of_seeds": [
+     -7.78,
+     7.86
+    ],
+    "three_seed_average_model": {
+     "mse_change_pct": -4.94,
+     "mse_change_pct_ci95": [
+      -7.8,
+      7.59
+     ]
+    },
+    "per_seed": {
+     "seed0": {
+      "rmse_baseline": 11.6867,
+      "rmse_candidate": 11.2546,
+      "mse_change_pct": -7.26,
+      "mse_change_pct_ci95": [
+       -14.62,
+       12.93
+      ]
+     },
+     "seed1": {
+      "rmse_baseline": 11.9009,
+      "rmse_candidate": 11.2927,
+      "mse_change_pct": -9.96,
+      "mse_change_pct_ci95": [
+       -11.88,
+       -3.8
+      ]
+     },
+     "seed2": {
+      "rmse_baseline": 11.6388,
+      "rmse_candidate": 11.7683,
+      "mse_change_pct": 2.24,
+      "mse_change_pct_ci95": [
+       -3.91,
+       14.44
+      ]
+     }
+    }
+   }
+  },
+  "replace": {
+   "all": {
+    "n_hours": 35063,
+    "rmse_persistence": 3.3704,
+    "rmse_baseline_seed0": 2.6565,
+    "rmse_candidate_seed0": 2.6612,
+    "skill_baseline_seed0": 0.3788,
+    "skill_candidate_seed0": 0.3766,
+    "rmse_baseline_mean_of_seeds": 2.6579,
+    "rmse_candidate_mean_of_seeds": 2.6579,
+    "mse_change_pct_mean_of_seeds": -0.01,
+    "mse_change_pct_ci95_mean_of_seeds": [
+     -0.32,
+     0.31
+    ],
+    "three_seed_average_model": {
+     "mse_change_pct": 0.0,
+     "mse_change_pct_ci95": [
+      -0.32,
+      0.31
+     ]
+    },
+    "per_seed": {
+     "seed0": {
+      "rmse_baseline": 2.6565,
+      "rmse_candidate": 2.6612,
+      "mse_change_pct": 0.35,
+      "mse_change_pct_ci95": [
+       -0.11,
+       0.84
+      ]
+     },
+     "seed1": {
+      "rmse_baseline": 2.6613,
+      "rmse_candidate": 2.6575,
+      "mse_change_pct": -0.29,
+      "mse_change_pct_ci95": [
+       -0.79,
+       0.19
+      ]
+     },
+     "seed2": {
+      "rmse_baseline": 2.656,
+      "rmse_candidate": 2.655,
+      "mse_change_pct": -0.08,
+      "mse_change_pct_ci95": [
+       -0.52,
+       0.32
+      ]
+     }
+    }
+   },
+   "quiet (Dst > -50)": {
+    "n_hours": 34701,
+    "rmse_persistence": 3.2359,
+    "rmse_baseline_seed0": 2.5679,
+    "rmse_candidate_seed0": 2.5714,
+    "skill_baseline_seed0": 0.3703,
+    "skill_candidate_seed0": 0.3686,
+    "rmse_baseline_mean_of_seeds": 2.5682,
+    "rmse_candidate_mean_of_seeds": 2.5691,
+    "mse_change_pct_mean_of_seeds": 0.07,
+    "mse_change_pct_ci95_mean_of_seeds": [
+     -0.2,
+     0.32
+    ],
+    "three_seed_average_model": {
+     "mse_change_pct": 0.06,
+     "mse_change_pct_ci95": [
+      -0.2,
+      0.31
+     ]
+    },
+    "per_seed": {
+     "seed0": {
+      "rmse_baseline": 2.5679,
+      "rmse_candidate": 2.5714,
+      "mse_change_pct": 0.27,
+      "mse_change_pct_ci95": [
+       -0.16,
+       0.72
+      ]
+     },
+     "seed1": {
+      "rmse_baseline": 2.5699,
+      "rmse_candidate": 2.569,
+      "mse_change_pct": -0.07,
+      "mse_change_pct_ci95": [
+       -0.43,
+       0.31
+      ]
+     },
+     "seed2": {
+      "rmse_baseline": 2.5668,
+      "rmse_candidate": 2.5669,
+      "mse_change_pct": 0.01,
+      "mse_change_pct_ci95": [
+       -0.39,
+       0.38
+      ]
+     }
+    }
+   },
+   "storm (Dst <= -50)": {
+    "n_hours": 362,
+    "rmse_persistence": 9.8253,
+    "rmse_baseline_seed0": 7.1727,
+    "rmse_candidate_seed0": 7.2195,
+    "skill_baseline_seed0": 0.4671,
+    "skill_candidate_seed0": 0.4601,
+    "rmse_baseline_mean_of_seeds": 7.2122,
+    "rmse_candidate_mean_of_seeds": 7.1804,
+    "mse_change_pct_mean_of_seeds": -0.87,
+    "mse_change_pct_ci95_mean_of_seeds": [
+     -3.57,
+     1.77
+    ],
+    "three_seed_average_model": {
+     "mse_change_pct": -0.75,
+     "mse_change_pct_ci95": [
+      -3.63,
+      1.79
+     ]
+    },
+    "per_seed": {
+     "seed0": {
+      "rmse_baseline": 7.1727,
+      "rmse_candidate": 7.2195,
+      "mse_change_pct": 1.31,
+      "mse_change_pct_ci95": [
+       -2.86,
+       6.96
+      ]
+     },
+     "seed1": {
+      "rmse_baseline": 7.2734,
+      "rmse_candidate": 7.1709,
+      "mse_change_pct": -2.8,
+      "mse_change_pct_ci95": [
+       -7.58,
+       2.08
+      ]
+     },
+     "seed2": {
+      "rmse_baseline": 7.1906,
+      "rmse_candidate": 7.1507,
+      "mse_change_pct": -1.11,
+      "mse_change_pct_ci95": [
+       -4.4,
+       1.19
+      ]
+     }
+    }
+   },
+   "intense (Dst <= -100)": {
+    "n_hours": 35,
+    "rmse_persistence": 15.9553,
+    "share_of_resamples_without_hours": 0.039,
+    "rmse_baseline_seed0": 11.6867,
+    "rmse_candidate_seed0": 11.5157,
+    "skill_baseline_seed0": 0.4635,
+    "skill_candidate_seed0": 0.4791,
+    "rmse_baseline_mean_of_seeds": 11.7421,
+    "rmse_candidate_mean_of_seeds": 11.3767,
+    "mse_change_pct_mean_of_seeds": -6.08,
+    "mse_change_pct_ci95_mean_of_seeds": [
+     -13.04,
+     1.49
+    ],
+    "three_seed_average_model": {
+     "mse_change_pct": -5.62,
+     "mse_change_pct_ci95": [
+      -13.14,
+      2.19
+     ]
+    },
+    "per_seed": {
+     "seed0": {
+      "rmse_baseline": 11.6867,
+      "rmse_candidate": 11.5157,
+      "mse_change_pct": -2.91,
+      "mse_change_pct_ci95": [
+       -10.88,
+       7.62
+      ]
+     },
+     "seed1": {
+      "rmse_baseline": 11.9009,
+      "rmse_candidate": 11.302,
+      "mse_change_pct": -9.81,
+      "mse_change_pct_ci95": [
+       -19.41,
+       0.25
+      ]
+     },
+     "seed2": {
+      "rmse_baseline": 11.6388,
+      "rmse_candidate": 11.3124,
+      "mse_change_pct": -5.53,
+      "mse_change_pct_ci95": [
+       -13.67,
+       -0.12
+      ]
+     }
+    }
+   }
+  }
+ },
+ "seconds": 1195
+}
