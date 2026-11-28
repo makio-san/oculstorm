@@ -1,0 +1,1132 @@
+{
+  "model": "xgboost and gru",
+  "search": "storm weight K",
+  "horizon_hours": 1,
+  "date": "2026-11-28",
+  "agent": "tuner",
+  "split": {
+    "train": "1995-01-01 .. 2017-01-01 (exclusive)",
+    "validation": "2017-01-01 .. 2021-01-01 (exclusive)",
+    "test": "not used"
+  },
+  "note": "Training code is fit of scripts/train_xgb.py and train_one of scripts/train_gru.py, unchanged, with --storm-weight K set per configuration (oculstorm.metrics.storm_weights: weight rises linearly from 1 at Dst >= 0 nT to K at Dst <= -100 nT). All other options are the production defaults. As in the scripts, early stopping uses the validation set with the same K weights, so validation RMSE is slightly optimistic for every configuration alike. Grid K in 1, 1.5, 2, 3, 5, 10 for each family; K = 1 is the current production configuration and reproduces models/xgb_dst_1h.ubj and models/gru_dst_1h_seed0.pt exactly on validation. XGBoost is deterministic (random_state 0), so one fit per K. GRU: seed 0 per K, then the 3 configurations with the lowest seed 0 storm MSE among those within +1% overall MSE of production seed 0 re-run with seeds 1 and 2. XGBoost fits used n_jobs 3, GRU torch threads 3. Validation RMSE and MSE are unweighted, reported for all hours and per regime by the observed Dst at the target hour (quiet Dst > -50 nT, storm Dst <= -50 nT, intense Dst <= -100 nT). Bootstrap: paired moving block bootstrap (oculstorm.metrics.block_bootstrap_rmse, 168 hour blocks, 2000 resamples, seed 0) of the relative MSE change against production.",
+  "fixed": {
+    "xgboost": "PARAMS of scripts/train_xgb.py, n_lags 6, n_jobs 3",
+    "gru": "hidden 64, window 24, dropout 0.1, lr 0.002, patience 6, batch 512, max_epochs 40, Huber delta 3"
+  },
+  "search_space": {
+    "storm_weight_K": "1, 1.5, 2, 3, 5, 10"
+  },
+  "n_configurations": 12,
+  "n_gru_reruns": 6,
+  "wall_seconds": 3780.0,
+  "reference_production": {
+    "xgboost": {
+      "source": "models/xgb_dst_1h.ubj",
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6565,
+          "mse": 7.0568,
+          "skill_vs_persistence": 0.3788
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5678,
+          "mse": 6.5937,
+          "skill_vs_persistence": 0.3703
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1727,
+          "mse": 51.448,
+          "skill_vs_persistence": 0.4671
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.6867,
+          "mse": 136.5794,
+          "skill_vs_persistence": 0.4635
+        }
+      }
+    },
+    "gru": {
+      "source": "models/gru_dst_1h_seed{0,1,2}.pt",
+      "validation_mean_of_3_seeds": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6205,
+          "mse": 6.867,
+          "skill_vs_persistence": 0.3955
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5324,
+          "mse": 6.4133,
+          "skill_vs_persistence": 0.3875
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0968,
+          "mse": 50.3644,
+          "skill_vs_persistence": 0.4783
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 10.5678,
+          "mse": 111.6787,
+          "skill_vs_persistence": 0.5613
+        }
+      },
+      "validation_seed0": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6403,
+          "mse": 6.9712,
+          "skill_vs_persistence": 0.3863
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5479,
+          "mse": 6.4918,
+          "skill_vs_persistence": 0.38
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.2755,
+          "mse": 52.9325,
+          "skill_vs_persistence": 0.4517
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.0072,
+          "mse": 121.1579,
+          "skill_vs_persistence": 0.5241
+        }
+      }
+    }
+  },
+  "configurations_xgboost": [
+    {
+      "id": 0,
+      "current": true,
+      "storm_weight_K": 1.0,
+      "best_iteration": 2151,
+      "fit_seconds": 82.5,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6565,
+          "mse": 7.0568,
+          "skill_vs_persistence": 0.3788
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5678,
+          "mse": 6.5937,
+          "skill_vs_persistence": 0.3703
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1727,
+          "mse": 51.448,
+          "skill_vs_persistence": 0.4671
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.6867,
+          "mse": 136.5794,
+          "skill_vs_persistence": 0.4635
+        }
+      },
+      "vs_production": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "id": 1,
+      "current": false,
+      "storm_weight_K": 1.5,
+      "best_iteration": 1764,
+      "fit_seconds": 101.0,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6562,
+          "mse": 7.0555,
+          "skill_vs_persistence": 0.3789
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5715,
+          "mse": 6.6125,
+          "skill_vs_persistence": 0.3685
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0375,
+          "mse": 49.5267,
+          "skill_vs_persistence": 0.487
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.1315,
+          "mse": 123.9108,
+          "skill_vs_persistence": 0.5133
+        }
+      },
+      "vs_production": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": -0.0002,
+          "ci95": [
+            -0.0063,
+            0.0049
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0028,
+          "ci95": [
+            -0.001,
+            0.0067
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0373,
+          "ci95": [
+            -0.1007,
+            0.0126
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "id": 2,
+      "current": false,
+      "storm_weight_K": 2.0,
+      "best_iteration": 2204,
+      "fit_seconds": 209.8,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.655,
+          "mse": 7.0489,
+          "skill_vs_persistence": 0.3795
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5703,
+          "mse": 6.6062,
+          "skill_vs_persistence": 0.3691
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0347,
+          "mse": 49.4874,
+          "skill_vs_persistence": 0.4874
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.0092,
+          "mse": 121.2035,
+          "skill_vs_persistence": 0.5239
+        }
+      },
+      "vs_production": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": -0.0011,
+          "ci95": [
+            -0.0074,
+            0.0045
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0019,
+          "ci95": [
+            -0.0024,
+            0.0063
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0381,
+          "ci95": [
+            -0.0928,
+            0.0129
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "id": 3,
+      "current": false,
+      "storm_weight_K": 3.0,
+      "best_iteration": 2342,
+      "fit_seconds": 222.5,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6627,
+          "mse": 7.0899,
+          "skill_vs_persistence": 0.3759
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5757,
+          "mse": 6.6342,
+          "skill_vs_persistence": 0.3664
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1252,
+          "mse": 50.7692,
+          "skill_vs_persistence": 0.4741
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.2844,
+          "mse": 127.3383,
+          "skill_vs_persistence": 0.4998
+        }
+      },
+      "vs_production": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0047,
+          "ci95": [
+            -0.0005,
+            0.0097
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0061,
+          "ci95": [
+            0.0015,
+            0.0104
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0132,
+          "ci95": [
+            -0.0449,
+            0.0287
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "id": 4,
+      "current": false,
+      "storm_weight_K": 5.0,
+      "best_iteration": 1507,
+      "fit_seconds": 143.5,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6654,
+          "mse": 7.1044,
+          "skill_vs_persistence": 0.3746
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5822,
+          "mse": 6.6678,
+          "skill_vs_persistence": 0.3632
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 6.9974,
+          "mse": 48.9636,
+          "skill_vs_persistence": 0.4928
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 10.8504,
+          "mse": 117.7314,
+          "skill_vs_persistence": 0.5375
+        }
+      },
+      "vs_production": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0068,
+          "ci95": [
+            -0.0009,
+            0.0142
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0112,
+          "ci95": [
+            0.0055,
+            0.0167
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0483,
+          "ci95": [
+            -0.096,
+            0.019
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "id": 5,
+      "current": false,
+      "storm_weight_K": 10.0,
+      "best_iteration": 1681,
+      "fit_seconds": 164.6,
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6703,
+          "mse": 7.1307,
+          "skill_vs_persistence": 0.3723
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5868,
+          "mse": 6.6916,
+          "skill_vs_persistence": 0.3609
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0155,
+          "mse": 49.2175,
+          "skill_vs_persistence": 0.4902
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.1509,
+          "mse": 124.3419,
+          "skill_vs_persistence": 0.5116
+        }
+      },
+      "vs_production": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0105,
+          "ci95": [
+            0.0034,
+            0.017
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0148,
+          "ci95": [
+            0.009,
+            0.0202
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0434,
+          "ci95": [
+            -0.089,
+            0.0099
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    }
+  ],
+  "configurations_gru": [
+    {
+      "id": 6,
+      "current": true,
+      "storm_weight_K": 1.0,
+      "seed0": {
+        "epochs": 21,
+        "best_weighted_val_rmse": 2.6403,
+        "seconds": 430.6
+      },
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6403,
+          "mse": 6.9712,
+          "skill_vs_persistence": 0.3863
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5479,
+          "mse": 6.4918,
+          "skill_vs_persistence": 0.38
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.2755,
+          "mse": 52.9325,
+          "skill_vs_persistence": 0.4517
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.0072,
+          "mse": 121.1579,
+          "skill_vs_persistence": 0.5241
+        }
+      },
+      "vs_production_seed0": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "id": 7,
+      "current": false,
+      "storm_weight_K": 1.5,
+      "seed0": {
+        "epochs": 26,
+        "best_weighted_val_rmse": 2.6904,
+        "seconds": 619.3
+      },
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6458,
+          "mse": 7.0005,
+          "skill_vs_persistence": 0.3837
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5546,
+          "mse": 6.5261,
+          "skill_vs_persistence": 0.3768
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.2441,
+          "mse": 52.4773,
+          "skill_vs_persistence": 0.4564
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.0408,
+          "mse": 121.8993,
+          "skill_vs_persistence": 0.5212
+        }
+      },
+      "vs_production_seed0": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0042,
+          "ci95": [
+            -0.0031,
+            0.0126
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0053,
+          "ci95": [
+            -0.0002,
+            0.011
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0086,
+          "ci95": [
+            -0.0723,
+            0.0518
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "id": 8,
+      "current": false,
+      "storm_weight_K": 2.0,
+      "seed0": {
+        "epochs": 21,
+        "best_weighted_val_rmse": 2.735,
+        "seconds": 275.8
+      },
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.651,
+          "mse": 7.0277,
+          "skill_vs_persistence": 0.3813
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5599,
+          "mse": 6.5529,
+          "skill_vs_persistence": 0.3742
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.2482,
+          "mse": 52.5365,
+          "skill_vs_persistence": 0.4558
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.2559,
+          "mse": 126.6958,
+          "skill_vs_persistence": 0.5023
+        }
+      },
+      "vs_production_seed0": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0081,
+          "ci95": [
+            0.0006,
+            0.0155
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0094,
+          "ci95": [
+            0.0037,
+            0.0153
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0075,
+          "ci95": [
+            -0.0727,
+            0.0439
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "id": 9,
+      "current": false,
+      "storm_weight_K": 3.0,
+      "seed0": {
+        "epochs": 26,
+        "best_weighted_val_rmse": 2.7929,
+        "seconds": 349.9
+      },
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6454,
+          "mse": 6.998,
+          "skill_vs_persistence": 0.384
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5593,
+          "mse": 6.5499,
+          "skill_vs_persistence": 0.3745
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0676,
+          "mse": 49.9513,
+          "skill_vs_persistence": 0.4826
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 10.5965,
+          "mse": 112.2854,
+          "skill_vs_persistence": 0.5589
+        }
+      },
+      "vs_production_seed0": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0038,
+          "ci95": [
+            -0.0054,
+            0.0123
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.009,
+          "ci95": [
+            0.0029,
+            0.0148
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0563,
+          "ci95": [
+            -0.1454,
+            0.0204
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "id": 10,
+      "current": false,
+      "storm_weight_K": 5.0,
+      "seed0": {
+        "epochs": 21,
+        "best_weighted_val_rmse": 2.9069,
+        "seconds": 307.0
+      },
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6598,
+          "mse": 7.0744,
+          "skill_vs_persistence": 0.3772
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5715,
+          "mse": 6.6124,
+          "skill_vs_persistence": 0.3685
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.1671,
+          "mse": 51.3673,
+          "skill_vs_persistence": 0.4679
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 11.172,
+          "mse": 124.814,
+          "skill_vs_persistence": 0.5097
+        }
+      },
+      "vs_production_seed0": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0148,
+          "ci95": [
+            0.0051,
+            0.0237
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0186,
+          "ci95": [
+            0.0107,
+            0.0254
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0296,
+          "ci95": [
+            -0.1194,
+            0.0437
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "id": 11,
+      "current": false,
+      "storm_weight_K": 10.0,
+      "seed0": {
+        "epochs": 25,
+        "best_weighted_val_rmse": 3.0457,
+        "seconds": 460.3
+      },
+      "validation": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6712,
+          "mse": 7.1353,
+          "skill_vs_persistence": 0.3719
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5866,
+          "mse": 6.6905,
+          "skill_vs_persistence": 0.3611
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0552,
+          "mse": 49.7765,
+          "skill_vs_persistence": 0.4844
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 10.7258,
+          "mse": 115.0423,
+          "skill_vs_persistence": 0.5481
+        }
+      },
+      "vs_production_seed0": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0235,
+          "ci95": [
+            0.0121,
+            0.0352
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0306,
+          "ci95": [
+            0.0206,
+            0.0399
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0596,
+          "ci95": [
+            -0.1269,
+            0.0056
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    }
+  ],
+  "gru_reruns_3_seeds": [
+    {
+      "storm_weight_K": 1.5,
+      "seeds": [
+        {
+          "seed": 0,
+          "epochs": 26,
+          "best_weighted_val_rmse": 2.6904,
+          "seconds": 619.3
+        },
+        {
+          "seed": 1,
+          "epochs": 23,
+          "best_weighted_val_rmse": 2.6838,
+          "seconds": 511.9
+        },
+        {
+          "seed": 2,
+          "epochs": 24,
+          "best_weighted_val_rmse": 2.6761,
+          "seconds": 308.3
+        }
+      ],
+      "validation_mean_of_3_seeds": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6226,
+          "mse": 6.8781,
+          "skill_vs_persistence": 0.3945
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5369,
+          "mse": 6.4359,
+          "skill_vs_persistence": 0.3854
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0188,
+          "mse": 49.2641,
+          "skill_vs_persistence": 0.4897
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 10.4206,
+          "mse": 108.5883,
+          "skill_vs_persistence": 0.5734
+        }
+      },
+      "vs_production_mean_of_3_seeds": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0016,
+          "ci95": [
+            -0.0028,
+            0.0064
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0035,
+          "ci95": [
+            0.0004,
+            0.0068
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0218,
+          "ci95": [
+            -0.0681,
+            0.0209
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "storm_weight_K": 2.0,
+      "seeds": [
+        {
+          "seed": 0,
+          "epochs": 21,
+          "best_weighted_val_rmse": 2.735,
+          "seconds": 275.8
+        },
+        {
+          "seed": 1,
+          "epochs": 17,
+          "best_weighted_val_rmse": 2.728,
+          "seconds": 155.4
+        },
+        {
+          "seed": 2,
+          "epochs": 21,
+          "best_weighted_val_rmse": 2.7229,
+          "seconds": 308.7
+        }
+      ],
+      "validation_mean_of_3_seeds": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6287,
+          "mse": 6.9103,
+          "skill_vs_persistence": 0.3917
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5429,
+          "mse": 6.4662,
+          "skill_vs_persistence": 0.3825
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 7.0347,
+          "mse": 49.4871,
+          "skill_vs_persistence": 0.4874
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 10.527,
+          "mse": 110.8179,
+          "skill_vs_persistence": 0.5647
+        }
+      },
+      "vs_production_mean_of_3_seeds": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0063,
+          "ci95": [
+            0.0023,
+            0.0107
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0082,
+          "ci95": [
+            0.0044,
+            0.0121
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0174,
+          "ci95": [
+            -0.0532,
+            0.0116
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    },
+    {
+      "storm_weight_K": 3.0,
+      "seeds": [
+        {
+          "seed": 0,
+          "epochs": 26,
+          "best_weighted_val_rmse": 2.7929,
+          "seconds": 349.9
+        },
+        {
+          "seed": 1,
+          "epochs": 19,
+          "best_weighted_val_rmse": 2.8024,
+          "seconds": 394.1
+        },
+        {
+          "seed": 2,
+          "epochs": 21,
+          "best_weighted_val_rmse": 2.8036,
+          "seconds": 460.6
+        }
+      ],
+      "validation_mean_of_3_seeds": {
+        "all": {
+          "n_hours": 35064,
+          "rmse": 2.6351,
+          "mse": 6.9435,
+          "skill_vs_persistence": 0.3888
+        },
+        "quiet (Dst > -50)": {
+          "n_hours": 34702,
+          "rmse": 2.5505,
+          "mse": 6.505,
+          "skill_vs_persistence": 0.3788
+        },
+        "storm (Dst <= -50)": {
+          "n_hours": 362,
+          "rmse": 6.9987,
+          "mse": 48.9821,
+          "skill_vs_persistence": 0.4926
+        },
+        "intense (Dst <= -100)": {
+          "n_hours": 35,
+          "rmse": 10.4462,
+          "mse": 109.1221,
+          "skill_vs_persistence": 0.5713
+        }
+      },
+      "vs_production_mean_of_3_seeds": {
+        "block_hours": 168,
+        "n_boot": 2000,
+        "all": {
+          "mse_change": 0.0111,
+          "ci95": [
+            0.0054,
+            0.0167
+          ]
+        },
+        "quiet (Dst > -50)": {
+          "mse_change": 0.0143,
+          "ci95": [
+            0.0098,
+            0.0187
+          ]
+        },
+        "storm (Dst <= -50)": {
+          "mse_change": -0.0274,
+          "ci95": [
+            -0.0905,
+            0.0227
+          ]
+        }
+      },
+      "promising_check": {
+        "overall_bar": false,
+        "storm_bar": false,
+        "meets_bar": false
+      }
+    }
+  ],
+  "promising_bar": "overall MSE at least 2% lower, or storm hour MSE at least 3% lower with overall MSE no more than 1% higher, paired block bootstrap 95% interval excluding zero (agents/retrain-policy.md)",
+  "promising": {
+    "xgboost": false,
+    "gru": false
+  },
+  "conclusion": "No storm weight meets the promising bar for either family. XGBoost: K 1.5 to 10 lower storm hour MSE by 1 to 5% but every 95% interval includes zero, while quiet RMSE rises slightly with K and K 10 costs 1% overall MSE. GRU: single seed storm gains of up to 6% (K 3, K 10) shrink to 1.7 to 2.7% with 3 seeds (K 1.5, 2, 3), with intervals including zero, and overall MSE rises with K (K 3: +1.1%, interval excluding zero). Production K = 1 stays."
+}
