@@ -13,6 +13,8 @@ HORIZONS = (1, 3, 6, 12)  # lead times the models are trained for
 N_LAGS = 6  # hours of history given to the model (lag 0 .. N_LAGS-1)
 MEMORY_TAUS = (3, 8, 24)  # e-folding times (hours) of the optional decaying driver memory
 MEMORY_DRIVERS = ("vbs", "newell")
+TIMING_DRIVERS = ("vbs", "newell", "bz_gsm")  # drivers of the timing robust windows (issue 51)
+TIMING_VARIANTS = ("add", "replace")  # replace also drops the lag 0 of TIMING_DRIVERS
 
 def suffix(horizon: int) -> str:
     """File name suffix for reports of a horizon; the 1 hour files keep their original names."""
@@ -96,7 +98,7 @@ def build_features(
     df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON,
     memory: tuple[float, ...] = (),
     ring_current: bool = False, n_lags: int = N_LAGS, gap_age: bool = False,
-    dst_skip: int = 0, newest_dst_error: pd.Series | None = None,
+    dst_skip: int = 0, newest_dst_error: pd.Series | None = None, timing_robust: str | None = None,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y) where y is Dst at t+horizon and X only looks backwards from t.
 
@@ -122,6 +124,11 @@ def build_features(
     the erroneous newest hour, while the older lags, the same hour seen from later rows and
     the target stay clean. It imitates a quick-look value that is not settled when the
     forecast is issued. None, the default, adds nothing.
+    timing_robust (issue 51) adds windowed extremes of VBs, Newell and Bz that end at t, so a
+    structure that arrives an hour early or late gives the same value: {name}_max2 and _min2
+    over t-1 .. t, _max3 and _min3 over t-2 .. t and _mean2 over t-1 .. t (trailing windows,
+    min_periods=1, never centred). "add" keeps every other column, "replace" also drops the
+    {name}_lag0 of those three drivers. None, the default, adds nothing (needs the solar wind).
     """
     if n_lags < 1:
         raise ValueError("n_lags must be at least 1")
@@ -131,6 +138,8 @@ def build_features(
         raise ValueError("ring_current cannot be combined with dst_skip or newest_dst_error")
     if dst_skip and newest_dst_error is not None:
         raise ValueError("dst_skip and newest_dst_error cannot be combined")
+    if timing_robust is not None and timing_robust not in TIMING_VARIANTS:
+        raise ValueError(f"timing_robust must be one of {TIMING_VARIANTS} or None")
     cols: dict[str, pd.Series] = {}
     target_source = df["dst"]
     dst = target_source.shift(dst_skip) if dst_skip else target_source
@@ -162,6 +171,15 @@ def build_features(
         for name in MEMORY_DRIVERS:
             for tau in memory:
                 cols[f"{name}_ewm{tau:g}"] = decaying_memory(drivers[name], tau)
+        if timing_robust is not None:
+            for name in TIMING_DRIVERS:
+                for window in (2, 3):
+                    rolling = drivers[name].rolling(window, min_periods=1)
+                    cols[f"{name}_max{window}"] = rolling.max()
+                    cols[f"{name}_min{window}"] = rolling.min()
+                cols[f"{name}_mean2"] = drivers[name].rolling(2, min_periods=1).mean()
+                if timing_robust == "replace":
+                    del cols[f"{name}_lag0"]
         cols["f107"] = df["f107"]
         if gap_age:
             for name, column in AGE_SOURCES.items():
