@@ -1,0 +1,524 @@
+{
+ "issue": 46,
+ "title": "Gap aware GRU training: one copy of the train years with IMF and plasma spans blanked at the real-time gap rates (split from #41)",
+ "date": "2026-11-28",
+ "result": "no-gain",
+ "label_basis": "agents/retrain-policy.md judges against the current production configuration, the mean of models/gru_dst_1h_seed{0,1,2}.pt. On clean validation neither rate meets the bar: rate 1 changes overall MSE by +0.35% (95% interval -0.12 to 0.83) and storm hour MSE by -0.90% (-3.90 to 3.07); rate 0.5 by +0.27% (-0.17 to 0.72) and -1.11% (-5.01 to 1.46). No claimed gain has an interval that excludes zero.",
+ "reading": [
+  "Clean validation, 3 seed mean: no regime improves with an interval that excludes zero. Quiet hours get slightly worse at both rates (rate 1 +0.45%, 0.03 to 0.90; rate 0.5 +0.38%, 0.01 to 0.80).",
+  "Storm and intense changes flip sign from seed to seed (rate 1 storm: seed 0 -6.58%, seed 1 +7.02%, seed 2 -0.55%), so they are seed noise at this sample size.",
+  "Diagnostic only: on validation with synthetic gaps from the same gap model (blank_gaps rate 1, seed 2024, not the real ACE mask) the production GRU has 16.4% higher MSE than on clean data (RMSE 2.8270 vs 2.6205), and the candidates remove most of that: rate 1 all hours -7.20% (-8.48 to -6.05), storm -12.06% (-19.04 to -1.54); rate 0.5 all -6.50% (-7.56 to -5.51), storm -11.86% (-17.07 to -3.69). This does not decide the label; real ACE inputs were not scored.",
+  "The option is kept behind --gap-aug (off by default) because it is small and reuses add_train_copies; it is not a production candidate."
+ ],
+ "horizon_hours": 1,
+ "split": "train 1995-01-01 .. 2017-01-01 (exclusive), validation 2017-01-01 .. 2021-01-01 (exclusive); rows from 2021 onwards dropped from the table before anything was built or fitted, test years not used",
+ "option": {
+  "gru": "scripts/train_gru.py --gap-aug K [--gap-aug-rate R] [--gap-aug-seed S]",
+  "functions": "oculstorm.augment.gap_copies(df, K, rate, seed) fed through scripts/train_gru.py add_train_copies, like --sw-noise-aug; copies hold train years only and are scaled with the clean training statistics",
+  "gap_model": "GAP_MODELS of oculstorm.augment (issue 41, from the issue 31 real-time ACE coverage summary)",
+  "default": "off (--gap-aug 0); the defaults leave files, tags and fits unchanged",
+  "tests": "tests/test_augment.py::test_gru_gap_copies_join_training_only_and_are_off_by_default"
+ },
+ "candidates": {
+  "1": "--gap-aug 1 --gap-aug-rate 1 --gap-aug-seed 0",
+  "0.5": "--gap-aug 1 --gap-aug-rate 0.5 --gap-aug-seed 0"
+ },
+ "baseline": "production models models/gru_dst_1h_seed{0,1,2}.pt as on main, not retrained; clean validation RMSE of the 3 seed mean 2.6205 equals validation_scores in reports/gru_baseline.json",
+ "evaluation_sets": {
+  "clean": "validation years as they are (decides the label)",
+  "gapped_synthetic": "blank_gaps(table before 2021, rate 1, seed 2024), validation rows, windows scaled with the clean training statistics; targets and persistence are the clean Dst; diagnostic only"
+ },
+ "bootstrap": {
+  "function": "oculstorm.metrics.block_bootstrap_rmse",
+  "n_boot": 2000,
+  "block_hours": 168,
+  "seed": 0,
+  "statistic": "MSE change of candidate vs baseline in percent (negative is better), paired resamples, 95% percentile interval; three_seed_mean compares the mean prediction of the 3 candidate seeds with that of the 3 production seeds; per_seed gives point changes only",
+  "reproducibility": "the candidate models are those of scripts/train_gru.py --gap-aug 1 --gap-aug-rate R (same seeds, same copy seed 0), trained here with the table cut before 2021 and torch threads 3; the bootstrap and the synthetic gap diagnostic were computed by an analysis script that is not tracked in the repository"
+ },
+ "hyperparameters": "as scripts/train_gru.py (hidden 64, batch 512, lr 2e-3, max 40 epochs, patience 6)",
+ "runs": {
+  "1": [
+   {
+    "seed": 0,
+    "epochs": 13,
+    "best_val_rmse": 2.6471,
+    "val_rmse_history": [
+     2.7046,
+     2.6844,
+     2.671,
+     2.6748,
+     2.6607,
+     2.6549,
+     2.6471,
+     2.6558,
+     2.6537,
+     2.6523,
+     2.6492,
+     2.6492,
+     2.6523
+    ],
+    "seconds": 664,
+    "rate": 1.0,
+    "copies": 1,
+    "copy_seed": 0,
+    "train_samples": 385681
+   },
+   {
+    "seed": 1,
+    "epochs": 18,
+    "best_val_rmse": 2.6495,
+    "val_rmse_history": [
+     2.7293,
+     2.6984,
+     2.6643,
+     2.6548,
+     2.6702,
+     2.6693,
+     2.6545,
+     2.6542,
+     2.6505,
+     2.6558,
+     2.6668,
+     2.6495,
+     2.6533,
+     2.6568,
+     2.6597,
+     2.6563,
+     2.6608,
+     2.658
+    ],
+    "seconds": 540,
+    "rate": 1.0,
+    "copies": 1,
+    "copy_seed": 0,
+    "train_samples": 385681
+   },
+   {
+    "seed": 2,
+    "epochs": 16,
+    "best_val_rmse": 2.6433,
+    "val_rmse_history": [
+     2.704,
+     2.7026,
+     2.6591,
+     2.658,
+     2.6544,
+     2.6669,
+     2.6495,
+     2.6479,
+     2.6485,
+     2.6433,
+     2.6553,
+     2.6555,
+     2.6541,
+     2.6466,
+     2.6482,
+     2.658
+    ],
+    "seconds": 414,
+    "rate": 1.0,
+    "copies": 1,
+    "copy_seed": 0,
+    "train_samples": 385681
+   }
+  ],
+  "0.5": [
+   {
+    "seed": 0,
+    "epochs": 12,
+    "best_val_rmse": 2.6452,
+    "val_rmse_history": [
+     2.7056,
+     2.6767,
+     2.6721,
+     2.68,
+     2.6529,
+     2.6452,
+     2.6506,
+     2.6599,
+     2.6483,
+     2.6503,
+     2.6504,
+     2.6604
+    ],
+    "seconds": 308,
+    "rate": 0.5,
+    "copies": 1,
+    "copy_seed": 0,
+    "train_samples": 385681
+   },
+   {
+    "seed": 1,
+    "epochs": 19,
+    "best_val_rmse": 2.6502,
+    "val_rmse_history": [
+     2.7196,
+     2.6895,
+     2.6633,
+     2.6561,
+     2.6716,
+     2.6607,
+     2.6519,
+     2.6688,
+     2.6592,
+     2.6654,
+     2.6606,
+     2.6522,
+     2.6502,
+     2.6528,
+     2.6584,
+     2.66,
+     2.6603,
+     2.6564,
+     2.6624
+    ],
+    "seconds": 685,
+    "rate": 0.5,
+    "copies": 1,
+    "copy_seed": 0,
+    "train_samples": 385681
+   },
+   {
+    "seed": 2,
+    "epochs": 14,
+    "best_val_rmse": 2.6479,
+    "val_rmse_history": [
+     2.7054,
+     2.6953,
+     2.655,
+     2.6492,
+     2.6532,
+     2.6585,
+     2.6485,
+     2.6479,
+     2.6604,
+     2.6543,
+     2.6611,
+     2.6671,
+     2.6538,
+     2.6546
+    ],
+    "seconds": 504,
+    "rate": 0.5,
+    "copies": 1,
+    "copy_seed": 0,
+    "train_samples": 385681
+   }
+  ]
+ },
+ "vs_baseline": {
+  "1": {
+   "clean": {
+    "three_seed_mean": {
+     "all": {
+      "n_hours": 35063,
+      "rmse_persistence": 3.3704,
+      "rmse_baseline": 2.6205,
+      "rmse_candidate": 2.6251,
+      "skill_baseline": 0.3955,
+      "skill_candidate": 0.3934,
+      "mse_change_pct": 0.35,
+      "mse_change_pct_ci95": [
+       -0.12,
+       0.83
+      ]
+     },
+     "quiet": {
+      "n_hours": 34701,
+      "rmse_persistence": 3.2359,
+      "rmse_baseline": 2.5325,
+      "rmse_candidate": 2.5381,
+      "skill_baseline": 0.3875,
+      "skill_candidate": 0.3848,
+      "mse_change_pct": 0.45,
+      "mse_change_pct_ci95": [
+       0.03,
+       0.9
+      ]
+     },
+     "storm": {
+      "n_hours": 362,
+      "rmse_persistence": 9.8253,
+      "rmse_baseline": 7.0968,
+      "rmse_candidate": 7.0646,
+      "skill_baseline": 0.4783,
+      "skill_candidate": 0.483,
+      "mse_change_pct": -0.9,
+      "mse_change_pct_ci95": [
+       -3.9,
+       3.07
+      ]
+     },
+     "intense": {
+      "n_hours": 35,
+      "rmse_persistence": 15.9553,
+      "rmse_baseline": 10.5678,
+      "rmse_candidate": 10.1431,
+      "skill_baseline": 0.5613,
+      "skill_candidate": 0.5959,
+      "mse_change_pct": -7.88,
+      "mse_change_pct_ci95": [
+       -15.17,
+       3.49
+      ]
+     }
+    },
+    "per_seed": {
+     "seed0": {
+      "all": 0.51,
+      "quiet": 1.11,
+      "storm": -6.58,
+      "intense": -8.49
+     },
+     "seed1": {
+      "all": 0.91,
+      "quiet": 0.4,
+      "storm": 7.02,
+      "intense": -4.25
+     },
+     "seed2": {
+      "all": 0.56,
+      "quiet": 0.65,
+      "storm": -0.55,
+      "intense": -4.91
+     }
+    }
+   },
+   "gapped": {
+    "three_seed_mean": {
+     "all": {
+      "n_hours": 35063,
+      "rmse_persistence": 3.3704,
+      "rmse_baseline": 2.827,
+      "rmse_candidate": 2.7234,
+      "skill_baseline": 0.2965,
+      "skill_candidate": 0.3471,
+      "mse_change_pct": -7.2,
+      "mse_change_pct_ci95": [
+       -8.48,
+       -6.05
+      ]
+     },
+     "quiet": {
+      "n_hours": 34701,
+      "rmse_persistence": 3.2359,
+      "rmse_baseline": 2.7121,
+      "rmse_candidate": 2.6194,
+      "skill_baseline": 0.2976,
+      "skill_candidate": 0.3448,
+      "mse_change_pct": -6.72,
+      "mse_change_pct_ci95": [
+       -7.53,
+       -5.89
+      ]
+     },
+     "storm": {
+      "n_hours": 362,
+      "rmse_persistence": 9.8253,
+      "rmse_baseline": 8.3071,
+      "rmse_candidate": 7.7899,
+      "skill_baseline": 0.2852,
+      "skill_candidate": 0.3714,
+      "mse_change_pct": -12.06,
+      "mse_change_pct_ci95": [
+       -19.04,
+       -1.54
+      ]
+     },
+     "intense": {
+      "n_hours": 35,
+      "rmse_persistence": 15.9553,
+      "rmse_baseline": 14.6391,
+      "rmse_candidate": 12.8104,
+      "skill_baseline": 0.1582,
+      "skill_candidate": 0.3554,
+      "mse_change_pct": -23.42,
+      "mse_change_pct_ci95": [
+       -32.91,
+       2.67
+      ]
+     }
+    },
+    "per_seed": {
+     "seed0": {
+      "all": -7.46,
+      "quiet": -7.08,
+      "storm": -11.47,
+      "intense": -13.71
+     },
+     "seed1": {
+      "all": -8.12,
+      "quiet": -7.94,
+      "storm": -9.88,
+      "intense": -30.87
+     },
+     "seed2": {
+      "all": -6.43,
+      "quiet": -5.76,
+      "storm": -13.14,
+      "intense": -20.71
+     }
+    }
+   }
+  },
+  "0.5": {
+   "clean": {
+    "three_seed_mean": {
+     "all": {
+      "n_hours": 35063,
+      "rmse_persistence": 3.3704,
+      "rmse_baseline": 2.6205,
+      "rmse_candidate": 2.6241,
+      "skill_baseline": 0.3955,
+      "skill_candidate": 0.3939,
+      "mse_change_pct": 0.27,
+      "mse_change_pct_ci95": [
+       -0.17,
+       0.72
+      ]
+     },
+     "quiet": {
+      "n_hours": 34701,
+      "rmse_persistence": 3.2359,
+      "rmse_baseline": 2.5325,
+      "rmse_candidate": 2.5373,
+      "skill_baseline": 0.3875,
+      "skill_candidate": 0.3852,
+      "mse_change_pct": 0.38,
+      "mse_change_pct_ci95": [
+       0.01,
+       0.8
+      ]
+     },
+     "storm": {
+      "n_hours": 362,
+      "rmse_persistence": 9.8253,
+      "rmse_baseline": 7.0968,
+      "rmse_candidate": 7.0574,
+      "skill_baseline": 0.4783,
+      "skill_candidate": 0.4841,
+      "mse_change_pct": -1.11,
+      "mse_change_pct_ci95": [
+       -5.01,
+       1.46
+      ]
+     },
+     "intense": {
+      "n_hours": 35,
+      "rmse_persistence": 15.9553,
+      "rmse_baseline": 10.5678,
+      "rmse_candidate": 10.549,
+      "skill_baseline": 0.5613,
+      "skill_candidate": 0.5629,
+      "mse_change_pct": -0.35,
+      "mse_change_pct_ci95": [
+       -21.22,
+       6.25
+      ]
+     }
+    },
+    "per_seed": {
+     "seed0": {
+      "all": 0.37,
+      "quiet": 0.98,
+      "storm": -6.85,
+      "intense": -11.2
+     },
+     "seed1": {
+      "all": 0.97,
+      "quiet": 0.53,
+      "storm": 6.27,
+      "intense": 12.86
+     },
+     "seed2": {
+      "all": 0.91,
+      "quiet": 1.03,
+      "storm": -0.55,
+      "intense": -1.86
+     }
+    }
+   },
+   "gapped": {
+    "three_seed_mean": {
+     "all": {
+      "n_hours": 35063,
+      "rmse_persistence": 3.3704,
+      "rmse_baseline": 2.827,
+      "rmse_candidate": 2.7336,
+      "skill_baseline": 0.2965,
+      "skill_candidate": 0.3422,
+      "mse_change_pct": -6.5,
+      "mse_change_pct_ci95": [
+       -7.56,
+       -5.51
+      ]
+     },
+     "quiet": {
+      "n_hours": 34701,
+      "rmse_persistence": 3.2359,
+      "rmse_baseline": 2.7121,
+      "rmse_candidate": 2.6298,
+      "skill_baseline": 0.2976,
+      "skill_candidate": 0.3395,
+      "mse_change_pct": -5.98,
+      "mse_change_pct_ci95": [
+       -6.75,
+       -5.27
+      ]
+     },
+     "storm": {
+      "n_hours": 362,
+      "rmse_persistence": 9.8253,
+      "rmse_baseline": 8.3071,
+      "rmse_candidate": 7.7989,
+      "skill_baseline": 0.2852,
+      "skill_candidate": 0.37,
+      "mse_change_pct": -11.86,
+      "mse_change_pct_ci95": [
+       -17.07,
+       -3.69
+      ]
+     },
+     "intense": {
+      "n_hours": 35,
+      "rmse_persistence": 15.9553,
+      "rmse_baseline": 14.6391,
+      "rmse_candidate": 12.816,
+      "skill_baseline": 0.1582,
+      "skill_candidate": 0.3548,
+      "mse_change_pct": -23.36,
+      "mse_change_pct_ci95": [
+       -28.3,
+       -9.39
+      ]
+     }
+    },
+    "per_seed": {
+     "seed0": {
+      "all": -6.74,
+      "quiet": -6.44,
+      "storm": -9.91,
+      "intense": -13.39
+     },
+     "seed1": {
+      "all": -7.2,
+      "quiet": -6.75,
+      "storm": -11.71,
+      "intense": -29.66
+     },
+     "seed2": {
+      "all": -5.66,
+      "quiet": -4.94,
+      "storm": -12.84,
+      "intense": -24.59
+     }
+    }
+   }
+  }
+ },
+ "run_time_seconds": {
+  "training_total": 3115,
+  "note": "sum of the fit times in runs; window building, scoring and the bootstrap add a few minutes"
+ }
+}

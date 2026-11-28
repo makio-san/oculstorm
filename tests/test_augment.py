@@ -10,7 +10,7 @@ from oculstorm import augment
 from oculstorm.augment import BLOCK, OFFSET_RANGE, SW_COLUMNS, block_offsets, consistent_rows, offset_table, perturb_solar_wind, train_copies
 from oculstorm.data import TEST_START, VAL_START, split
 from oculstorm.features import SOLAR_WIND, build_features
-from oculstorm.sequences import WINDOW, build_windows, channel_stats, concat_windows
+from oculstorm.sequences import WINDOW, build_channels, build_windows, channel_stats, concat_windows
 
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 
@@ -346,3 +346,25 @@ def test_gap_copies_hold_training_hours_only_and_are_off_by_default():
         assert copy.index.equals(df.index[df.index < VAL_START])
     assert not copies[0]["bz_gsm"].isna().equals(copies[1]["bz_gsm"].isna())
     pd.testing.assert_frame_equal(copies[1], blank_gaps(df[df.index < VAL_START], 1.0, 5))
+
+
+def test_gru_gap_copies_join_training_only_and_are_off_by_default():
+    train_gru = _script("train_gru")
+    args = train_gru.build_parser().parse_args([])
+    assert args.gap_aug == 0 and args.gap_aug_rate == 1.0
+    df = _table("2016-10-01", "2021-03-01")
+    stats = channel_stats(df)
+    windows, meta = build_windows(df)
+    _, parts = train_gru.add_train_copies(windows, meta, [], stats)
+    joined, aug = train_gru.add_train_copies(windows, meta, gap_copies(df, copies=1, seed=4), stats)
+    n_train = len(parts["train"])
+    assert len(aug["train"]) > 1.9 * n_train and aug["train"].index.max() < pd.Timestamp(VAL_START)
+    for name in ("val", "test"):
+        assert aug[name].index.equals(parts[name].index)
+        assert np.array_equal(joined[aug[name]["row"].to_numpy()], windows[parts[name]["row"].to_numpy()])
+    # The gap copy reaches the network through the observed flags, at about the real-time rates.
+    channels = list(build_channels(df, stats)[0].columns)
+    imf_flag = joined[aug["train"]["row"].to_numpy()[n_train:], -1, channels.index("imf_observed")]
+    plasma_flag = joined[aug["train"]["row"].to_numpy()[n_train:], -1, channels.index("plasma_observed")]
+    assert 0.12 < 1 - imf_flag.mean() < 0.26 and 0.2 < 1 - plasma_flag.mean() < 0.34
+    assert windows[parts["train"]["row"].to_numpy(), -1, channels.index("imf_observed")].min() == 1.0
