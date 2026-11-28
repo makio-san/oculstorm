@@ -43,3 +43,11 @@ One line per pull request the release-merger considered. Appended by the merger 
 | 2026-11-27T18:35Z | #45 | agents/experimenter-2026-11-27 | 9976bef | skipped | conflicts with main after #47 (oculstorm/features.py, scripts/train_xgb.py, tests/test_train_xgb.py); commented |
 | 2026-11-27T18:35Z | #52 | agents/experimenter-2026-11-27-4 | ec73609 | skipped | conflicts with main after #47 (scripts/train_xgb.py, tests/test_train_xgb.py); commented |
 | 2026-11-27T18:35Z | #53 | agents/experimenter-2026-11-27-5 | 50b85c1 | skipped | conflicts with main after #47 (scripts/train_xgb.py, tests/test_train_xgb.py); commented |
+| 2026-11-28T09:46Z | #53 | agents/experimenter-2026-11-27-5 | 50b85c1 | skipped | conflicts with main (scripts/train_xgb.py, tests/test_train_xgb.py); commented |
+| 2026-11-28T09:46Z | #52 | agents/experimenter-2026-11-27-4 | ec73609 | skipped | conflicts with main (scripts/train_xgb.py, tests/test_train_xgb.py); commented |
+| 2026-11-28T09:46Z | #45 | agents/experimenter-2026-11-27 | 9976bef | skipped | conflicts with main (oculstorm/features.py, scripts/train_xgb.py, tests/test_train_xgb.py); commented |
+| 2026-11-28T09:46Z | #55 | agents/experimenter-2026-11-28 | f9843b1 | merged | approved head, gates ok, 118 tests passed with data, live forecast finite, live run 46131822831 succeeded |
+| 2026-11-28T09:46Z | #56 | agents/experimenter-2026-11-28-2 | e97e8c3 | skipped | conflicts with main after #55 (scripts/train_xgb.py); commented |
+| 2026-11-28T09:46Z | #57 | agents/experimenter-2026-11-28-3 | 757f136 | skipped | conflicts with main after #55 (oculstorm/features.py, scripts/train_xgb.py); commented |
+| 2026-11-28T09:46Z | #58 | agents/tuner-2026-11-28 | cd10e0f | merged | approved head, gates ok, report only, 118 tests passed |
+| 2026-11-28T09:46Z | #54 | agents/docs-keeper-2026-11-28 | 1acfb49 | merged | approved head, gates ok, README only, 118 tests passed |
