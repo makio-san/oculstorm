@@ -174,6 +174,25 @@ significant change:
 The live forecast keeps the unweighted 1 hour models. Reports are in
 `reports/comparison{,_3h,_6h,_12h}.json` and `reports/*_sw10.json`.
 
+## Fresh holdout
+
+```bash
+.venv/bin/python scripts/score_holdout.py
+```
+
+The committed 1 hour models scored on OMNI hours after the last test hour
+(2026-10-30 13:00 UTC), which no model and no choice has seen. The newest OMNI2 file reaches
+2026-11-25 17:00, but its IMF values lag behind Dst, so an issue hour is scored only when every
+solar wind input was observed in each of the last 6 hours: 276 of 605 issue hours, with
+target hours from 2026-10-31 14:00 to 2026-11-12 01:00.
+
+| Hours | Persistence RMSE | XGBoost RMSE (skill) | GRU RMSE (skill) |
+|---|---|---|---|
+| 276 | 3.99 nT | 3.10 nT (0.40) | 3.02 nT (0.43) |
+
+Only 2 of those hours are storm hours (Dst <= -50 nT), too few to say anything about storms.
+The numbers are in `reports/holdout.json`.
+
 ## Dashboard
 
 Live: https://makio-san.github.io/oculstorm/
