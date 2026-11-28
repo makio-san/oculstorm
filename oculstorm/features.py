@@ -96,7 +96,7 @@ def build_features(
     df: pd.DataFrame, use_solar_wind: bool = True, require_target: bool = True, horizon: int = HORIZON,
     memory: tuple[float, ...] = (),
     ring_current: bool = False, n_lags: int = N_LAGS, gap_age: bool = False,
-    dst_skip: int = 0, newest_dst_error: pd.Series | None = None,
+    dst_skip: int = 0, newest_dst_error: pd.Series | None = None, newest_flag: float | None = None,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y) where y is Dst at t+horizon and X only looks backwards from t.
 
@@ -122,6 +122,10 @@ def build_features(
     the erroneous newest hour, while the older lags, the same hour seen from later rows and
     the target stay clean. It imitates a quick-look value that is not settled when the
     forecast is issued. None, the default, adds nothing.
+    newest_flag (issue 49) adds the constant column dst_newest_unsettled with this value: 0
+    on clean rows, the error level on rows built with newest_dst_error, so the model can be
+    told whether the newest Dst hour is settled. It is known at issue time and depends on no
+    data. None, the default, adds no column.
     """
     if n_lags < 1:
         raise ValueError("n_lags must be at least 1")
@@ -150,6 +154,8 @@ def build_features(
         # The window of row t is the clean hours t-23 .. t-1 and the erroneous hour t.
         cols["dst_min24"] = np.fmin(dst + error, dst.shift(1).rolling(23, min_periods=1).min())
         cols["dst_mean24"] = cols["dst_mean24"] + error / dst.rolling(24, min_periods=1).count()
+    if newest_flag is not None:
+        cols["dst_newest_unsettled"] = pd.Series(float(newest_flag), index=df.index)
 
     if use_solar_wind:
         drivers = pd.concat([df[SOLAR_WIND], _coupling(df)], axis=1)

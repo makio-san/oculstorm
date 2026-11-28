@@ -5,7 +5,7 @@ Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-curr
        [--colsample-bytree C] [--n-estimators T] [--seed S] [--objective {squarederror,pseudohuber,absolute}]
        [--huber-slope D] [--dst-offset-aug K] [--sw-noise-aug LEVEL] [--sw-noise-copies K]
        [--sw-noise-seed S] [--gap-aug K] [--gap-aug-rate R] [--gap-aug-seed S] [--gap-age]
-       [--dst-skip S] [--dst-newest-noise K] [--validation-only]
+       [--dst-skip S] [--dst-newest-noise K] [--dst-newest-flag K] [--validation-only]
 Writes: models/xgb_dst_{H}h{_swK}{variant}.ubj, reports/xgb_baseline{_Hh}{_swK}{variant}.json,
 reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -16,7 +16,9 @@ adds _hp, and --dst-offset-aug K adds _oaK, so a tuned run never overwrites the 
 --dst-skip S ends the Dst history at t-S and adds _dsS: persistence and the learned change then
 start from Dst(t-S), so the persistence rows are S+H hour persistence;
 --dst-newest-noise K trains on K extra copies of the train years whose newest Dst hour carries
-an AR(1) error and adds _nnK.
+an AR(1) error and adds _nnK; --dst-newest-flag K trains on the same copies and adds the
+feature dst_newest_unsettled (0 on clean rows, the error level of the copy on noisy rows) and
+the tag _nfK.
 --sw-noise-aug LEVEL (off at 0, the default) adds K real-time like perturbed copies of the
 training years, see oculstorm/augment.py, and the tag _swnLEVEL; validation and test stay clean.
 --gap-aug K (off at 0, the default) adds K copies of the training years with real-time like IMF
@@ -102,11 +104,12 @@ NOISE_LEVELS = (1.0, 0.5)  # share of the newest hour error in the first and the
 
 def noisy_copies(
     df: pd.DataFrame, copies: int, horizon: int, n_lags: int = N_LAGS, seed: int = 1,
-    memory: tuple[float, ...] = (), gap_age: bool = False,
+    memory: tuple[float, ...] = (), gap_age: bool = False, flag: bool = False,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Train years of `copies` copies whose newest Dst hour carries an AR(1) error (issue 30), features and target.
 
-    Copy k uses NOISE_LEVELS[k] of the error. Only the Dst(t) seen from row t is wrong; the
+    Copy k uses NOISE_LEVELS[k] of the error. With flag=True (issue 49) every copy also gets
+    the column dst_newest_unsettled set to its error level. Only the Dst(t) seen from row t is wrong; the
     older lags and the target are clean. Only rows before the validation years are returned.
     """
     if not 0 <= copies <= len(NOISE_LEVELS):
@@ -114,7 +117,8 @@ def noisy_copies(
     parts = []
     for k in range(copies):
         error = newest_hour_error(df.index, seed + k, NOISE_LEVELS[k])
-        X_k, y_k = build_features(df, horizon=horizon, n_lags=n_lags, memory=memory, gap_age=gap_age, newest_dst_error=error)
+        X_k, y_k = build_features(df, horizon=horizon, n_lags=n_lags, memory=memory, gap_age=gap_age, newest_dst_error=error,
+                                  newest_flag=NOISE_LEVELS[k] if flag else None)
         parts.append((split(X_k)[0], split(y_k)[0]))
     return pd.concat([p[0] for p in parts]), pd.concat([p[1] for p in parts])
 
@@ -173,6 +177,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dst-skip", type=int, default=0, metavar="S", help="end the Dst history at t-S instead of t (0 = off)")
     parser.add_argument("--dst-newest-noise", type=int, default=0, metavar="K", choices=range(len(NOISE_LEVELS) + 1),
                         help="train on K extra copies of the train years with an AR(1) error on the newest Dst hour (0 = off)")
+    parser.add_argument("--dst-newest-flag", type=int, default=0, metavar="K", choices=range(len(NOISE_LEVELS) + 1),
+                        help="as --dst-newest-noise K, plus the feature dst_newest_unsettled: 0 on clean rows, the error level on the copies (0 = off)")
     parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never predict the test years")
     return parser
 
@@ -180,11 +186,17 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-    if args.ring_current and (args.dst_skip or args.dst_newest_noise):
-        parser.error("--ring-current cannot be combined with --dst-skip or --dst-newest-noise")
-    if args.dst_skip and (args.dst_newest_noise or args.dst_offset_aug):
-        parser.error("--dst-skip cannot be combined with --dst-newest-noise or --dst-offset-aug")
-    skip, newest = args.dst_skip, args.dst_newest_noise
+    if args.ring_current and (args.dst_skip or args.dst_newest_noise or args.dst_newest_flag):
+        parser.error("--ring-current cannot be combined with --dst-skip, --dst-newest-noise or --dst-newest-flag")
+    if args.dst_skip and (args.dst_newest_noise or args.dst_newest_flag or args.dst_offset_aug):
+        parser.error("--dst-skip cannot be combined with --dst-newest-noise, --dst-newest-flag or --dst-offset-aug")
+    if args.dst_newest_noise and args.dst_newest_flag:
+        parser.error("--dst-newest-noise and --dst-newest-flag cannot be combined; the flag option adds the same copies")
+    if args.dst_newest_flag and args.dst_offset_aug:
+        parser.error("--dst-newest-flag cannot be combined with --dst-offset-aug")
+    skip, flagged = args.dst_skip, args.dst_newest_flag
+    newest = args.dst_newest_noise or flagged
+    flag_feature = dict(newest_flag=0.0) if flagged else {}
     h, peak, n_lags = args.horizon, args.storm_weight, args.n_lags
     params = {**PARAMS, **{name: getattr(args, name) for name in TUNABLE}, **objective_params(args.objective, args.huber_slope)}
     rc = "_rc" if args.ring_current else ""
@@ -196,8 +208,8 @@ def main() -> None:
     gaps = args.gap_aug if args.gap_aug_rate > 0 else 0
     variant += (f"_ga{gaps}" + (f"_r{args.gap_aug_rate:g}" if args.gap_aug_rate != 1 else "")) if gaps > 0 else ""
     variant += "_age" if args.gap_age else ""
-    variant += (f"_ds{skip}" if skip else "") + (f"_nn{newest}" if newest else "")
-    features = dict(horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, gap_age=args.gap_age, dst_skip=skip)
+    variant += (f"_ds{skip}" if skip else "") + (f"_nf{flagged}" if flagged else f"_nn{newest}" if newest else "")
+    features = dict(horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, gap_age=args.gap_age, dst_skip=skip, **flag_feature)
     tag = suffix(h) + weight_tag(peak) + variant
     df = load_hourly()
     X, y = build_features(df, **features)
@@ -215,9 +227,9 @@ def main() -> None:
     gapped = [build_features(copy, **features) for copy in gap_copies(df, gaps, args.gap_aug_rate, args.gap_aug_seed)]
     if gapped:
         print(f"gap augmentation: rate {args.gap_aug_rate:g}, {len(gapped)} copies of the training years, {sum(len(x) for x, _ in gapped):,} extra rows")
-    newest_rows = [noisy_copies(df, newest, h, n_lags, memory=memory, gap_age=args.gap_age)] if newest else []
+    newest_rows = [noisy_copies(df, newest, h, n_lags, memory=memory, gap_age=args.gap_age, flag=bool(flagged))] if newest else []
     if newest_rows:
-        print(f"newest hour noise: {newest} copies, {len(newest_rows[0][0]):,} extra train rows")
+        print(f"newest hour noise: {newest} copies, {len(newest_rows[0][0]):,} extra train rows" + (", flagged" if flagged else ""))
     if skip:
         print(f"Dst history ends at t-{skip}: persistence below is Dst(t-{skip}), {skip + h} hours before the target")
     extra = offset + noisy + gapped + newest_rows
@@ -230,7 +242,7 @@ def main() -> None:
         print(val_scores.round(4).to_string(index=False))
         return
 
-    X_dst, _ = build_features(df, use_solar_wind=False, horizon=h, n_lags=n_lags, dst_skip=skip)
+    X_dst, _ = build_features(df, use_solar_wind=False, horizon=h, n_lags=n_lags, dst_skip=skip, **flag_feature)
     model, val_pred, pred = fit(X, y, peak, params, extra=extra)
     extra_dst = [offset_copies(df, args.dst_offset_aug, h, False, n_lags)] if args.dst_offset_aug else []
     extra_dst += newest_rows  # fit keeps only the Dst only columns
@@ -271,7 +283,8 @@ def main() -> None:
         "gap_aug": {"copies": len(gapped), "rate": args.gap_aug_rate, "seed": args.gap_aug_seed},
         "gap_age": args.gap_age,
         "dst_skip": skip,
-        "dst_newest_noise": newest,
+        "dst_newest_noise": args.dst_newest_noise,
+        "dst_newest_flag": flagged,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
         "test": f"{TEST_START} .. {y_te.index.max()}",

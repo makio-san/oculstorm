@@ -1,0 +1,827 @@
+{
+ "issue": 49,
+ "title": "Noisy newest Dst hour copies with a dst_newest_unsettled flag feature, XGBoost, 1 hour",
+ "result": "worse",
+ "result_note": "label by the retrain policy bar, which is defined on clean validation: with flag 0 the flagged model (nf1) has 2.03% more overall MSE than the production configuration, interval [1.33, 2.67] above zero, so it is significantly worse and fails the issue's own 2% clean cost rule. The flag cuts the #30 V2 clean cost from +11.15% to +2.03% and on the perturbed copy with flag 1 it is 3.00% [-3.50, -2.51] below V2 K=1 overall (quiet RMSE 3.4352 nT against 3.4973 nT, below persistence from the perturbed Dst(t), 5.9748 nT). In storm hours of the perturbed copy flag 1 is worse than V2 K=1 (+6.29% [2.82, 12.12]) and not different from production (+3.89% [-8.69, 22.77]). The policy has no bar for the perturbed set; that decision stays with the owner.",
+ "date": "2026-11-28",
+ "split": "validation only, 2017-01-01 .. 2020-12-31; train 1995 .. 2016; the table was cut after 2021-01-01 00:00, which is used only as the target of the last validation hour, so no test row existed in the run (fit(..., test=False) as well)",
+ "horizon_hours": 1,
+ "configuration": {
+  "baseline": "production configuration of scripts/train_xgb.py (6 lags, PARAMS, 89 features), seeds 0 1 2; seed 0 reproduces best_iteration 2151 and validation RMSE 2.6565 of reports/xgb_baseline.json",
+  "v2k1": "scripts/train_xgb.py --dst-newest-noise 1 (issue 30 V2 K=1), rerun here as the reference for the flag; seeds 0 1 2 reproduce the best iterations and seed mean RMSE of reports/experiments/30-newest-dst-hour.json",
+  "nf1": "scripts/train_xgb.py --dst-newest-flag 1: the same clean train years plus the same noisy copy as v2k1 (oculstorm.augment.newest_hour_error, level 1, seed 1), with the extra feature dst_newest_unsettled (build_features(newest_flag=...)), 0 on every clean row and 1 on the noisy copy; 90 features; seeds 0 1 2",
+  "nf2": "--dst-newest-flag 2: as nf1 plus the half level copy of #30 (seed 2) with flag 0.5, to test the flag as a noise level",
+  "early_stopping": "on the clean validation years with flag 0 for every variant, as in production",
+  "perturbed_validation": "validation features rebuilt with the #30 recipe at full level and seed 12345 on the newest hour of every row, target clean; realised error in perturbation_on_validation (identical to #30). Scored with flag 1 (what live would set) and with flag 0 (to show what the flag buys). baseline and v2k1 have no flag column.",
+  "references": "persistence from the clean Dst(t) and from the perturbed Dst(t)",
+  "regimes": "by the clean observed Dst at the target hour",
+  "not_run": "GRU: scripts/train_gru.py has no validation only mode, as in #30. Live use of the flag (oculstorm/live.py) is a follow up the issue leaves out.",
+  "defaults": "--dst-newest-flag is 0 by default and build_features(newest_flag=None) adds no column; production features and results are unchanged. Refused together with --dst-newest-noise, --dst-skip, --ring-current and --dst-offset-aug."
+ },
+ "bootstrap": {
+  "method": "oculstorm.metrics.block_bootstrap_rmse, paired",
+  "block_hours": 168,
+  "resamples": 2000,
+  "seed": 0,
+  "intervals": "95% percentile interval of the MSE change of the first (candidate) against the second (reference) in percent; seed0 is seed 0 against seed 0, seedmean is the mean prediction of seeds 0 1 2 on both sides (persistence has no seeds); null where the regime touches fewer than 20 distinct 168 hour blocks (intense: 3)"
+ },
+ "threads": 3,
+ "perturbation_on_validation": {
+  "seed": 12345,
+  "mean": -2.988,
+  "std": 4.031,
+  "lag1": 0.607,
+  "share_within_1nT": 0.149
+ },
+ "fits": {
+  "baseline_0": {
+   "best_iteration": 2151,
+   "seconds": 73
+  },
+  "baseline_1": {
+   "best_iteration": 1838,
+   "seconds": 66
+  },
+  "baseline_2": {
+   "best_iteration": 1980,
+   "seconds": 71
+  },
+  "v2k1_0": {
+   "best_iteration": 888,
+   "seconds": 57
+  },
+  "v2k1_1": {
+   "best_iteration": 1494,
+   "seconds": 83
+  },
+  "v2k1_2": {
+   "best_iteration": 1230,
+   "seconds": 70
+  },
+  "nf1_0": {
+   "best_iteration": 1794,
+   "seconds": 107
+  },
+  "nf1_1": {
+   "best_iteration": 1658,
+   "seconds": 90
+  },
+  "nf1_2": {
+   "best_iteration": 1877,
+   "seconds": 115
+  },
+  "nf2_0": {
+   "best_iteration": 1258,
+   "seconds": 146
+  },
+  "nf2_1": {
+   "best_iteration": 1763,
+   "seconds": 244
+  },
+  "nf2_2": {
+   "best_iteration": 1472,
+   "seconds": 174
+  }
+ },
+ "regimes": {
+  "all": {
+   "n_hours": 35064,
+   "rmse_tracked_xgb_baseline_json": 2.6565,
+   "rmse_persistence_clean_dst_t": 3.3704,
+   "rmse_persistence_perturbed_dst_t": 6.043,
+   "rmse_baseline_clean_seeds": [
+    2.6565,
+    2.6613,
+    2.656
+   ],
+   "rmse_baseline_clean_seedmean": 2.6535,
+   "rmse_baseline_perturbed_seeds": [
+    6.3299,
+    6.3362,
+    6.3128
+   ],
+   "rmse_baseline_perturbed_seedmean": 6.3241,
+   "rmse_v2k1_clean_seeds": [
+    2.805,
+    2.8012,
+    2.8017
+   ],
+   "rmse_v2k1_clean_seedmean": 2.7975,
+   "rmse_v2k1_perturbed_seeds": [
+    3.6018,
+    3.5645,
+    3.5781
+   ],
+   "rmse_v2k1_perturbed_seedmean": 3.5764,
+   "rmse_nf1_clean_flag0_seeds": [
+    2.6871,
+    2.682,
+    2.6856
+   ],
+   "rmse_nf1_clean_flag0_seedmean": 2.6803,
+   "rmse_nf1_perturbed_flag1_seeds": [
+    3.5301,
+    3.5289,
+    3.5217
+   ],
+   "rmse_nf1_perturbed_flag1_seedmean": 3.5225,
+   "rmse_nf1_perturbed_flag0_seeds": [
+    5.5462,
+    5.6153,
+    5.5399
+   ],
+   "rmse_nf1_perturbed_flag0_seedmean": 5.5642,
+   "rmse_nf2_clean_flag0_seeds": [
+    2.687,
+    2.6863,
+    2.6919
+   ],
+   "rmse_nf2_clean_flag0_seedmean": 2.6841,
+   "rmse_nf2_perturbed_flag1_seeds": [
+    3.5472,
+    3.5286,
+    3.543
+   ],
+   "rmse_nf2_perturbed_flag1_seedmean": 3.5352,
+   "rmse_nf2_perturbed_flag0_seeds": [
+    5.6622,
+    5.6777,
+    5.636
+   ],
+   "rmse_nf2_perturbed_flag0_seedmean": 5.656,
+   "distinct_168h_blocks": 209,
+   "mse_change_pct": {
+    "nf1 clean_flag0 vs baseline clean": {
+     "seed0": 2.32,
+     "seed0_ci95": [
+      1.56,
+      3.03
+     ],
+     "seedmean": 2.03,
+     "seedmean_ci95": [
+      1.33,
+      2.67
+     ]
+    },
+    "nf1 perturbed_flag1 vs baseline perturbed": {
+     "seed0": -68.9,
+     "seed0_ci95": [
+      -70.78,
+      -66.97
+     ],
+     "seedmean": -68.98,
+     "seedmean_ci95": [
+      -70.82,
+      -67.08
+     ]
+    },
+    "nf1 perturbed_flag0 vs baseline perturbed": {
+     "seed0": -23.23,
+     "seed0_ci95": [
+      -23.99,
+      -22.54
+     ],
+     "seedmean": -22.59,
+     "seedmean_ci95": [
+      -23.28,
+      -21.96
+     ]
+    },
+    "nf1 perturbed_flag1 vs v2k1 perturbed": {
+     "seed0": -3.94,
+     "seed0_ci95": [
+      -4.69,
+      -3.24
+     ],
+     "seedmean": -3.0,
+     "seedmean_ci95": [
+      -3.5,
+      -2.51
+     ]
+    },
+    "nf1 clean_flag0 vs v2k1 clean": {
+     "seed0": -8.23,
+     "seed0_ci95": [
+      -9.25,
+      -7.25
+     ],
+     "seedmean": -8.2,
+     "seedmean_ci95": [
+      -9.23,
+      -7.25
+     ]
+    },
+    "v2k1 clean vs baseline clean": {
+     "seed0": 11.49,
+     "seed0_ci95": [
+      10.15,
+      12.81
+     ],
+     "seedmean": 11.15,
+     "seedmean_ci95": [
+      9.79,
+      12.41
+     ]
+    },
+    "v2k1 perturbed vs baseline perturbed": {
+     "seed0": -67.62,
+     "seed0_ci95": [
+      -69.44,
+      -65.76
+     ],
+     "seedmean": -68.02,
+     "seedmean_ci95": [
+      -69.83,
+      -66.16
+     ]
+    },
+    "nf2 clean_flag0 vs baseline clean": {
+     "seed0": 2.31,
+     "seed0_ci95": [
+      1.7,
+      2.9
+     ],
+     "seedmean": 2.32,
+     "seedmean_ci95": [
+      1.61,
+      2.99
+     ]
+    },
+    "nf2 perturbed_flag1 vs baseline perturbed": {
+     "seed0": -68.6,
+     "seed0_ci95": [
+      -70.41,
+      -66.74
+     ],
+     "seedmean": -68.75,
+     "seedmean_ci95": [
+      -70.57,
+      -66.87
+     ]
+    },
+    "nf2 perturbed_flag1 vs nf1 perturbed_flag1": {
+     "seed0": 0.97,
+     "seed0_ci95": [
+      0.51,
+      1.43
+     ],
+     "seedmean": 0.73,
+     "seedmean_ci95": [
+      0.39,
+      1.07
+     ]
+    },
+    "nf1 perturbed_flag1 vs persistence perturbed": {
+     "seed0": -65.88,
+     "seed0_ci95": [
+      -67.49,
+      -64.3
+     ],
+     "seedmean": -66.02,
+     "seedmean_ci95": [
+      -67.58,
+      -64.49
+     ]
+    }
+   }
+  },
+  "quiet": {
+   "n_hours": 34702,
+   "rmse_tracked_xgb_baseline_json": 2.5678,
+   "rmse_persistence_clean_dst_t": 3.2359,
+   "rmse_persistence_perturbed_dst_t": 5.9748,
+   "rmse_baseline_clean_seeds": [
+    2.5678,
+    2.5699,
+    2.5668
+   ],
+   "rmse_baseline_clean_seedmean": 2.5645,
+   "rmse_baseline_perturbed_seeds": [
+    6.3074,
+    6.3114,
+    6.2897
+   ],
+   "rmse_baseline_perturbed_seedmean": 6.301,
+   "rmse_v2k1_clean_seeds": [
+    2.7055,
+    2.6966,
+    2.6996
+   ],
+   "rmse_v2k1_clean_seedmean": 2.6958,
+   "rmse_v2k1_perturbed_seeds": [
+    3.5244,
+    3.4826,
+    3.4986
+   ],
+   "rmse_v2k1_perturbed_seedmean": 3.4973,
+   "rmse_nf1_clean_flag0_seeds": [
+    2.5967,
+    2.5933,
+    2.5966
+   ],
+   "rmse_nf1_clean_flag0_seedmean": 2.5914,
+   "rmse_nf1_perturbed_flag1_seeds": [
+    3.4411,
+    3.4424,
+    3.4345
+   ],
+   "rmse_nf1_perturbed_flag1_seedmean": 3.4352,
+   "rmse_nf1_perturbed_flag0_seeds": [
+    5.5157,
+    5.5875,
+    5.5109
+   ],
+   "rmse_nf1_perturbed_flag0_seedmean": 5.5353,
+   "rmse_nf2_clean_flag0_seeds": [
+    2.5979,
+    2.5982,
+    2.6008
+   ],
+   "rmse_nf2_clean_flag0_seedmean": 2.595,
+   "rmse_nf2_perturbed_flag1_seeds": [
+    3.4596,
+    3.4404,
+    3.4536
+   ],
+   "rmse_nf2_perturbed_flag1_seedmean": 3.4472,
+   "rmse_nf2_perturbed_flag0_seeds": [
+    5.6323,
+    5.6505,
+    5.6059
+   ],
+   "rmse_nf2_perturbed_flag0_seedmean": 5.6272,
+   "distinct_168h_blocks": 209,
+   "mse_change_pct": {
+    "nf1 clean_flag0 vs baseline clean": {
+     "seed0": 2.26,
+     "seed0_ci95": [
+      1.51,
+      2.98
+     ],
+     "seedmean": 2.11,
+     "seedmean_ci95": [
+      1.48,
+      2.71
+     ]
+    },
+    "nf1 perturbed_flag1 vs baseline perturbed": {
+     "seed0": -70.24,
+     "seed0_ci95": [
+      -71.73,
+      -68.78
+     ],
+     "seedmean": -70.28,
+     "seedmean_ci95": [
+      -71.77,
+      -68.85
+     ]
+    },
+    "nf1 perturbed_flag0 vs baseline perturbed": {
+     "seed0": -23.53,
+     "seed0_ci95": [
+      -24.19,
+      -22.92
+     ],
+     "seedmean": -22.83,
+     "seedmean_ci95": [
+      -23.44,
+      -22.26
+     ]
+    },
+    "nf1 perturbed_flag1 vs v2k1 perturbed": {
+     "seed0": -4.67,
+     "seed0_ci95": [
+      -5.32,
+      -4.05
+     ],
+     "seedmean": -3.52,
+     "seedmean_ci95": [
+      -4.01,
+      -3.07
+     ]
+    },
+    "nf1 clean_flag0 vs v2k1 clean": {
+     "seed0": -7.88,
+     "seed0_ci95": [
+      -8.83,
+      -7.01
+     ],
+     "seedmean": -7.6,
+     "seedmean_ci95": [
+      -8.48,
+      -6.76
+     ]
+    },
+    "v2k1 clean vs baseline clean": {
+     "seed0": 11.01,
+     "seed0_ci95": [
+      9.61,
+      12.37
+     ],
+     "seedmean": 10.51,
+     "seedmean_ci95": [
+      9.18,
+      11.84
+     ]
+    },
+    "v2k1 perturbed vs baseline perturbed": {
+     "seed0": -68.78,
+     "seed0_ci95": [
+      -70.29,
+      -67.32
+     ],
+     "seedmean": -69.19,
+     "seedmean_ci95": [
+      -70.68,
+      -67.74
+     ]
+    },
+    "nf2 clean_flag0 vs baseline clean": {
+     "seed0": 2.36,
+     "seed0_ci95": [
+      1.71,
+      2.97
+     ],
+     "seedmean": 2.4,
+     "seedmean_ci95": [
+      1.68,
+      3.1
+     ]
+    },
+    "nf2 perturbed_flag1 vs baseline perturbed": {
+     "seed0": -69.91,
+     "seed0_ci95": [
+      -71.38,
+      -68.5
+     ],
+     "seedmean": -70.07,
+     "seedmean_ci95": [
+      -71.55,
+      -68.63
+     ]
+    },
+    "nf2 perturbed_flag1 vs nf1 perturbed_flag1": {
+     "seed0": 1.08,
+     "seed0_ci95": [
+      0.63,
+      1.5
+     ],
+     "seedmean": 0.7,
+     "seedmean_ci95": [
+      0.39,
+      0.99
+     ]
+    },
+    "nf1 perturbed_flag1 vs persistence perturbed": {
+     "seed0": -66.83,
+     "seed0_ci95": [
+      -68.24,
+      -65.52
+     ],
+     "seedmean": -66.94,
+     "seedmean_ci95": [
+      -68.34,
+      -65.68
+     ]
+    }
+   }
+  },
+  "storm": {
+   "n_hours": 362,
+   "rmse_tracked_xgb_baseline_json": 7.1727,
+   "rmse_persistence_clean_dst_t": 9.8253,
+   "rmse_persistence_perturbed_dst_t": 10.7301,
+   "rmse_baseline_clean_seeds": [
+    7.1727,
+    7.2734,
+    7.1906
+   ],
+   "rmse_baseline_clean_seedmean": 7.1824,
+   "rmse_baseline_perturbed_seeds": [
+    8.211,
+    8.3766,
+    8.2307
+   ],
+   "rmse_baseline_perturbed_seedmean": 8.2443,
+   "rmse_v2k1_clean_seeds": [
+    7.7724,
+    7.9362,
+    7.8544
+   ],
+   "rmse_v2k1_clean_seedmean": 7.8329,
+   "rmse_v2k1_perturbed_seeds": [
+    8.1135,
+    8.2442,
+    8.1663
+   ],
+   "rmse_v2k1_perturbed_seedmean": 8.1507,
+   "rmse_nf1_clean_flag0_seeds": [
+    7.2809,
+    7.2176,
+    7.2284
+   ],
+   "rmse_nf1_clean_flag0_seedmean": 7.2213,
+   "rmse_nf1_perturbed_flag1_seeds": [
+    8.4829,
+    8.3839,
+    8.3994
+   ],
+   "rmse_nf1_perturbed_flag1_seedmean": 8.403,
+   "rmse_nf1_perturbed_flag0_seeds": [
+    7.9422,
+    7.8369,
+    7.8394
+   ],
+   "rmse_nf1_perturbed_flag0_seedmean": 7.8528,
+   "rmse_nf2_clean_flag0_seeds": [
+    7.2369,
+    7.2015,
+    7.3139
+   ],
+   "rmse_nf2_clean_flag0_seedmean": 7.2303,
+   "rmse_nf2_perturbed_flag1_seeds": [
+    8.4484,
+    8.4489,
+    8.5175
+   ],
+   "rmse_nf2_perturbed_flag1_seedmean": 8.4527,
+   "rmse_nf2_perturbed_flag0_seeds": [
+    8.0271,
+    7.8641,
+    8.0131
+   ],
+   "rmse_nf2_perturbed_flag0_seedmean": 7.948,
+   "distinct_168h_blocks": 40,
+   "mse_change_pct": {
+    "nf1 clean_flag0 vs baseline clean": {
+     "seed0": 3.04,
+     "seed0_ci95": [
+      -1.51,
+      7.31
+     ],
+     "seedmean": 1.09,
+     "seedmean_ci95": [
+      -3.59,
+      5.37
+     ]
+    },
+    "nf1 perturbed_flag1 vs baseline perturbed": {
+     "seed0": 6.73,
+     "seed0_ci95": [
+      -5.34,
+      24.68
+     ],
+     "seedmean": 3.89,
+     "seedmean_ci95": [
+      -8.69,
+      22.77
+     ]
+    },
+    "nf1 perturbed_flag0 vs baseline perturbed": {
+     "seed0": -6.44,
+     "seed0_ci95": [
+      -12.97,
+      -0.87
+     ],
+     "seedmean": -9.27,
+     "seedmean_ci95": [
+      -14.72,
+      -4.75
+     ]
+    },
+    "nf1 perturbed_flag1 vs v2k1 perturbed": {
+     "seed0": 9.31,
+     "seed0_ci95": [
+      4.69,
+      15.2
+     ],
+     "seedmean": 6.29,
+     "seedmean_ci95": [
+      2.82,
+      12.12
+     ]
+    },
+    "nf1 clean_flag0 vs v2k1 clean": {
+     "seed0": -12.25,
+     "seed0_ci95": [
+      -18.95,
+      -6.28
+     ],
+     "seedmean": -15.01,
+     "seedmean_ci95": [
+      -20.37,
+      -9.34
+     ]
+    },
+    "v2k1 clean vs baseline clean": {
+     "seed0": 17.42,
+     "seed0_ci95": [
+      11.32,
+      25.06
+     ],
+     "seedmean": 18.94,
+     "seedmean_ci95": [
+      12.37,
+      25.2
+     ]
+    },
+    "v2k1 perturbed vs baseline perturbed": {
+     "seed0": -2.36,
+     "seed0_ci95": [
+      -12.16,
+      11.42
+     ],
+     "seedmean": -2.26,
+     "seedmean_ci95": [
+      -12.8,
+      12.1
+     ]
+    },
+    "nf2 clean_flag0 vs baseline clean": {
+     "seed0": 1.8,
+     "seed0_ci95": [
+      -1.6,
+      4.88
+     ],
+     "seedmean": 1.34,
+     "seedmean_ci95": [
+      -2.95,
+      4.69
+     ]
+    },
+    "nf2 perturbed_flag1 vs baseline perturbed": {
+     "seed0": 5.87,
+     "seed0_ci95": [
+      -6.21,
+      22.63
+     ],
+     "seedmean": 5.12,
+     "seedmean_ci95": [
+      -7.98,
+      22.6
+     ]
+    },
+    "nf2 perturbed_flag1 vs nf1 perturbed_flag1": {
+     "seed0": -0.81,
+     "seed0_ci95": [
+      -3.0,
+      1.38
+     ],
+     "seedmean": 1.19,
+     "seedmean_ci95": [
+      -1.73,
+      3.4
+     ]
+    },
+    "nf1 perturbed_flag1 vs persistence perturbed": {
+     "seed0": -37.5,
+     "seed0_ci95": [
+      -47.37,
+      -19.99
+     ],
+     "seedmean": -38.67,
+     "seedmean_ci95": [
+      -48.76,
+      -20.53
+     ]
+    }
+   }
+  },
+  "intense": {
+   "n_hours": 35,
+   "rmse_tracked_xgb_baseline_json": 11.6867,
+   "rmse_persistence_clean_dst_t": 15.9553,
+   "rmse_persistence_perturbed_dst_t": 17.4689,
+   "rmse_baseline_clean_seeds": [
+    11.6867,
+    11.9009,
+    11.6388
+   ],
+   "rmse_baseline_clean_seedmean": 11.6674,
+   "rmse_baseline_perturbed_seeds": [
+    12.6012,
+    12.6593,
+    12.4828
+   ],
+   "rmse_baseline_perturbed_seedmean": 12.5034,
+   "rmse_v2k1_clean_seeds": [
+    12.8549,
+    13.151,
+    13.1025
+   ],
+   "rmse_v2k1_clean_seedmean": 13.0018,
+   "rmse_v2k1_perturbed_seeds": [
+    12.9212,
+    12.9703,
+    12.999
+   ],
+   "rmse_v2k1_perturbed_seedmean": 12.9212,
+   "rmse_nf1_clean_flag0_seeds": [
+    11.6186,
+    11.4841,
+    11.5448
+   ],
+   "rmse_nf1_clean_flag0_seedmean": 11.511,
+   "rmse_nf1_perturbed_flag1_seeds": [
+    13.029,
+    12.7773,
+    12.7253
+   ],
+   "rmse_nf1_perturbed_flag1_seedmean": 12.805,
+   "rmse_nf1_perturbed_flag0_seeds": [
+    12.2161,
+    11.925,
+    11.952
+   ],
+   "rmse_nf1_perturbed_flag0_seedmean": 11.9913,
+   "rmse_nf2_clean_flag0_seeds": [
+    11.7549,
+    11.7608,
+    12.4271
+   ],
+   "rmse_nf2_clean_flag0_seedmean": 11.9475,
+   "rmse_nf2_perturbed_flag1_seeds": [
+    12.9438,
+    13.0761,
+    13.5545
+   ],
+   "rmse_nf2_perturbed_flag1_seedmean": 13.1543,
+   "rmse_nf2_perturbed_flag0_seeds": [
+    12.3627,
+    12.3129,
+    12.8069
+   ],
+   "rmse_nf2_perturbed_flag0_seedmean": 12.4558,
+   "distinct_168h_blocks": 3,
+   "mse_change_pct": {
+    "nf1 clean_flag0 vs baseline clean": {
+     "seed0": -1.16,
+     "seed0_ci95": null,
+     "seedmean": -2.66,
+     "seedmean_ci95": null
+    },
+    "nf1 perturbed_flag1 vs baseline perturbed": {
+     "seed0": 6.91,
+     "seed0_ci95": null,
+     "seedmean": 4.88,
+     "seedmean_ci95": null
+    },
+    "nf1 perturbed_flag0 vs baseline perturbed": {
+     "seed0": -6.02,
+     "seed0_ci95": null,
+     "seedmean": -8.02,
+     "seedmean_ci95": null
+    },
+    "nf1 perturbed_flag1 vs v2k1 perturbed": {
+     "seed0": 1.68,
+     "seed0_ci95": null,
+     "seedmean": -1.79,
+     "seedmean_ci95": null
+    },
+    "nf1 clean_flag0 vs v2k1 clean": {
+     "seed0": -18.31,
+     "seed0_ci95": null,
+     "seedmean": -21.62,
+     "seedmean_ci95": null
+    },
+    "v2k1 clean vs baseline clean": {
+     "seed0": 20.99,
+     "seed0_ci95": null,
+     "seedmean": 24.18,
+     "seedmean_ci95": null
+    },
+    "v2k1 perturbed vs baseline perturbed": {
+     "seed0": 5.14,
+     "seed0_ci95": null,
+     "seedmean": 6.79,
+     "seedmean_ci95": null
+    },
+    "nf2 clean_flag0 vs baseline clean": {
+     "seed0": 1.17,
+     "seed0_ci95": null,
+     "seedmean": 4.86,
+     "seedmean_ci95": null
+    },
+    "nf2 perturbed_flag1 vs baseline perturbed": {
+     "seed0": 5.51,
+     "seed0_ci95": null,
+     "seedmean": 10.68,
+     "seedmean_ci95": null
+    },
+    "nf2 perturbed_flag1 vs nf1 perturbed_flag1": {
+     "seed0": -1.3,
+     "seed0_ci95": null,
+     "seedmean": 5.53,
+     "seedmean_ci95": null
+    },
+    "nf1 perturbed_flag1 vs persistence perturbed": {
+     "seed0": -44.37,
+     "seed0_ci95": null,
+     "seedmean": -46.27,
+     "seedmean_ci95": null
+    }
+   }
+  }
+ },
+ "run_time_seconds": 1307
+}
