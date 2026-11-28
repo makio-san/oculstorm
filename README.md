@@ -280,6 +280,7 @@ oculstorm/gru.py           GRU model definition
 scripts/train_xgb.py       train XGBoost, score against persistence
 scripts/train_gru.py       train the GRU, score against persistence and XGBoost
 scripts/compare_models.py  bootstrap intervals for RMSE differences between models
+scripts/score_holdout.py   score the 1 hour models on OMNI hours after the test set
 scripts/build_dashboard.py export test predictions to docs/data.js
 oculstorm/live.py          NOAA real-time inputs as an OMNI-style hourly table
 oculstorm/archive.py       append-only log of forecasts issued in real time
