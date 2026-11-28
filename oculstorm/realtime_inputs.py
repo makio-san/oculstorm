@@ -39,6 +39,8 @@ KINDS = {
     "mag": ["bx", "by_gsm", "bz_gsm", "b_mag_avg", "lat", "lon"],
     "swepam": ["proton_density", "flow_speed", "proton_temp"],
 }
+TRAIN_ACE_START = "2001-01-01"  # first month of the archive used for the train years mode (issue 50)
+YEARS = {"validation": (VAL_START, TEST_START), "train": (TRAIN_ACE_START, VAL_START)}
 SENTINEL = -999.0  # every missing value in the files is at or below this (-999.9, -9999.9, -1.00e+05)
 BZ_LARGE = 4.0  # nT, the StormFocus threshold for a large real-time against OMNI Bz difference
 
@@ -48,22 +50,29 @@ def months(start: str = VAL_START, stop: str = TEST_START) -> list[str]:
     return [m.strftime("%Y%m") for m in pd.date_range(start, stop, freq="MS", inclusive="left")]
 
 
-def file_name(month: str, kind: str) -> str:
-    """Name of one monthly file; months outside the validation years are refused."""
-    if month not in months():
-        raise ValueError(f"{month} is outside the validation years; nothing else may be downloaded or read")
+def year_months(years: str = "validation") -> list[str]:
+    """YYYYMM of every month of `years`: validation 2017-01 .. 2020-12, train 2001-01 .. 2016-12."""
+    if years not in YEARS:
+        raise ValueError(f"unknown years {years}")
+    return months(*YEARS[years])
+
+
+def file_name(month: str, kind: str, years: str = "validation") -> str:
+    """Name of one monthly file; months outside `years` are refused, and no mode reaches the test years."""
+    if month not in year_months(years) or month >= TEST_START[:7].replace("-", ""):
+        raise ValueError(f"{month} is outside the {years} years; nothing else may be downloaded or read")
     if kind not in KINDS:
         raise ValueError(f"unknown file kind {kind}")
     return f"{month}_ace_{kind}_1h.txt"
 
 
-def download(cache: Path = CACHE) -> list[Path]:
-    """Fetch the 96 monthly files that are not in `cache` yet."""
+def download(cache: Path = CACHE, years: str = "validation") -> list[Path]:
+    """Fetch the monthly files of `years` that are not in `cache` yet (96 for validation, 384 for train)."""
     cache.mkdir(parents=True, exist_ok=True)
     paths = []
-    for month in months():
+    for month in year_months(years):
         for kind in KINDS:
-            path = cache / file_name(month, kind)
+            path = cache / file_name(month, kind, years)
             if not path.exists():
                 request = urllib.request.Request(f"{BASE_URL}/{path.name}", headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(request, timeout=60) as response:
@@ -91,14 +100,14 @@ def parse_month(text: str, kind: str) -> pd.DataFrame:
     return pd.DataFrame(rows, index=pd.DatetimeIndex(times), columns=names, dtype=float)
 
 
-def load_ace(cache: Path = CACHE) -> pd.DataFrame:
-    """Hourly real-time ACE table on the validation hours, named like the OMNI columns, not delayed."""
-    index = pd.date_range(VAL_START, TEST_START, freq="h", inclusive="left")
+def load_ace(cache: Path = CACHE, years: str = "validation") -> pd.DataFrame:
+    """Hourly real-time ACE table on the hours of `years`, named like the OMNI columns, not delayed."""
+    index = pd.date_range(*YEARS[years], freq="h", inclusive="left")
     parts = []
     for kind in KINDS:
         frames = []
-        for month in months():
-            frame = parse_month((cache / file_name(month, kind)).read_text(), kind)
+        for month in year_months(years):
+            frame = parse_month((cache / file_name(month, kind, years)).read_text(), kind)
             frames.append(frame[frame.index.strftime("%Y%m") == month])  # a file only speaks for its own month
         joined = pd.concat(frames)
         parts.append(joined[~joined.index.duplicated(keep="last")].reindex(index))
@@ -120,6 +129,16 @@ def delayed(ace: pd.DataFrame, hours: int) -> pd.DataFrame:
 def validation_table(table: pd.DataFrame) -> pd.DataFrame:
     """Only the validation years: no train hour and no test hour reaches a model or a statistic."""
     return table[(table.index >= VAL_START) & (table.index < TEST_START)]
+
+
+def train_table(omni: pd.DataFrame, ace: pd.DataFrame, delay: int = DELAYS[0]) -> pd.DataFrame:
+    """Train years 2001 .. 2016 of `omni` with the real-time ACE solar wind delayed `delay` hours (issue 50).
+
+    Dst and F10.7 stay from OMNI. Rows before TRAIN_ACE_START and from VAL_START on are dropped,
+    so the table can only ever feed the training rows.
+    """
+    rows = omni[(omni.index >= TRAIN_ACE_START) & (omni.index < VAL_START)]
+    return with_solar_wind(rows, delayed(ace[ace.index < VAL_START], delay))
 
 
 def with_solar_wind(omni: pd.DataFrame, wind: pd.DataFrame) -> pd.DataFrame:

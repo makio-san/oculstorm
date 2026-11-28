@@ -128,3 +128,27 @@ def test_score_is_paired_and_respects_the_row_filter():
     part = rt.score(frame, "omni", ["ace"], rows)
     assert part["all"]["n_hours"] == 500
     assert part["storm (Dst <= -50)"]["n_hours"] == int(((observed <= -50) & rows).sum())
+
+
+def test_train_years_mode_names_only_2001_to_2016_and_never_the_test_years():
+    names = [rt.file_name(m, kind, "train") for m in rt.year_months("train") for kind in rt.KINDS]
+    assert len(names) == 384
+    assert names[0] == "200101_ace_mag_1h.txt" and names[-1] == "201612_ace_swepam_1h.txt"
+    for month in ("200012", "201701", "202101", "202405"):
+        with pytest.raises(ValueError):
+            rt.file_name(month, "mag", "train")
+    with pytest.raises(ValueError):
+        rt.year_months("test")
+
+
+def test_train_table_feeds_only_train_rows_and_keeps_dst():
+    omni = _omni(start="2000-12-20", stop="2017-01-05")
+    hours = pd.date_range(rt.TRAIN_ACE_START, VAL_START, freq="h", inclusive="left")
+    ace = pd.DataFrame({col: 100.0 + i for i, col in enumerate(SOLAR_WIND)}, index=hours)
+    ace.iloc[5:, 0] = np.arange(len(hours) - 5, dtype=float)
+    table = rt.train_table(omni, ace)
+    assert table.index.min() == pd.Timestamp(rt.TRAIN_ACE_START) and table.index.max() < pd.Timestamp(VAL_START)
+    assert table["dst"].equals(omni["dst"].reindex(table.index)) and table["f107"].equals(omni["f107"].reindex(table.index))
+    assert table[SOLAR_WIND].iloc[0].isna().all()  # delayed 1 hour, the first hour has no earlier value
+    col = SOLAR_WIND[0]
+    assert (table[col].iloc[1:] == ace[col].shift(1).iloc[1:]).all()  # value at t was measured at t-1, never later
