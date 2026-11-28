@@ -156,3 +156,47 @@ def test_noisy_copies_stay_in_the_train_years_with_a_clean_target():
     assert first["dst_lag1"].equals(X_clean["dst_lag1"].iloc[:n])
     with pytest.raises(ValueError):
         train_xgb.noisy_copies(df, copies=3, horizon=1)
+
+
+def test_newest_flag_is_off_by_default_and_adds_only_a_constant_column():
+    args = train_xgb.build_parser().parse_args([])
+    assert args.dst_newest_flag == 0
+    df = _table()
+    X, y = build_features(df)
+    assert "dst_newest_unsettled" not in X.columns
+    Xf, yf = build_features(df, newest_flag=0.0)
+    assert yf.equals(y) and Xf.drop(columns="dst_newest_unsettled").equals(X)
+    assert (Xf["dst_newest_unsettled"] == 0).all()
+    X1, _ = build_features(df, newest_flag=1.0, newest_dst_error=newest_hour_error(df.index, seed=7))
+    assert (X1["dst_newest_unsettled"] == 1).all()
+
+
+def test_newest_flag_features_do_not_depend_on_the_future():
+    df = _table()
+    cut = pd.Timestamp("2016-11-10 12:00")
+    error = newest_hour_error(df.index, seed=7)
+    Xe, _ = build_features(df, newest_dst_error=error, newest_flag=1.0, require_target=False)
+    corrupted_error = error.copy()
+    corrupted_error[corrupted_error.index > cut] = 500.0
+    Xc, _ = build_features(_corrupt_after(df, cut), newest_dst_error=corrupted_error, newest_flag=1.0, require_target=False)
+    past = Xe[Xe.index <= cut]
+    assert past.equals(Xc.loc[past.index])
+
+
+def test_flagged_copies_carry_their_error_level_and_match_the_plain_copies():
+    df = _table()
+    X, y = train_xgb.noisy_copies(df, copies=2, horizon=1, flag=True)
+    X_plain, y_plain = train_xgb.noisy_copies(df, copies=2, horizon=1)
+    assert y.equals(y_plain) and X.drop(columns="dst_newest_unsettled").equals(X_plain)
+    n = len(X) // 2
+    assert (X["dst_newest_unsettled"].iloc[:n] == 1.0).all() and (X["dst_newest_unsettled"].iloc[n:] == 0.5).all()
+    assert X.index.max() < pd.Timestamp("2017-01-01")
+    X_clean, _ = build_features(df, newest_flag=0.0)
+    assert list(X.columns) == list(X_clean.columns)
+
+
+@pytest.mark.parametrize("extra", [["--dst-newest-noise", "1"], ["--dst-skip", "1"], ["--ring-current"], ["--dst-offset-aug", "1"]])
+def test_newest_flag_refuses_options_it_does_not_combine_with(extra, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["train_xgb.py", "--dst-newest-flag", "1", *extra])
+    with pytest.raises(SystemExit):
+        train_xgb.main()
