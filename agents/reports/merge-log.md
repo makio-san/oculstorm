@@ -51,3 +51,10 @@ One line per pull request the release-merger considered. Appended by the merger 
 | 2026-11-28T09:46Z | #57 | agents/experimenter-2026-11-28-3 | 757f136 | skipped | conflicts with main after #55 (oculstorm/features.py, scripts/train_xgb.py); commented |
 | 2026-11-28T09:46Z | #58 | agents/tuner-2026-11-28 | cd10e0f | merged | approved head, gates ok, report only, 118 tests passed |
 | 2026-11-28T09:46Z | #54 | agents/docs-keeper-2026-11-28 | 1acfb49 | merged | approved head, gates ok, README only, 118 tests passed |
+| 2026-11-28T17:53Z | #57 | agents/experimenter-2026-11-28-3 | 757f136 | skipped | conflicts with main (oculstorm/features.py, scripts/train_xgb.py); commented |
+| 2026-11-28T17:53Z | #56 | agents/experimenter-2026-11-28-2 | e97e8c3 | skipped | conflicts with main (scripts/train_xgb.py); commented |
+| 2026-11-28T17:53Z | #53 | agents/experimenter-2026-11-27-5 | 50b85c1 | skipped | conflicts with main (scripts/train_xgb.py, tests/test_train_xgb.py); commented |
+| 2026-11-28T17:53Z | #52 | agents/experimenter-2026-11-27-4 | ec73609 | skipped | conflicts with main (scripts/train_xgb.py, tests/test_train_xgb.py); commented |
+| 2026-11-28T17:53Z | #45 | agents/experimenter-2026-11-27 | 9976bef | skipped | conflicts with main (oculstorm/features.py, scripts/train_xgb.py, tests/test_train_xgb.py); commented |
+| 2026-11-28T17:53Z | #61 | agents/experimenter-2026-11-28-4 | e7d3fa1 | merged | approved head, gates ok, 119 tests passed with data, no deploy paths touched |
+| 2026-11-28T17:53Z | #62 | agents/tuner-2026-11-28 | 8a6a213 | merged | approved head, gates ok, report only, 119 tests passed |
