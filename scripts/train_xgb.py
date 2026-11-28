@@ -5,7 +5,7 @@ Usage: python scripts/train_xgb.py [--horizon H] [--storm-weight K] [--ring-curr
        [--colsample-bytree C] [--n-estimators T] [--seed S] [--objective {squarederror,pseudohuber,absolute}]
        [--huber-slope D] [--dst-offset-aug K] [--sw-noise-aug LEVEL] [--sw-noise-copies K]
        [--sw-noise-seed S] [--gap-aug K] [--gap-aug-rate R] [--gap-aug-seed S] [--gap-age]
-       [--dst-skip S] [--dst-newest-noise K] [--validation-only]
+       [--dst-skip S] [--dst-newest-noise K] [--timing-robust {add,replace}] [--validation-only]
 Writes: models/xgb_dst_{H}h{_swK}{variant}.ubj, reports/xgb_baseline{_Hh}{_swK}{variant}.json,
 reports/xgb_test_predictions{_Hh}{_swK}{variant}.parquet
 (the 1 hour reports keep their names without the suffix; _swK only when K is not 1;
@@ -22,6 +22,8 @@ training years, see oculstorm/augment.py, and the tag _swnLEVEL; validation and 
 --gap-aug K (off at 0, the default) adds K copies of the training years with real-time like IMF
 and plasma gaps (oculstorm.augment.blank_gaps, issue 41) and the tag _gaK (_gaK_rR for a rate
 other than 1); --gap-age adds the imf_age and plasma_age features and the tag _age.
+--timing-robust add (issue 51) adds trailing 2 and 3 hour maxima and minima and the 2 hour mean
+of VBs, Newell and Bz and the tag _tr; replace also drops their lag 0 and adds the tag _trr.
 --validation-only fits, prints the validation scores and writes nothing; the test years are
 not predicted)
 """
@@ -39,7 +41,7 @@ sys.path.insert(0, str(ROOT))
 
 from oculstorm.augment import consistent_rows, gap_copies, newest_hour_error, offset_table, train_copies  # noqa: E402
 from oculstorm.data import TEST_START, VAL_START, load_hourly, split  # noqa: E402
-from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, N_LAGS, build_features, suffix, weight_tag  # noqa: E402
+from oculstorm.features import HORIZON, HORIZONS, MEMORY_TAUS, N_LAGS, TIMING_VARIANTS, build_features, suffix, weight_tag  # noqa: E402
 from oculstorm.metrics import evaluate, persistence, storm_weights, trend_persistence  # noqa: E402
 
 PARAMS = dict(
@@ -80,7 +82,7 @@ def objective_params(objective: str, huber_slope: float = 3.0) -> dict:
 
 def offset_copies(
     df: pd.DataFrame, copies: int, horizon: int, ring_current: bool = False, n_lags: int = N_LAGS, seed: int = 1,
-    memory: tuple[float, ...] = (), gap_age: bool = False,
+    memory: tuple[float, ...] = (), gap_age: bool = False, timing_robust: str | None = None,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Train years of `copies` Dst offset copies of the table (oculstorm.augment), features and target.
 
@@ -89,7 +91,8 @@ def offset_copies(
     parts = []
     for k in range(copies):
         shifted = offset_table(df, seed + k)
-        X_k, y_k = build_features(shifted, horizon=horizon, ring_current=ring_current, n_lags=n_lags, memory=memory, gap_age=gap_age)
+        X_k, y_k = build_features(shifted, horizon=horizon, ring_current=ring_current, n_lags=n_lags, memory=memory, gap_age=gap_age,
+                                  timing_robust=timing_robust)
         rows = pd.Series(consistent_rows(df.index, horizon), index=df.index).reindex(X_k.index)
         X_k, y_k = X_k[rows.to_numpy()], y_k[rows.to_numpy()]
         X_k, y_k = split(X_k)[0], split(y_k)[0]
@@ -102,7 +105,7 @@ NOISE_LEVELS = (1.0, 0.5)  # share of the newest hour error in the first and the
 
 def noisy_copies(
     df: pd.DataFrame, copies: int, horizon: int, n_lags: int = N_LAGS, seed: int = 1,
-    memory: tuple[float, ...] = (), gap_age: bool = False,
+    memory: tuple[float, ...] = (), gap_age: bool = False, timing_robust: str | None = None,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Train years of `copies` copies whose newest Dst hour carries an AR(1) error (issue 30), features and target.
 
@@ -114,7 +117,8 @@ def noisy_copies(
     parts = []
     for k in range(copies):
         error = newest_hour_error(df.index, seed + k, NOISE_LEVELS[k])
-        X_k, y_k = build_features(df, horizon=horizon, n_lags=n_lags, memory=memory, gap_age=gap_age, newest_dst_error=error)
+        X_k, y_k = build_features(df, horizon=horizon, n_lags=n_lags, memory=memory, gap_age=gap_age, newest_dst_error=error,
+                                  timing_robust=timing_robust)
         parts.append((split(X_k)[0], split(y_k)[0]))
     return pd.concat([p[0] for p in parts]), pd.concat([p[1] for p in parts])
 
@@ -173,6 +177,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dst-skip", type=int, default=0, metavar="S", help="end the Dst history at t-S instead of t (0 = off)")
     parser.add_argument("--dst-newest-noise", type=int, default=0, metavar="K", choices=range(len(NOISE_LEVELS) + 1),
                         help="train on K extra copies of the train years with an AR(1) error on the newest Dst hour (0 = off)")
+    parser.add_argument("--timing-robust", choices=TIMING_VARIANTS, default=None,
+                        help="add trailing 2 and 3 hour extremes and the 2 hour mean of VBs, Newell and Bz (issue 51); replace also drops their lag 0 (default off)")
     parser.add_argument("--validation-only", action="store_true", help="print validation scores only, write nothing, never predict the test years")
     return parser
 
@@ -197,7 +203,10 @@ def main() -> None:
     variant += (f"_ga{gaps}" + (f"_r{args.gap_aug_rate:g}" if args.gap_aug_rate != 1 else "")) if gaps > 0 else ""
     variant += "_age" if args.gap_age else ""
     variant += (f"_ds{skip}" if skip else "") + (f"_nn{newest}" if newest else "")
-    features = dict(horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, gap_age=args.gap_age, dst_skip=skip)
+    timing = args.timing_robust
+    variant += {None: "", "add": "_tr", "replace": "_trr"}[timing]
+    features = dict(horizon=h, ring_current=args.ring_current, n_lags=n_lags, memory=memory, gap_age=args.gap_age, dst_skip=skip,
+                    timing_robust=timing)
     tag = suffix(h) + weight_tag(peak) + variant
     df = load_hourly()
     X, y = build_features(df, **features)
@@ -206,7 +215,8 @@ def main() -> None:
     if params != PARAMS:
         print("params:", {k: v for k, v in params.items() if v != PARAMS.get(k)})
 
-    offset = [offset_copies(df, args.dst_offset_aug, h, args.ring_current, n_lags, memory=memory, gap_age=args.gap_age)] if args.dst_offset_aug else []
+    offset = [offset_copies(df, args.dst_offset_aug, h, args.ring_current, n_lags, memory=memory, gap_age=args.gap_age,
+                            timing_robust=timing)] if args.dst_offset_aug else []
     if offset:
         print(f"offset augmentation: {args.dst_offset_aug} copies, {len(offset[0][0]):,} extra train rows")
     noisy = [build_features(copy, **features) for copy in train_copies(df, noise, args.sw_noise_copies, args.sw_noise_seed)]
@@ -215,7 +225,7 @@ def main() -> None:
     gapped = [build_features(copy, **features) for copy in gap_copies(df, gaps, args.gap_aug_rate, args.gap_aug_seed)]
     if gapped:
         print(f"gap augmentation: rate {args.gap_aug_rate:g}, {len(gapped)} copies of the training years, {sum(len(x) for x, _ in gapped):,} extra rows")
-    newest_rows = [noisy_copies(df, newest, h, n_lags, memory=memory, gap_age=args.gap_age)] if newest else []
+    newest_rows = [noisy_copies(df, newest, h, n_lags, memory=memory, gap_age=args.gap_age, timing_robust=timing)] if newest else []
     if newest_rows:
         print(f"newest hour noise: {newest} copies, {len(newest_rows[0][0]):,} extra train rows")
     if skip:
@@ -272,6 +282,7 @@ def main() -> None:
         "gap_age": args.gap_age,
         "dst_skip": skip,
         "dst_newest_noise": newest,
+        "timing_robust": timing,
         "train": f"1995-01-01 .. {VAL_START} (exclusive)",
         "validation": f"{VAL_START} .. {TEST_START} (exclusive)",
         "test": f"{TEST_START} .. {y_te.index.max()}",

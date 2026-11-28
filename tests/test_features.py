@@ -5,7 +5,7 @@ import pandas as pd
 from oculstorm.data import load_hourly
 import pytest
 
-from oculstorm.features import HORIZONS, MEMORY_TAUS, N_LAGS, build_features, decaying_memory
+from oculstorm.features import HORIZONS, MEMORY_TAUS, N_LAGS, TIMING_DRIVERS, TIMING_VARIANTS, build_features, decaying_memory
 
 CUT = pd.Timestamp("2024-05-10 12:00")
 
@@ -150,3 +150,55 @@ def test_gap_age_is_off_by_default():
     X_age, _ = build_features(df, gap_age=True)
     assert "imf_age" not in X.columns and "plasma_age" not in X.columns
     assert X.equals(X_age[X.columns])
+
+
+TIMING_SUFFIXES = ("max2", "min2", "max3", "min3", "mean2")
+
+
+@pytest.mark.parametrize("variant", TIMING_VARIANTS)
+def test_timing_robust_windows_do_not_depend_on_the_future(variant):
+    df = load_hourly("2024-01-01")
+    X, _ = build_features(df, timing_robust=variant)
+    window_cols = [f"{name}_{s}" for name in TIMING_DRIVERS for s in TIMING_SUFFIXES]
+    assert set(window_cols) <= set(X.columns)
+
+    # Every hour after CUT is corrupted, so a window that reached past t would change rows <= CUT.
+    corrupted = df.copy()
+    floats = corrupted.select_dtypes("float").columns
+    corrupted.loc[corrupted.index > CUT, floats] = -1234.0
+    X_corrupted, _ = build_features(corrupted, timing_robust=variant)
+    past = X[X.index <= CUT]
+    assert past.equals(X_corrupted.loc[past.index])
+    future = X.index[X.index > CUT][:50]
+    assert not X.loc[future, window_cols].equals(X_corrupted.loc[future, window_cols])
+
+    # Corrupting only hour CUT + 1 leaves row CUT unchanged and changes row CUT + 1.
+    one = df.copy()
+    one.loc[CUT + pd.Timedelta(hours=1), floats] = -1234.0
+    X_one, _ = build_features(one, timing_robust=variant)
+    assert X.loc[:CUT].equals(X_one.loc[:CUT])
+    assert not X.loc[[CUT + pd.Timedelta(hours=1)], window_cols].equals(X_one.loc[[CUT + pd.Timedelta(hours=1)], window_cols])
+
+
+def test_timing_robust_is_off_by_default_and_uses_trailing_windows():
+    df = load_hourly("2024-01-01")
+    X, _ = build_features(df)
+    assert not any(c.endswith(TIMING_SUFFIXES) for c in X.columns)
+    X_add, _ = build_features(df, timing_robust="add")
+    assert X.equals(X_add[X.columns])
+    X_rep, _ = build_features(df, timing_robust="replace")
+    dropped = {f"{name}_lag0" for name in TIMING_DRIVERS}
+    assert set(X_add.columns) - set(X_rep.columns) == dropped
+    assert X_add.drop(columns=sorted(dropped)).equals(X_rep)
+
+    rows = X_add.loc[CUT - pd.Timedelta(hours=48):CUT]
+    for name in TIMING_DRIVERS:
+        lags = rows[[f"{name}_lag{k}" for k in range(3)]].astype("float64")
+        assert np.allclose(rows[f"{name}_max2"], lags.iloc[:, :2].max(axis=1), rtol=1e-6, equal_nan=True)
+        assert np.allclose(rows[f"{name}_min2"], lags.iloc[:, :2].min(axis=1), rtol=1e-6, equal_nan=True)
+        assert np.allclose(rows[f"{name}_max3"], lags.max(axis=1), rtol=1e-6, equal_nan=True)
+        assert np.allclose(rows[f"{name}_min3"], lags.min(axis=1), rtol=1e-6, equal_nan=True)
+        assert np.allclose(rows[f"{name}_mean2"], lags.iloc[:, :2].mean(axis=1), rtol=1e-5, atol=1e-6, equal_nan=True)
+
+    with pytest.raises(ValueError):
+        build_features(df, timing_robust="centred")
