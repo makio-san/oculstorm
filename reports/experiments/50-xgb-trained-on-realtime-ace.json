@@ -1,0 +1,6533 @@
+{
+ "issue": 50,
+ "title": "1 hour XGBoost trained on archived real-time ACE solar wind for 2001 to 2016, scored on validation",
+ "split": "validation only, 2017-01-01 .. 2020-12-31; train rows end before 2017-01-01; the test years are never predicted",
+ "source": {
+  "url": "https://sohoftp.nascom.nasa.gov/sdb/goes/ace/monthly",
+  "files": 480,
+  "megabytes": 28.3,
+  "kept": false,
+  "train_months": "200101 .. 201612",
+  "validation_months": "201701 .. 202012"
+ },
+ "configuration": {
+  "reference": "production: models/xgb_dst_1h.ubj loaded by scripts/live_forecast.py predict_xgb",
+  "variants": {
+   "omni": "scripts/train_xgb.py defaults retrained with each seed (seed 0 is the production configuration): seed noise",
+   "ace_rt": "train rows 2001-01-01 .. 2016-12-31 with real-time ACE solar wind delayed 1 hour, Dst and F10.7 from OMNI; train_xgb.py --train-inputs ace_rt",
+   "omni+ace_rt": "OMNI train rows 1995 .. 2016 plus the ACE copy (K = 1); train_xgb.py --train-inputs omni+ace_rt",
+   "seed mean": "mean forecast of the seeds of one variant"
+  },
+  "train_rows": {
+   "omni": 192864,
+   "ace_rt": 140255,
+   "omni+ace_rt": 333119
+  },
+  "early_stopping": "validation years with OMNI inputs, as production",
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "params": {
+   "n_estimators": 3000,
+   "learning_rate": 0.03,
+   "max_depth": 6,
+   "min_child_weight": 5,
+   "subsample": 0.8,
+   "colsample_bytree": 0.8,
+   "tree_method": "hist",
+   "early_stopping_rounds": 100,
+   "random_state": 0
+  },
+  "validation_inputs": {
+   "omni": "parquet",
+   "ace_delay1h": "issue 31 real-time ACE inputs delayed 1 hour"
+  },
+  "scored_hours": "35,039 issue hours from 2017-01-02T00:00 to 2020-12-31T22:00, the same for every model and input"
+ },
+ "bootstrap": {
+  "method": "oculstorm.metrics.block_bootstrap_rmse, paired",
+  "block_hours": 168,
+  "resamples": 2000,
+  "seed": 0,
+  "intervals": "95%; differences are model minus production on the same inputs"
+ },
+ "fits": {
+  "omni seed0": {
+   "trees": 2151,
+   "seconds": 154
+  },
+  "omni seed1": {
+   "trees": 1838,
+   "seconds": 130
+  },
+  "omni seed2": {
+   "trees": 1980,
+   "seconds": 186
+  },
+  "ace_rt seed0": {
+   "trees": 1217,
+   "seconds": 89
+  },
+  "ace_rt seed1": {
+   "trees": 1177,
+   "seconds": 72
+  },
+  "ace_rt seed2": {
+   "trees": 1072,
+   "seconds": 47
+  },
+  "omni+ace_rt seed0": {
+   "trees": 2356,
+   "seconds": 121
+  },
+  "omni+ace_rt seed1": {
+   "trees": 2173,
+   "seconds": 208
+  },
+  "omni+ace_rt seed2": {
+   "trees": 1790,
+   "seconds": 140
+  }
+ },
+ "train_years_input_statistics": {
+  "bz_gsm": {
+   "bias": 0.0172,
+   "std_difference": 1.882,
+   "correlation": 0.8095,
+   "omni_mean": 0.0116,
+   "omni_std": 2.9929,
+   "missing_share_realtime": 0.0493,
+   "missing_share_omni": 0.0,
+   "hours_compared": 133348,
+   "share_abs_difference_above_4nT": 0.0462
+  },
+  "by_gsm": {
+   "bias": -0.0201,
+   "std_difference": 1.659,
+   "correlation": 0.9005,
+   "omni_mean": 0.0081,
+   "omni_std": 3.7619,
+   "missing_share_realtime": 0.0493,
+   "missing_share_omni": 0.0,
+   "hours_compared": 133348
+  },
+  "b_mag_avg": {
+   "bias": -0.5988,
+   "std_difference": 1.0729,
+   "correlation": 0.9401,
+   "omni_mean": 5.7563,
+   "omni_std": 3.131,
+   "missing_share_realtime": 0.0493,
+   "missing_share_omni": 0.0,
+   "hours_compared": 133348,
+   "bias_to_omni_b_vector_mag": 0.0546,
+   "std_difference_to_omni_b_vector_mag": 0.9258
+  },
+  "flow_speed": {
+   "bias": 1.2092,
+   "std_difference": 19.9975,
+   "correlation": 0.9821,
+   "omni_mean": 432.6314,
+   "omni_std": 106.2351,
+   "missing_share_realtime": 0.0693,
+   "missing_share_omni": 0.0009,
+   "hours_compared": 130415
+  },
+  "proton_density": {
+   "bias": -2.3021,
+   "std_difference": 3.346,
+   "correlation": 0.7237,
+   "omni_mean": 5.8251,
+   "omni_std": 4.8479,
+   "missing_share_realtime": 0.0693,
+   "missing_share_omni": 0.0246,
+   "hours_compared": 127240,
+   "share_realtime_below_omni": 0.8549
+  },
+  "flow_pressure": {
+   "bias": -0.6387,
+   "std_difference": 1.1125,
+   "correlation": 0.7686,
+   "omni_mean": 1.9432,
+   "omni_std": 1.7389,
+   "missing_share_realtime": 0.0693,
+   "missing_share_omni": 0.0247,
+   "hours_compared": 127236
+  },
+  "electric_field": {
+   "bias": 0.0001,
+   "std_difference": 0.9159,
+   "correlation": 0.7925,
+   "omni_mean": -0.0083,
+   "omni_std": 1.401,
+   "missing_share_realtime": 0.0958,
+   "missing_share_omni": 0.0009,
+   "hours_compared": 126702
+  },
+  "proton_temp": {
+   "bias": 7844.125,
+   "std_difference": 50468.7528,
+   "correlation": 0.8612,
+   "omni_mean": 96321.4219,
+   "omni_std": 98106.4141,
+   "missing_share_realtime": 0.0699,
+   "missing_share_omni": 0.0211,
+   "hours_compared": 127567
+  }
+ },
+ "train_years_coverage": {
+  "imf": {
+   "missing_share_by_year": {
+    "2001": 0.0459,
+    "2002": 0.075,
+    "2003": 0.0283,
+    "2004": 0.0266,
+    "2005": 0.0216,
+    "2006": 0.0255,
+    "2007": 0.0394,
+    "2008": 0.0359,
+    "2009": 0.0267,
+    "2010": 0.0379,
+    "2011": 0.1045,
+    "2012": 0.0181,
+    "2013": 0.0461,
+    "2014": 0.051,
+    "2015": 0.0517,
+    "2016": 0.1538
+   },
+   "gaps": 1633,
+   "longest_gap_hours": 177,
+   "share_of_missing_hours_in_gaps_up_to_3h": 0.1684
+  },
+  "plasma": {
+   "missing_share_by_year": {
+    "2001": 0.0337,
+    "2002": 0.0114,
+    "2003": 0.0137,
+    "2004": 0.0114,
+    "2005": 0.0055,
+    "2006": 0.0107,
+    "2007": 0.0184,
+    "2008": 0.0208,
+    "2009": 0.0177,
+    "2010": 0.0132,
+    "2011": 0.0685,
+    "2012": 0.1868,
+    "2013": 0.1255,
+    "2014": 0.1461,
+    "2015": 0.1602,
+    "2016": 0.2643
+   },
+   "gaps": 5609,
+   "longest_gap_hours": 74,
+   "share_of_missing_hours_in_gaps_up_to_3h": 0.6813
+  }
+ },
+ "issue_hours": {
+  "all": 35039,
+  "all_inputs_observed_last_6h_in_both_inputs": 11204
+ },
+ "summary": {
+  "all_hours": {
+   "omni": {
+    "all": {
+     "n_hours": 35039,
+     "production_rmse": 2.6561,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": 0.36,
+      "ci95": [
+       -0.08,
+       0.81
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": -0.04,
+      "ci95": [
+       -0.52,
+       0.43
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": 3.23,
+      "ci95": [
+       2.12,
+       4.43
+      ],
+      "significant": true
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": 3.13,
+      "ci95": [
+       1.93,
+       4.35
+      ],
+      "significant": true
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": 2.87,
+      "ci95": [
+       1.7,
+       4.05
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -0.05,
+      "ci95": [
+       -0.83,
+       0.72
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -0.08,
+      "ci95": [
+       -1.0,
+       0.81
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": 0.36,
+      "ci95": [
+       -0.36,
+       1.07
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": -0.22,
+      "ci95": [
+       -0.51,
+       0.07
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": 2.65,
+      "ci95": [
+       1.54,
+       3.81
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -0.2,
+      "ci95": [
+       -0.96,
+       0.54
+      ],
+      "significant": false
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 34677,
+     "production_rmse": 2.5674,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": 0.16,
+      "ci95": [
+       -0.25,
+       0.54
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": -0.08,
+      "ci95": [
+       -0.46,
+       0.33
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": 2.96,
+      "ci95": [
+       2.07,
+       3.87
+      ],
+      "significant": true
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": 2.77,
+      "ci95": [
+       1.94,
+       3.58
+      ],
+      "significant": true
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": 2.85,
+      "ci95": [
+       2.05,
+       3.68
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": 0.06,
+      "ci95": [
+       -0.58,
+       0.66
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": 0.25,
+      "ci95": [
+       -0.41,
+       0.84
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": 0.37,
+      "ci95": [
+       -0.1,
+       0.85
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": -0.26,
+      "ci95": [
+       -0.49,
+       -0.02
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": 2.47,
+      "ci95": [
+       1.65,
+       3.26
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -0.02,
+      "ci95": [
+       -0.54,
+       0.48
+      ],
+      "significant": false
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 362,
+     "production_rmse": 7.1727,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": 2.83,
+      "ci95": [
+       -1.06,
+       7.92
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": 0.5,
+      "ci95": [
+       -3.27,
+       5.23
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": 6.46,
+      "ci95": [
+       -1.78,
+       17.43
+      ],
+      "significant": false
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": 7.55,
+      "ci95": [
+       -4.67,
+       21.2
+      ],
+      "significant": false
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": 3.11,
+      "ci95": [
+       -8.09,
+       16.09
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -1.42,
+      "ci95": [
+       -5.19,
+       3.91
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -4.16,
+      "ci95": [
+       -9.2,
+       3.34
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": 0.23,
+      "ci95": [
+       -5.89,
+       7.23
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": 0.27,
+      "ci95": [
+       -2.15,
+       3.41
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": 4.86,
+      "ci95": [
+       -5.65,
+       17.23
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -2.43,
+      "ci95": [
+       -7.2,
+       3.61
+      ],
+      "significant": false
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 35,
+     "production_rmse": 11.6867,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": 3.7,
+      "ci95": [
+       -1.21,
+       16.64
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": -0.82,
+      "ci95": [
+       -6.93,
+       13.06
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -12.1,
+      "ci95": [
+       -29.41,
+       6.73
+      ],
+      "significant": false
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": -12.38,
+      "ci95": [
+       -34.18,
+       30.67
+      ],
+      "significant": false
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -16.48,
+      "ci95": [
+       -38.98,
+       2.54
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -10.73,
+      "ci95": [
+       -18.37,
+       15.71
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -17.5,
+      "ci95": [
+       -26.83,
+       12.18
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -2.3,
+      "ci95": [
+       -16.91,
+       19.79
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": -0.33,
+      "ci95": [
+       -4.84,
+       9.12
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -14.53,
+      "ci95": [
+       -34.79,
+       11.99
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -11.04,
+      "ci95": [
+       -21.5,
+       14.82
+      ],
+      "significant": false
+     }
+    }
+   },
+   "ace_delay1h": {
+    "all": {
+     "n_hours": 35039,
+     "production_rmse": 2.9401,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": -0.43,
+      "ci95": [
+       -1.3,
+       0.42
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": 0.3,
+      "ci95": [
+       -0.39,
+       1.0
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -8.13,
+      "ci95": [
+       -9.82,
+       -6.64
+      ],
+      "significant": true
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": -8.46,
+      "ci95": [
+       -10.14,
+       -6.89
+      ],
+      "significant": true
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -8.28,
+      "ci95": [
+       -10.07,
+       -6.65
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -8.81,
+      "ci95": [
+       -10.32,
+       -7.36
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -8.82,
+      "ci95": [
+       -10.4,
+       -7.32
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -8.69,
+      "ci95": [
+       -10.31,
+       -7.2
+      ],
+      "significant": true
+     },
+     "omni seed mean": {
+      "mse_change_percent": -1.13,
+      "ci95": [
+       -1.62,
+       -0.66
+      ],
+      "significant": true
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -8.61,
+      "ci95": [
+       -10.27,
+       -7.07
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -9.1,
+      "ci95": [
+       -10.64,
+       -7.61
+      ],
+      "significant": true
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 34677,
+     "production_rmse": 2.81,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": -0.74,
+      "ci95": [
+       -1.41,
+       -0.05
+      ],
+      "significant": true
+     },
+     "omni seed2": {
+      "mse_change_percent": 0.33,
+      "ci95": [
+       -0.36,
+       1.08
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -8.38,
+      "ci95": [
+       -9.92,
+       -6.96
+      ],
+      "significant": true
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": -8.48,
+      "ci95": [
+       -9.99,
+       -7.08
+      ],
+      "significant": true
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -8.08,
+      "ci95": [
+       -9.62,
+       -6.65
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -8.68,
+      "ci95": [
+       -10.03,
+       -7.39
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -8.57,
+      "ci95": [
+       -10.0,
+       -7.23
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -8.45,
+      "ci95": [
+       -9.84,
+       -7.15
+      ],
+      "significant": true
+     },
+     "omni seed mean": {
+      "mse_change_percent": -1.22,
+      "ci95": [
+       -1.63,
+       -0.82
+      ],
+      "significant": true
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -8.59,
+      "ci95": [
+       -10.12,
+       -7.21
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -8.86,
+      "ci95": [
+       -10.26,
+       -7.58
+      ],
+      "significant": true
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 362,
+     "production_rmse": 8.9623,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": 2.48,
+      "ci95": [
+       -4.05,
+       7.63
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": 0.03,
+      "ci95": [
+       -3.76,
+       3.68
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -5.82,
+      "ci95": [
+       -12.32,
+       3.98
+      ],
+      "significant": false
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": -8.26,
+      "ci95": [
+       -16.04,
+       4.34
+      ],
+      "significant": false
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -10.19,
+      "ci95": [
+       -18.41,
+       5.88
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -10.05,
+      "ci95": [
+       -16.55,
+       3.16
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -11.15,
+      "ci95": [
+       -17.76,
+       1.73
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -10.95,
+      "ci95": [
+       -17.98,
+       3.28
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": -0.29,
+      "ci95": [
+       -3.67,
+       2.12
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -8.8,
+      "ci95": [
+       -16.12,
+       3.91
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -11.27,
+      "ci95": [
+       -17.86,
+       1.98
+      ],
+      "significant": false
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 35,
+     "production_rmse": 15.8193,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": 11.54,
+      "ci95": [
+       2.11,
+       52.52
+      ],
+      "significant": true
+     },
+     "omni seed2": {
+      "mse_change_percent": 1.75,
+      "ci95": [
+       -0.41,
+       22.96
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -8.84,
+      "ci95": [
+       -19.12,
+       39.15
+      ],
+      "significant": false
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": -15.15,
+      "ci95": [
+       -24.46,
+       37.66
+      ],
+      "significant": false
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -21.06,
+      "ci95": [
+       -30.7,
+       63.91
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -21.18,
+      "ci95": [
+       -28.91,
+       51.34
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -21.61,
+      "ci95": [
+       -29.33,
+       48.79
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -24.69,
+      "ci95": [
+       -31.76,
+       41.82
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": 3.63,
+      "ci95": [
+       0.66,
+       21.96
+      ],
+      "significant": true
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -16.1,
+      "ci95": [
+       -23.99,
+       44.98
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -23.07,
+      "ci95": [
+       -29.91,
+       46.07
+      ],
+      "significant": false
+     }
+    }
+   }
+  },
+  "inputs_observed": {
+   "omni": {
+    "all": {
+     "n_hours": 11204,
+     "production_rmse": 2.3961,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": 0.06,
+      "ci95": [
+       -0.57,
+       0.72
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": 0.05,
+      "ci95": [
+       -0.66,
+       0.79
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": 2.58,
+      "ci95": [
+       1.25,
+       3.99
+      ],
+      "significant": true
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": 2.65,
+      "ci95": [
+       1.52,
+       3.93
+      ],
+      "significant": true
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": 1.63,
+      "ci95": [
+       0.2,
+       3.14
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -0.0,
+      "ci95": [
+       -1.19,
+       1.12
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": 0.16,
+      "ci95": [
+       -1.08,
+       1.27
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -0.05,
+      "ci95": [
+       -1.19,
+       1.07
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": -0.24,
+      "ci95": [
+       -0.63,
+       0.17
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": 1.88,
+      "ci95": [
+       0.71,
+       3.17
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -0.21,
+      "ci95": [
+       -1.34,
+       0.8
+      ],
+      "significant": false
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 11156,
+     "production_rmse": 2.3442,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": 0.16,
+      "ci95": [
+       -0.4,
+       0.78
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": 0.28,
+      "ci95": [
+       -0.29,
+       0.93
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": 3.1,
+      "ci95": [
+       1.86,
+       4.41
+      ],
+      "significant": true
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": 2.71,
+      "ci95": [
+       1.53,
+       4.03
+      ],
+      "significant": true
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": 2.27,
+      "ci95": [
+       1.17,
+       3.45
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": 0.39,
+      "ci95": [
+       -0.37,
+       1.31
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": 0.68,
+      "ci95": [
+       -0.05,
+       1.49
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": 0.46,
+      "ci95": [
+       -0.15,
+       1.2
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": -0.12,
+      "ci95": [
+       -0.45,
+       0.23
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": 2.29,
+      "ci95": [
+       1.22,
+       3.51
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": 0.28,
+      "ci95": [
+       -0.34,
+       0.99
+      ],
+      "significant": false
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 48,
+     "production_rmse": 7.9341,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": -2.11,
+      "ci95": [
+       -5.1,
+       5.61
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": -4.61,
+      "ci95": [
+       -7.68,
+       3.73
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -7.82,
+      "ci95": [
+       -16.44,
+       11.88
+      ],
+      "significant": false
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": 1.29,
+      "ci95": [
+       -8.79,
+       21.56
+      ],
+      "significant": false
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -11.17,
+      "ci95": [
+       -19.08,
+       13.99
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -8.04,
+      "ci95": [
+       -13.55,
+       13.58
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -10.56,
+      "ci95": [
+       -16.14,
+       11.51
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -10.37,
+      "ci95": [
+       -15.66,
+       10.69
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": -2.67,
+      "ci95": [
+       -4.48,
+       2.22
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -6.49,
+      "ci95": [
+       -14.84,
+       14.39
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -10.05,
+      "ci95": [
+       -15.33,
+       10.56
+      ],
+      "significant": false
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 6,
+     "production_rmse": 12.9857,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": -8.71,
+      "ci95": [
+       -13.97,
+       103.41
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": 4.35,
+      "ci95": [
+       -13.7,
+       28.25
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -36.82,
+      "ci95": [
+       -94.09,
+       -14.19
+      ],
+      "significant": true
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": -28.19,
+      "ci95": [
+       -58.26,
+       -5.56
+      ],
+      "significant": true
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -40.07,
+      "ci95": [
+       -75.47,
+       -19.5
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -27.22,
+      "ci95": [
+       -83.71,
+       -12.36
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -31.41,
+      "ci95": [
+       -60.24,
+       -21.5
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -27.2,
+      "ci95": [
+       -94.94,
+       -24.47
+      ],
+      "significant": true
+     },
+     "omni seed mean": {
+      "mse_change_percent": -1.89,
+      "ci95": [
+       -9.67,
+       25.49
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -35.79,
+      "ci95": [
+       -70.28,
+       -14.33
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -29.09,
+      "ci95": [
+       -82.38,
+       -20.13
+      ],
+      "significant": true
+     }
+    }
+   },
+   "ace_delay1h": {
+    "all": {
+     "n_hours": 11204,
+     "production_rmse": 2.4919,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": -0.17,
+      "ci95": [
+       -0.88,
+       0.65
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": 0.29,
+      "ci95": [
+       -0.22,
+       0.92
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -1.41,
+      "ci95": [
+       -3.92,
+       0.97
+      ],
+      "significant": false
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": -2.14,
+      "ci95": [
+       -6.0,
+       1.03
+      ],
+      "significant": false
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -2.91,
+      "ci95": [
+       -7.63,
+       0.86
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -3.84,
+      "ci95": [
+       -8.41,
+       -0.3
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -3.8,
+      "ci95": [
+       -8.61,
+       -0.1
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -3.64,
+      "ci95": [
+       -8.17,
+       -0.07
+      ],
+      "significant": true
+     },
+     "omni seed mean": {
+      "mse_change_percent": -0.24,
+      "ci95": [
+       -0.59,
+       0.15
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -2.44,
+      "ci95": [
+       -6.11,
+       0.63
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -3.97,
+      "ci95": [
+       -8.59,
+       -0.41
+      ],
+      "significant": true
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 11156,
+     "production_rmse": 2.3828,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": -0.03,
+      "ci95": [
+       -0.66,
+       0.59
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": 0.18,
+      "ci95": [
+       -0.43,
+       0.77
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -0.66,
+      "ci95": [
+       -1.94,
+       0.69
+      ],
+      "significant": false
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": -0.87,
+      "ci95": [
+       -2.14,
+       0.45
+      ],
+      "significant": false
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -0.85,
+      "ci95": [
+       -2.12,
+       0.48
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -1.63,
+      "ci95": [
+       -2.71,
+       -0.44
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -1.4,
+      "ci95": [
+       -2.4,
+       -0.25
+      ],
+      "significant": true
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -1.46,
+      "ci95": [
+       -2.54,
+       -0.28
+      ],
+      "significant": true
+     },
+     "omni seed mean": {
+      "mse_change_percent": -0.23,
+      "ci95": [
+       -0.58,
+       0.12
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -1.05,
+      "ci95": [
+       -2.29,
+       0.23
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -1.71,
+      "ci95": [
+       -2.74,
+       -0.57
+      ],
+      "significant": true
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 48,
+     "production_rmse": 11.393,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": -1.62,
+      "ci95": [
+       -3.17,
+       18.74
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": 1.45,
+      "ci95": [
+       -0.86,
+       25.16
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -9.03,
+      "ci95": [
+       -15.17,
+       49.59
+      ],
+      "significant": false
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": -14.99,
+      "ci95": [
+       -24.49,
+       62.68
+      ],
+      "significant": false
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -23.91,
+      "ci95": [
+       -32.91,
+       51.68
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -26.34,
+      "ci95": [
+       -34.35,
+       42.29
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -28.12,
+      "ci95": [
+       -35.64,
+       39.53
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -25.76,
+      "ci95": [
+       -33.07,
+       42.56
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": -0.29,
+      "ci95": [
+       -1.41,
+       12.52
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -16.56,
+      "ci95": [
+       -24.67,
+       53.55
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -26.94,
+      "ci95": [
+       -34.4,
+       40.71
+      ],
+      "significant": false
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 6,
+     "production_rmse": 21.7128,
+     "omni seed0": {
+      "mse_change_percent": 0.0,
+      "ci95": [
+       0.0,
+       0.0
+      ],
+      "significant": false
+     },
+     "omni seed1": {
+      "mse_change_percent": -2.62,
+      "ci95": [
+       -8.85,
+       18025.68
+      ],
+      "significant": false
+     },
+     "omni seed2": {
+      "mse_change_percent": -0.98,
+      "ci95": [
+       -1.09,
+       3578.51
+      ],
+      "significant": false
+     },
+     "ace_rt seed0": {
+      "mse_change_percent": -15.37,
+      "ci95": [
+       -28.34,
+       147288.23
+      ],
+      "significant": false
+     },
+     "ace_rt seed1": {
+      "mse_change_percent": -29.32,
+      "ci95": [
+       -49.25,
+       551270.12
+      ],
+      "significant": false
+     },
+     "ace_rt seed2": {
+      "mse_change_percent": -45.4,
+      "ci95": [
+       -65.82,
+       36833.25
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed0": {
+      "mse_change_percent": -46.72,
+      "ci95": [
+       -67.05,
+       47259.95
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed1": {
+      "mse_change_percent": -51.77,
+      "ci95": [
+       -66.52,
+       6143.01
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed2": {
+      "mse_change_percent": -48.08,
+      "ci95": [
+       -61.64,
+       12350.52
+      ],
+      "significant": false
+     },
+     "omni seed mean": {
+      "mse_change_percent": -1.28,
+      "ci95": [
+       -3.5,
+       4582.32
+      ],
+      "significant": false
+     },
+     "ace_rt seed mean": {
+      "mse_change_percent": -31.03,
+      "ci95": [
+       -48.98,
+       193100.36
+      ],
+      "significant": false
+     },
+     "omni+ace_rt seed mean": {
+      "mse_change_percent": -49.13,
+      "ci95": [
+       -65.12,
+       6854.84
+      ],
+      "significant": false
+     }
+    }
+   }
+  }
+ },
+ "scores": {
+  "all_hours": {
+   "omni": {
+    "all": {
+     "n_hours": 35039,
+     "rmse_persistence": 3.3705,
+     "inputs": {
+      "production": {
+       "rmse": 2.6561,
+       "rmse_ci95": [
+        2.539,
+        2.775
+       ],
+       "skill": 0.379
+      },
+      "omni seed0": {
+       "rmse": 2.6561,
+       "rmse_ci95": [
+        2.539,
+        2.775
+       ],
+       "skill": 0.379
+      },
+      "omni seed1": {
+       "rmse": 2.6609,
+       "rmse_ci95": [
+        2.543,
+        2.781
+       ],
+       "skill": 0.3767
+      },
+      "omni seed2": {
+       "rmse": 2.6556,
+       "rmse_ci95": [
+        2.538,
+        2.776
+       ],
+       "skill": 0.3792
+      },
+      "ace_rt seed0": {
+       "rmse": 2.6986,
+       "rmse_ci95": [
+        2.582,
+        2.823
+       ],
+       "skill": 0.359
+      },
+      "ace_rt seed1": {
+       "rmse": 2.6974,
+       "rmse_ci95": [
+        2.58,
+        2.822
+       ],
+       "skill": 0.3595
+      },
+      "ace_rt seed2": {
+       "rmse": 2.6939,
+       "rmse_ci95": [
+        2.577,
+        2.818
+       ],
+       "skill": 0.3612
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 2.6555,
+       "rmse_ci95": [
+        2.542,
+        2.771
+       ],
+       "skill": 0.3793
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 2.655,
+       "rmse_ci95": [
+        2.542,
+        2.771
+       ],
+       "skill": 0.3795
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 2.6609,
+       "rmse_ci95": [
+        2.547,
+        2.779
+       ],
+       "skill": 0.3767
+      },
+      "omni seed mean": {
+       "rmse": 2.6531,
+       "rmse_ci95": [
+        2.536,
+        2.772
+       ],
+       "skill": 0.3804
+      },
+      "ace_rt seed mean": {
+       "rmse": 2.691,
+       "rmse_ci95": [
+        2.574,
+        2.814
+       ],
+       "skill": 0.3626
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 2.6534,
+       "rmse_ci95": [
+        2.54,
+        2.769
+       ],
+       "skill": 0.3803
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": 0.0048,
+       "rmse_ci95": [
+        -0.001,
+        0.011
+       ],
+       "mse_change_percent": 0.36,
+       "mse_change_percent_ci95": [
+        -0.08,
+        0.81
+       ],
+       "skill_change": -0.0023,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": -0.0005,
+       "rmse_ci95": [
+        -0.007,
+        0.006
+       ],
+       "mse_change_percent": -0.04,
+       "mse_change_percent_ci95": [
+        -0.52,
+        0.43
+       ],
+       "skill_change": 0.0002,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": 0.0425,
+       "rmse_ci95": [
+        0.028,
+        0.058
+       ],
+       "mse_change_percent": 3.23,
+       "mse_change_percent_ci95": [
+        2.12,
+        4.43
+       ],
+       "skill_change": -0.02,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": 0.0413,
+       "rmse_ci95": [
+        0.025,
+        0.057
+       ],
+       "mse_change_percent": 3.13,
+       "mse_change_percent_ci95": [
+        1.93,
+        4.35
+       ],
+       "skill_change": -0.0195,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": 0.0379,
+       "rmse_ci95": [
+        0.023,
+        0.053
+       ],
+       "mse_change_percent": 2.87,
+       "mse_change_percent_ci95": [
+        1.7,
+        4.05
+       ],
+       "skill_change": -0.0178,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -0.0006,
+       "rmse_ci95": [
+        -0.011,
+        0.009
+       ],
+       "mse_change_percent": -0.05,
+       "mse_change_percent_ci95": [
+        -0.83,
+        0.72
+       ],
+       "skill_change": 0.0003,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -0.001,
+       "rmse_ci95": [
+        -0.014,
+        0.011
+       ],
+       "mse_change_percent": -0.08,
+       "mse_change_percent_ci95": [
+        -1.0,
+        0.81
+       ],
+       "skill_change": 0.0005,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": 0.0048,
+       "rmse_ci95": [
+        -0.005,
+        0.014
+       ],
+       "mse_change_percent": 0.36,
+       "mse_change_percent_ci95": [
+        -0.36,
+        1.07
+       ],
+       "skill_change": -0.0023,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.0029,
+       "rmse_ci95": [
+        -0.007,
+        0.001
+       ],
+       "mse_change_percent": -0.22,
+       "mse_change_percent_ci95": [
+        -0.51,
+        0.07
+       ],
+       "skill_change": 0.0014,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": 0.0349,
+       "rmse_ci95": [
+        0.02,
+        0.05
+       ],
+       "mse_change_percent": 2.65,
+       "mse_change_percent_ci95": [
+        1.54,
+        3.81
+       ],
+       "skill_change": -0.0164,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.0027,
+       "rmse_ci95": [
+        -0.013,
+        0.007
+       ],
+       "mse_change_percent": -0.2,
+       "mse_change_percent_ci95": [
+        -0.96,
+        0.54
+       ],
+       "skill_change": 0.0013,
+       "significant": false,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 34677,
+     "rmse_persistence": 3.2359,
+     "inputs": {
+      "production": {
+       "rmse": 2.5674,
+       "rmse_ci95": [
+        2.473,
+        2.664
+       ],
+       "skill": 0.3705
+      },
+      "omni seed0": {
+       "rmse": 2.5674,
+       "rmse_ci95": [
+        2.473,
+        2.664
+       ],
+       "skill": 0.3705
+      },
+      "omni seed1": {
+       "rmse": 2.5694,
+       "rmse_ci95": [
+        2.473,
+        2.666
+       ],
+       "skill": 0.3695
+      },
+      "omni seed2": {
+       "rmse": 2.5663,
+       "rmse_ci95": [
+        2.471,
+        2.663
+       ],
+       "skill": 0.371
+      },
+      "ace_rt seed0": {
+       "rmse": 2.6051,
+       "rmse_ci95": [
+        2.514,
+        2.699
+       ],
+       "skill": 0.3519
+      },
+      "ace_rt seed1": {
+       "rmse": 2.6027,
+       "rmse_ci95": [
+        2.511,
+        2.698
+       ],
+       "skill": 0.3531
+      },
+      "ace_rt seed2": {
+       "rmse": 2.6037,
+       "rmse_ci95": [
+        2.511,
+        2.699
+       ],
+       "skill": 0.3526
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 2.5682,
+       "rmse_ci95": [
+        2.476,
+        2.661
+       ],
+       "skill": 0.3701
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 2.5706,
+       "rmse_ci95": [
+        2.479,
+        2.663
+       ],
+       "skill": 0.3689
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 2.5721,
+       "rmse_ci95": [
+        2.479,
+        2.668
+       ],
+       "skill": 0.3682
+      },
+      "omni seed mean": {
+       "rmse": 2.564,
+       "rmse_ci95": [
+        2.469,
+        2.661
+       ],
+       "skill": 0.3722
+      },
+      "ace_rt seed mean": {
+       "rmse": 2.5988,
+       "rmse_ci95": [
+        2.508,
+        2.694
+       ],
+       "skill": 0.355
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 2.5671,
+       "rmse_ci95": [
+        2.475,
+        2.661
+       ],
+       "skill": 0.3707
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": 0.0021,
+       "rmse_ci95": [
+        -0.003,
+        0.007
+       ],
+       "mse_change_percent": 0.16,
+       "mse_change_percent_ci95": [
+        -0.25,
+        0.54
+       ],
+       "skill_change": -0.001,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": -0.001,
+       "rmse_ci95": [
+        -0.006,
+        0.004
+       ],
+       "mse_change_percent": -0.08,
+       "mse_change_percent_ci95": [
+        -0.46,
+        0.33
+       ],
+       "skill_change": 0.0005,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": 0.0378,
+       "rmse_ci95": [
+        0.026,
+        0.049
+       ],
+       "mse_change_percent": 2.96,
+       "mse_change_percent_ci95": [
+        2.07,
+        3.87
+       ],
+       "skill_change": -0.0186,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": 0.0354,
+       "rmse_ci95": [
+        0.025,
+        0.046
+       ],
+       "mse_change_percent": 2.77,
+       "mse_change_percent_ci95": [
+        1.94,
+        3.58
+       ],
+       "skill_change": -0.0174,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": 0.0363,
+       "rmse_ci95": [
+        0.027,
+        0.046
+       ],
+       "mse_change_percent": 2.85,
+       "mse_change_percent_ci95": [
+        2.05,
+        3.68
+       ],
+       "skill_change": -0.0179,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": 0.0008,
+       "rmse_ci95": [
+        -0.008,
+        0.008
+       ],
+       "mse_change_percent": 0.06,
+       "mse_change_percent_ci95": [
+        -0.58,
+        0.66
+       ],
+       "skill_change": -0.0004,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": 0.0033,
+       "rmse_ci95": [
+        -0.005,
+        0.011
+       ],
+       "mse_change_percent": 0.25,
+       "mse_change_percent_ci95": [
+        -0.41,
+        0.84
+       ],
+       "skill_change": -0.0016,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": 0.0048,
+       "rmse_ci95": [
+        -0.001,
+        0.011
+       ],
+       "mse_change_percent": 0.37,
+       "mse_change_percent_ci95": [
+        -0.1,
+        0.85
+       ],
+       "skill_change": -0.0023,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.0034,
+       "rmse_ci95": [
+        -0.006,
+        -0.0
+       ],
+       "mse_change_percent": -0.26,
+       "mse_change_percent_ci95": [
+        -0.49,
+        -0.02
+       ],
+       "skill_change": 0.0017,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": 0.0315,
+       "rmse_ci95": [
+        0.022,
+        0.041
+       ],
+       "mse_change_percent": 2.47,
+       "mse_change_percent_ci95": [
+        1.65,
+        3.26
+       ],
+       "skill_change": -0.0155,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.0003,
+       "rmse_ci95": [
+        -0.007,
+        0.006
+       ],
+       "mse_change_percent": -0.02,
+       "mse_change_percent_ci95": [
+        -0.54,
+        0.48
+       ],
+       "skill_change": 0.0002,
+       "significant": false,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 362,
+     "rmse_persistence": 9.8253,
+     "inputs": {
+      "production": {
+       "rmse": 7.1727,
+       "rmse_ci95": [
+        6.332,
+        7.932
+       ],
+       "skill": 0.4671
+      },
+      "omni seed0": {
+       "rmse": 7.1727,
+       "rmse_ci95": [
+        6.332,
+        7.932
+       ],
+       "skill": 0.4671
+      },
+      "omni seed1": {
+       "rmse": 7.2734,
+       "rmse_ci95": [
+        6.456,
+        8.038
+       ],
+       "skill": 0.452
+      },
+      "omni seed2": {
+       "rmse": 7.1906,
+       "rmse_ci95": [
+        6.416,
+        7.918
+       ],
+       "skill": 0.4644
+      },
+      "ace_rt seed0": {
+       "rmse": 7.4008,
+       "rmse_ci95": [
+        6.598,
+        8.276
+       ],
+       "skill": 0.4326
+      },
+      "ace_rt seed1": {
+       "rmse": 7.4384,
+       "rmse_ci95": [
+        6.536,
+        8.386
+       ],
+       "skill": 0.4268
+      },
+      "ace_rt seed2": {
+       "rmse": 7.2834,
+       "rmse_ci95": [
+        6.459,
+        8.187
+       ],
+       "skill": 0.4505
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 7.1218,
+       "rmse_ci95": [
+        6.37,
+        7.829
+       ],
+       "skill": 0.4746
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 7.0221,
+       "rmse_ci95": [
+        6.312,
+        7.743
+       ],
+       "skill": 0.4892
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 7.1809,
+       "rmse_ci95": [
+        6.426,
+        7.889
+       ],
+       "skill": 0.4658
+      },
+      "omni seed mean": {
+       "rmse": 7.1824,
+       "rmse_ci95": [
+        6.397,
+        7.916
+       ],
+       "skill": 0.4656
+      },
+      "ace_rt seed mean": {
+       "rmse": 7.3448,
+       "rmse_ci95": [
+        6.502,
+        8.252
+       ],
+       "skill": 0.4412
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 7.0852,
+       "rmse_ci95": [
+        6.345,
+        7.789
+       ],
+       "skill": 0.48
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": 0.1007,
+       "rmse_ci95": [
+        -0.037,
+        0.281
+       ],
+       "mse_change_percent": 2.83,
+       "mse_change_percent_ci95": [
+        -1.06,
+        7.92
+       ],
+       "skill_change": -0.0151,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.0178,
+       "rmse_ci95": [
+        -0.119,
+        0.178
+       ],
+       "mse_change_percent": 0.5,
+       "mse_change_percent_ci95": [
+        -3.27,
+        5.23
+       ],
+       "skill_change": -0.0027,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": 0.2281,
+       "rmse_ci95": [
+        -0.065,
+        0.593
+       ],
+       "mse_change_percent": 6.46,
+       "mse_change_percent_ci95": [
+        -1.78,
+        17.43
+       ],
+       "skill_change": -0.0345,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": 0.2657,
+       "rmse_ci95": [
+        -0.168,
+        0.723
+       ],
+       "mse_change_percent": 7.55,
+       "mse_change_percent_ci95": [
+        -4.67,
+        21.2
+       ],
+       "skill_change": -0.0403,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": 0.1107,
+       "rmse_ci95": [
+        -0.291,
+        0.531
+       ],
+       "mse_change_percent": 3.11,
+       "mse_change_percent_ci95": [
+        -8.09,
+        16.09
+       ],
+       "skill_change": -0.0166,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -0.051,
+       "rmse_ci95": [
+        -0.196,
+        0.136
+       ],
+       "mse_change_percent": -1.42,
+       "mse_change_percent_ci95": [
+        -5.19,
+        3.91
+       ],
+       "skill_change": 0.0075,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -0.1506,
+       "rmse_ci95": [
+        -0.355,
+        0.117
+       ],
+       "mse_change_percent": -4.16,
+       "mse_change_percent_ci95": [
+        -9.2,
+        3.34
+       ],
+       "skill_change": 0.0221,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": 0.0082,
+       "rmse_ci95": [
+        -0.219,
+        0.243
+       ],
+       "mse_change_percent": 0.23,
+       "mse_change_percent_ci95": [
+        -5.89,
+        7.23
+       ],
+       "skill_change": -0.0013,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": 0.0096,
+       "rmse_ci95": [
+        -0.079,
+        0.118
+       ],
+       "mse_change_percent": 0.27,
+       "mse_change_percent_ci95": [
+        -2.15,
+        3.41
+       ],
+       "skill_change": -0.0015,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": 0.1721,
+       "rmse_ci95": [
+        -0.198,
+        0.584
+       ],
+       "mse_change_percent": 4.86,
+       "mse_change_percent_ci95": [
+        -5.65,
+        17.23
+       ],
+       "skill_change": -0.0259,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.0875,
+       "rmse_ci95": [
+        -0.27,
+        0.123
+       ],
+       "mse_change_percent": -2.43,
+       "mse_change_percent_ci95": [
+        -7.2,
+        3.61
+       ],
+       "skill_change": 0.0129,
+       "significant": false,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 35,
+     "rmse_persistence": 15.9553,
+     "inputs": {
+      "production": {
+       "rmse": 11.6867,
+       "rmse_ci95": [
+        8.804,
+        13.939
+       ],
+       "skill": 0.4635
+      },
+      "omni seed0": {
+       "rmse": 11.6867,
+       "rmse_ci95": [
+        8.804,
+        13.939
+       ],
+       "skill": 0.4635
+      },
+      "omni seed1": {
+       "rmse": 11.9009,
+       "rmse_ci95": [
+        9.509,
+        14.343
+       ],
+       "skill": 0.4436
+      },
+      "omni seed2": {
+       "rmse": 11.6388,
+       "rmse_ci95": [
+        9.362,
+        14.114
+       ],
+       "skill": 0.4679
+      },
+      "ace_rt seed0": {
+       "rmse": 10.9567,
+       "rmse_ci95": [
+        9.096,
+        11.796
+       ],
+       "skill": 0.5284
+      },
+      "ace_rt seed1": {
+       "rmse": 10.9394,
+       "rmse_ci95": [
+        10.064,
+        11.613
+       ],
+       "skill": 0.5299
+      },
+      "ace_rt seed2": {
+       "rmse": 10.6804,
+       "rmse_ci95": [
+        8.915,
+        11.589
+       ],
+       "skill": 0.5519
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 11.0418,
+       "rmse_ci95": [
+        9.471,
+        13.29
+       ],
+       "skill": 0.5211
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 10.6153,
+       "rmse_ci95": [
+        9.325,
+        12.87
+       ],
+       "skill": 0.5574
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 11.5514,
+       "rmse_ci95": [
+        9.636,
+        14.538
+       ],
+       "skill": 0.4758
+      },
+      "omni seed mean": {
+       "rmse": 11.6674,
+       "rmse_ci95": [
+        9.197,
+        14.102
+       ],
+       "skill": 0.4653
+      },
+      "ace_rt seed mean": {
+       "rmse": 10.8041,
+       "rmse_ci95": [
+        9.317,
+        11.585
+       ],
+       "skill": 0.5415
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 11.0227,
+       "rmse_ci95": [
+        9.434,
+        13.521
+       ],
+       "skill": 0.5227
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni seed1 minus production": {
+       "rmse": 0.2142,
+       "rmse_ci95": [
+        -0.068,
+        0.704
+       ],
+       "mse_change_percent": 3.7,
+       "mse_change_percent_ci95": [
+        -1.21,
+        16.64
+       ],
+       "skill_change": -0.0199,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni seed2 minus production": {
+       "rmse": -0.0479,
+       "rmse_ci95": [
+        -0.398,
+        0.557
+       ],
+       "mse_change_percent": -0.82,
+       "mse_change_percent_ci95": [
+        -6.93,
+        13.06
+       ],
+       "skill_change": 0.0044,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -0.73,
+       "rmse_ci95": [
+        -2.228,
+        0.291
+       ],
+       "mse_change_percent": -12.1,
+       "mse_change_percent_ci95": [
+        -29.41,
+        6.73
+       ],
+       "skill_change": 0.0649,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": -0.7473,
+       "rmse_ci95": [
+        -2.631,
+        1.26
+       ],
+       "mse_change_percent": -12.38,
+       "mse_change_percent_ci95": [
+        -34.18,
+        30.67
+       ],
+       "skill_change": 0.0664,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -1.0064,
+       "rmse_ci95": [
+        -3.051,
+        0.111
+       ],
+       "mse_change_percent": -16.48,
+       "mse_change_percent_ci95": [
+        -38.98,
+        2.54
+       ],
+       "skill_change": 0.0884,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -0.6449,
+       "rmse_ci95": [
+        -1.174,
+        0.666
+       ],
+       "mse_change_percent": -10.73,
+       "mse_change_percent_ci95": [
+        -18.37,
+        15.71
+       ],
+       "skill_change": 0.0576,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -1.0714,
+       "rmse_ci95": [
+        -1.647,
+        0.521
+       ],
+       "mse_change_percent": -17.5,
+       "mse_change_percent_ci95": [
+        -26.83,
+        12.18
+       ],
+       "skill_change": 0.0939,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -0.1354,
+       "rmse_ci95": [
+        -0.999,
+        0.832
+       ],
+       "mse_change_percent": -2.3,
+       "mse_change_percent_ci95": [
+        -16.91,
+        19.79
+       ],
+       "skill_change": 0.0123,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.0194,
+       "rmse_ci95": [
+        -0.277,
+        0.393
+       ],
+       "mse_change_percent": -0.33,
+       "mse_change_percent_ci95": [
+        -4.84,
+        9.12
+       ],
+       "skill_change": 0.0018,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -0.8826,
+       "rmse_ci95": [
+        -2.683,
+        0.513
+       ],
+       "mse_change_percent": -14.53,
+       "mse_change_percent_ci95": [
+        -34.79,
+        11.99
+       ],
+       "skill_change": 0.078,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.664,
+       "rmse_ci95": [
+        -1.287,
+        0.63
+       ],
+       "mse_change_percent": -11.04,
+       "mse_change_percent_ci95": [
+        -21.5,
+        14.82
+       ],
+       "skill_change": 0.0592,
+       "significant": false,
+       "resamples_with_hours": 1921
+      }
+     }
+    }
+   },
+   "ace_delay1h": {
+    "all": {
+     "n_hours": 35039,
+     "rmse_persistence": 3.3705,
+     "inputs": {
+      "production": {
+       "rmse": 2.9401,
+       "rmse_ci95": [
+        2.78,
+        3.116
+       ],
+       "skill": 0.2391
+      },
+      "omni seed0": {
+       "rmse": 2.9401,
+       "rmse_ci95": [
+        2.78,
+        3.116
+       ],
+       "skill": 0.2391
+      },
+      "omni seed1": {
+       "rmse": 2.9338,
+       "rmse_ci95": [
+        2.774,
+        3.115
+       ],
+       "skill": 0.2423
+      },
+      "omni seed2": {
+       "rmse": 2.9445,
+       "rmse_ci95": [
+        2.785,
+        3.122
+       ],
+       "skill": 0.2368
+      },
+      "ace_rt seed0": {
+       "rmse": 2.818,
+       "rmse_ci95": [
+        2.666,
+        2.99
+       ],
+       "skill": 0.301
+      },
+      "ace_rt seed1": {
+       "rmse": 2.813,
+       "rmse_ci95": [
+        2.663,
+        2.98
+       ],
+       "skill": 0.3034
+      },
+      "ace_rt seed2": {
+       "rmse": 2.8157,
+       "rmse_ci95": [
+        2.668,
+        2.979
+       ],
+       "skill": 0.3021
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 2.8077,
+       "rmse_ci95": [
+        2.659,
+        2.971
+       ],
+       "skill": 0.3061
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 2.8075,
+       "rmse_ci95": [
+        2.658,
+        2.971
+       ],
+       "skill": 0.3062
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 2.8095,
+       "rmse_ci95": [
+        2.659,
+        2.974
+       ],
+       "skill": 0.3052
+      },
+      "omni seed mean": {
+       "rmse": 2.9234,
+       "rmse_ci95": [
+        2.764,
+        3.102
+       ],
+       "skill": 0.2477
+      },
+      "ace_rt seed mean": {
+       "rmse": 2.8107,
+       "rmse_ci95": [
+        2.661,
+        2.977
+       ],
+       "skill": 0.3046
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 2.8032,
+       "rmse_ci95": [
+        2.653,
+        2.965
+       ],
+       "skill": 0.3083
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": -0.0063,
+       "rmse_ci95": [
+        -0.019,
+        0.006
+       ],
+       "mse_change_percent": -0.43,
+       "mse_change_percent_ci95": [
+        -1.3,
+        0.42
+       ],
+       "skill_change": 0.0032,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.0044,
+       "rmse_ci95": [
+        -0.006,
+        0.015
+       ],
+       "mse_change_percent": 0.3,
+       "mse_change_percent_ci95": [
+        -0.39,
+        1.0
+       ],
+       "skill_change": -0.0023,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -0.1221,
+       "rmse_ci95": [
+        -0.149,
+        -0.098
+       ],
+       "mse_change_percent": -8.13,
+       "mse_change_percent_ci95": [
+        -9.82,
+        -6.64
+       ],
+       "skill_change": 0.0619,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": -0.1271,
+       "rmse_ci95": [
+        -0.156,
+        -0.102
+       ],
+       "mse_change_percent": -8.46,
+       "mse_change_percent_ci95": [
+        -10.14,
+        -6.89
+       ],
+       "skill_change": 0.0643,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -0.1244,
+       "rmse_ci95": [
+        -0.156,
+        -0.098
+       ],
+       "mse_change_percent": -8.28,
+       "mse_change_percent_ci95": [
+        -10.07,
+        -6.65
+       ],
+       "skill_change": 0.063,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -0.1325,
+       "rmse_ci95": [
+        -0.159,
+        -0.108
+       ],
+       "mse_change_percent": -8.81,
+       "mse_change_percent_ci95": [
+        -10.32,
+        -7.36
+       ],
+       "skill_change": 0.067,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -0.1327,
+       "rmse_ci95": [
+        -0.16,
+        -0.108
+       ],
+       "mse_change_percent": -8.82,
+       "mse_change_percent_ci95": [
+        -10.4,
+        -7.32
+       ],
+       "skill_change": 0.0671,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -0.1306,
+       "rmse_ci95": [
+        -0.157,
+        -0.106
+       ],
+       "mse_change_percent": -8.69,
+       "mse_change_percent_ci95": [
+        -10.31,
+        -7.2
+       ],
+       "skill_change": 0.0661,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.0167,
+       "rmse_ci95": [
+        -0.024,
+        -0.01
+       ],
+       "mse_change_percent": -1.13,
+       "mse_change_percent_ci95": [
+        -1.62,
+        -0.66
+       ],
+       "skill_change": 0.0086,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -0.1295,
+       "rmse_ci95": [
+        -0.158,
+        -0.105
+       ],
+       "mse_change_percent": -8.61,
+       "mse_change_percent_ci95": [
+        -10.27,
+        -7.07
+       ],
+       "skill_change": 0.0655,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.1369,
+       "rmse_ci95": [
+        -0.164,
+        -0.113
+       ],
+       "mse_change_percent": -9.1,
+       "mse_change_percent_ci95": [
+        -10.64,
+        -7.61
+       ],
+       "skill_change": 0.0692,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 34677,
+     "rmse_persistence": 3.2359,
+     "inputs": {
+      "production": {
+       "rmse": 2.81,
+       "rmse_ci95": [
+        2.695,
+        2.925
+       ],
+       "skill": 0.2459
+      },
+      "omni seed0": {
+       "rmse": 2.81,
+       "rmse_ci95": [
+        2.695,
+        2.925
+       ],
+       "skill": 0.2459
+      },
+      "omni seed1": {
+       "rmse": 2.7996,
+       "rmse_ci95": [
+        2.683,
+        2.918
+       ],
+       "skill": 0.2515
+      },
+      "omni seed2": {
+       "rmse": 2.8146,
+       "rmse_ci95": [
+        2.7,
+        2.935
+       ],
+       "skill": 0.2434
+      },
+      "ace_rt seed0": {
+       "rmse": 2.6897,
+       "rmse_ci95": [
+        2.584,
+        2.8
+       ],
+       "skill": 0.3091
+      },
+      "ace_rt seed1": {
+       "rmse": 2.6882,
+       "rmse_ci95": [
+        2.582,
+        2.799
+       ],
+       "skill": 0.3099
+      },
+      "ace_rt seed2": {
+       "rmse": 2.6941,
+       "rmse_ci95": [
+        2.587,
+        2.806
+       ],
+       "skill": 0.3068
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 2.6853,
+       "rmse_ci95": [
+        2.578,
+        2.797
+       ],
+       "skill": 0.3113
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 2.6869,
+       "rmse_ci95": [
+        2.578,
+        2.8
+       ],
+       "skill": 0.3105
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 2.6887,
+       "rmse_ci95": [
+        2.579,
+        2.801
+       ],
+       "skill": 0.3096
+      },
+      "omni seed mean": {
+       "rmse": 2.7928,
+       "rmse_ci95": [
+        2.678,
+        2.91
+       ],
+       "skill": 0.2551
+      },
+      "ace_rt seed mean": {
+       "rmse": 2.6865,
+       "rmse_ci95": [
+        2.58,
+        2.798
+       ],
+       "skill": 0.3107
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 2.6826,
+       "rmse_ci95": [
+        2.574,
+        2.794
+       ],
+       "skill": 0.3127
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": -0.0104,
+       "rmse_ci95": [
+        -0.02,
+        -0.001
+       ],
+       "mse_change_percent": -0.74,
+       "mse_change_percent_ci95": [
+        -1.41,
+        -0.05
+       ],
+       "skill_change": 0.0056,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.0046,
+       "rmse_ci95": [
+        -0.005,
+        0.015
+       ],
+       "mse_change_percent": 0.33,
+       "mse_change_percent_ci95": [
+        -0.36,
+        1.08
+       ],
+       "skill_change": -0.0025,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -0.1203,
+       "rmse_ci95": [
+        -0.145,
+        -0.098
+       ],
+       "mse_change_percent": -8.38,
+       "mse_change_percent_ci95": [
+        -9.92,
+        -6.96
+       ],
+       "skill_change": 0.0632,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": -0.1218,
+       "rmse_ci95": [
+        -0.146,
+        -0.1
+       ],
+       "mse_change_percent": -8.48,
+       "mse_change_percent_ci95": [
+        -9.99,
+        -7.08
+       ],
+       "skill_change": 0.064,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -0.1159,
+       "rmse_ci95": [
+        -0.14,
+        -0.095
+       ],
+       "mse_change_percent": -8.08,
+       "mse_change_percent_ci95": [
+        -9.62,
+        -6.65
+       ],
+       "skill_change": 0.0609,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -0.1247,
+       "rmse_ci95": [
+        -0.146,
+        -0.105
+       ],
+       "mse_change_percent": -8.68,
+       "mse_change_percent_ci95": [
+        -10.03,
+        -7.39
+       ],
+       "skill_change": 0.0654,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -0.1231,
+       "rmse_ci95": [
+        -0.146,
+        -0.103
+       ],
+       "mse_change_percent": -8.57,
+       "mse_change_percent_ci95": [
+        -10.0,
+        -7.23
+       ],
+       "skill_change": 0.0646,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -0.1213,
+       "rmse_ci95": [
+        -0.143,
+        -0.102
+       ],
+       "mse_change_percent": -8.45,
+       "mse_change_percent_ci95": [
+        -9.84,
+        -7.15
+       ],
+       "skill_change": 0.0637,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.0172,
+       "rmse_ci95": [
+        -0.023,
+        -0.011
+       ],
+       "mse_change_percent": -1.22,
+       "mse_change_percent_ci95": [
+        -1.63,
+        -0.82
+       ],
+       "skill_change": 0.0092,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -0.1235,
+       "rmse_ci95": [
+        -0.148,
+        -0.103
+       ],
+       "mse_change_percent": -8.59,
+       "mse_change_percent_ci95": [
+        -10.12,
+        -7.21
+       ],
+       "skill_change": 0.0648,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.1274,
+       "rmse_ci95": [
+        -0.15,
+        -0.107
+       ],
+       "mse_change_percent": -8.86,
+       "mse_change_percent_ci95": [
+        -10.26,
+        -7.58
+       ],
+       "skill_change": 0.0668,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 362,
+     "rmse_persistence": 9.8253,
+     "inputs": {
+      "production": {
+       "rmse": 8.9623,
+       "rmse_ci95": [
+        7.235,
+        10.497
+       ],
+       "skill": 0.168
+      },
+      "omni seed0": {
+       "rmse": 8.9623,
+       "rmse_ci95": [
+        7.235,
+        10.497
+       ],
+       "skill": 0.168
+      },
+      "omni seed1": {
+       "rmse": 9.0726,
+       "rmse_ci95": [
+        7.333,
+        10.679
+       ],
+       "skill": 0.1473
+      },
+      "omni seed2": {
+       "rmse": 8.9637,
+       "rmse_ci95": [
+        7.222,
+        10.49
+       ],
+       "skill": 0.1677
+      },
+      "ace_rt seed0": {
+       "rmse": 8.6977,
+       "rmse_ci95": [
+        7.183,
+        10.125
+       ],
+       "skill": 0.2164
+      },
+      "ace_rt seed1": {
+       "rmse": 8.584,
+       "rmse_ci95": [
+        7.167,
+        9.934
+       ],
+       "skill": 0.2367
+      },
+      "ace_rt seed2": {
+       "rmse": 8.4933,
+       "rmse_ci95": [
+        7.2,
+        9.739
+       ],
+       "skill": 0.2528
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 8.4999,
+       "rmse_ci95": [
+        7.193,
+        9.716
+       ],
+       "skill": 0.2516
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 8.4477,
+       "rmse_ci95": [
+        7.133,
+        9.672
+       ],
+       "skill": 0.2608
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 8.4575,
+       "rmse_ci95": [
+        7.119,
+        9.728
+       ],
+       "skill": 0.259
+      },
+      "omni seed mean": {
+       "rmse": 8.9492,
+       "rmse_ci95": [
+        7.205,
+        10.496
+       ],
+       "skill": 0.1704
+      },
+      "ace_rt seed mean": {
+       "rmse": 8.5591,
+       "rmse_ci95": [
+        7.18,
+        9.883
+       ],
+       "skill": 0.2411
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 8.4421,
+       "rmse_ci95": [
+        7.14,
+        9.679
+       ],
+       "skill": 0.2617
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": 0.1103,
+       "rmse_ci95": [
+        -0.168,
+        0.321
+       ],
+       "mse_change_percent": 2.48,
+       "mse_change_percent_ci95": [
+        -4.05,
+        7.63
+       ],
+       "skill_change": -0.0207,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.0014,
+       "rmse_ci95": [
+        -0.157,
+        0.15
+       ],
+       "mse_change_percent": 0.03,
+       "mse_change_percent_ci95": [
+        -3.76,
+        3.68
+       ],
+       "skill_change": -0.0003,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -0.2646,
+       "rmse_ci95": [
+        -0.589,
+        0.153
+       ],
+       "mse_change_percent": -5.82,
+       "mse_change_percent_ci95": [
+        -12.32,
+        3.98
+       ],
+       "skill_change": 0.0484,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": -0.3783,
+       "rmse_ci95": [
+        -0.787,
+        0.173
+       ],
+       "mse_change_percent": -8.26,
+       "mse_change_percent_ci95": [
+        -16.04,
+        4.34
+       ],
+       "skill_change": 0.0687,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -0.469,
+       "rmse_ci95": [
+        -0.959,
+        0.212
+       ],
+       "mse_change_percent": -10.19,
+       "mse_change_percent_ci95": [
+        -18.41,
+        5.88
+       ],
+       "skill_change": 0.0848,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -0.4624,
+       "rmse_ci95": [
+        -0.88,
+        0.122
+       ],
+       "mse_change_percent": -10.05,
+       "mse_change_percent_ci95": [
+        -16.55,
+        3.16
+       ],
+       "skill_change": 0.0836,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -0.5146,
+       "rmse_ci95": [
+        -0.929,
+        0.066
+       ],
+       "mse_change_percent": -11.15,
+       "mse_change_percent_ci95": [
+        -17.76,
+        1.73
+       ],
+       "skill_change": 0.0928,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -0.5048,
+       "rmse_ci95": [
+        -0.94,
+        0.118
+       ],
+       "mse_change_percent": -10.95,
+       "mse_change_percent_ci95": [
+        -17.98,
+        3.28
+       ],
+       "skill_change": 0.091,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.0131,
+       "rmse_ci95": [
+        -0.149,
+        0.091
+       ],
+       "mse_change_percent": -0.29,
+       "mse_change_percent_ci95": [
+        -3.67,
+        2.12
+       ],
+       "skill_change": 0.0024,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -0.4032,
+       "rmse_ci95": [
+        -0.81,
+        0.149
+       ],
+       "mse_change_percent": -8.8,
+       "mse_change_percent_ci95": [
+        -16.12,
+        3.91
+       ],
+       "skill_change": 0.0731,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.5202,
+       "rmse_ci95": [
+        -0.943,
+        0.074
+       ],
+       "mse_change_percent": -11.27,
+       "mse_change_percent_ci95": [
+        -17.86,
+        1.98
+       ],
+       "skill_change": 0.0937,
+       "significant": false,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 35,
+     "rmse_persistence": 15.9553,
+     "inputs": {
+      "production": {
+       "rmse": 15.8193,
+       "rmse_ci95": [
+        8.456,
+        18.492
+       ],
+       "skill": 0.017
+      },
+      "omni seed0": {
+       "rmse": 15.8193,
+       "rmse_ci95": [
+        8.456,
+        18.492
+       ],
+       "skill": 0.017
+      },
+      "omni seed1": {
+       "rmse": 16.7069,
+       "rmse_ci95": [
+        10.443,
+        18.979
+       ],
+       "skill": -0.0964
+      },
+      "omni seed2": {
+       "rmse": 15.9572,
+       "rmse_ci95": [
+        9.377,
+        18.485
+       ],
+       "skill": -0.0002
+      },
+      "ace_rt seed0": {
+       "rmse": 15.1037,
+       "rmse_ci95": [
+        9.975,
+        17.097
+       ],
+       "skill": 0.1039
+      },
+      "ace_rt seed1": {
+       "rmse": 14.5719,
+       "rmse_ci95": [
+        9.921,
+        16.276
+       ],
+       "skill": 0.1659
+      },
+      "ace_rt seed2": {
+       "rmse": 14.0553,
+       "rmse_ci95": [
+        10.826,
+        15.529
+       ],
+       "skill": 0.224
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 14.044,
+       "rmse_ci95": [
+        10.402,
+        15.787
+       ],
+       "skill": 0.2252
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 14.0065,
+       "rmse_ci95": [
+        10.315,
+        15.899
+       ],
+       "skill": 0.2294
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 13.7277,
+       "rmse_ci95": [
+        10.07,
+        15.206
+       ],
+       "skill": 0.2597
+      },
+      "omni seed mean": {
+       "rmse": 16.104,
+       "rmse_ci95": [
+        9.338,
+        18.604
+       ],
+       "skill": -0.0187
+      },
+      "ace_rt seed mean": {
+       "rmse": 14.4899,
+       "rmse_ci95": [
+        10.182,
+        16.118
+       ],
+       "skill": 0.1753
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 13.8749,
+       "rmse_ci95": [
+        10.22,
+        15.531
+       ],
+       "skill": 0.2438
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni seed1 minus production": {
+       "rmse": 0.8876,
+       "rmse_ci95": [
+        0.189,
+        1.987
+       ],
+       "mse_change_percent": 11.54,
+       "mse_change_percent_ci95": [
+        2.11,
+        52.52
+       ],
+       "skill_change": -0.1134,
+       "significant": true,
+       "resamples_with_hours": 1921
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.138,
+       "rmse_ci95": [
+        -0.035,
+        0.921
+       ],
+       "mse_change_percent": 1.75,
+       "mse_change_percent_ci95": [
+        -0.41,
+        22.96
+       ],
+       "skill_change": -0.0172,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -0.7155,
+       "rmse_ci95": [
+        -1.819,
+        1.519
+       ],
+       "mse_change_percent": -8.84,
+       "mse_change_percent_ci95": [
+        -19.12,
+        39.15
+       ],
+       "skill_change": 0.0869,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": -1.2473,
+       "rmse_ci95": [
+        -2.364,
+        1.465
+       ],
+       "mse_change_percent": -15.15,
+       "mse_change_percent_ci95": [
+        -24.46,
+        37.66
+       ],
+       "skill_change": 0.1489,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -1.764,
+       "rmse_ci95": [
+        -2.927,
+        2.37
+       ],
+       "mse_change_percent": -21.06,
+       "mse_change_percent_ci95": [
+        -30.7,
+        63.91
+       ],
+       "skill_change": 0.207,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -1.7752,
+       "rmse_ci95": [
+        -2.824,
+        1.947
+       ],
+       "mse_change_percent": -21.18,
+       "mse_change_percent_ci95": [
+        -28.91,
+        51.34
+       ],
+       "skill_change": 0.2082,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -1.8128,
+       "rmse_ci95": [
+        -2.843,
+        1.859
+       ],
+       "mse_change_percent": -21.61,
+       "mse_change_percent_ci95": [
+        -29.33,
+        48.79
+       ],
+       "skill_change": 0.2124,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -2.0915,
+       "rmse_ci95": [
+        -3.22,
+        1.614
+       ],
+       "mse_change_percent": -24.69,
+       "mse_change_percent_ci95": [
+        -31.76,
+        41.82
+       ],
+       "skill_change": 0.2427,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni seed mean minus production": {
+       "rmse": 0.2848,
+       "rmse_ci95": [
+        0.06,
+        0.883
+       ],
+       "mse_change_percent": 3.63,
+       "mse_change_percent_ci95": [
+        0.66,
+        21.96
+       ],
+       "skill_change": -0.0357,
+       "significant": true,
+       "resamples_with_hours": 1921
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -1.3294,
+       "rmse_ci95": [
+        -2.377,
+        1.726
+       ],
+       "mse_change_percent": -16.1,
+       "mse_change_percent_ci95": [
+        -23.99,
+        44.98
+       ],
+       "skill_change": 0.1583,
+       "significant": false,
+       "resamples_with_hours": 1921
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -1.9443,
+       "rmse_ci95": [
+        -2.949,
+        1.764
+       ],
+       "mse_change_percent": -23.07,
+       "mse_change_percent_ci95": [
+        -29.91,
+        46.07
+       ],
+       "skill_change": 0.2268,
+       "significant": false,
+       "resamples_with_hours": 1921
+      }
+     }
+    }
+   }
+  },
+  "inputs_observed": {
+   "omni": {
+    "all": {
+     "n_hours": 11204,
+     "rmse_persistence": 3.0149,
+     "inputs": {
+      "production": {
+       "rmse": 2.3961,
+       "rmse_ci95": [
+        2.286,
+        2.523
+       ],
+       "skill": 0.3684
+      },
+      "omni seed0": {
+       "rmse": 2.3961,
+       "rmse_ci95": [
+        2.286,
+        2.523
+       ],
+       "skill": 0.3684
+      },
+      "omni seed1": {
+       "rmse": 2.3968,
+       "rmse_ci95": [
+        2.288,
+        2.523
+       ],
+       "skill": 0.368
+      },
+      "omni seed2": {
+       "rmse": 2.3967,
+       "rmse_ci95": [
+        2.288,
+        2.52
+       ],
+       "skill": 0.368
+      },
+      "ace_rt seed0": {
+       "rmse": 2.4268,
+       "rmse_ci95": [
+        2.321,
+        2.549
+       ],
+       "skill": 0.3521
+      },
+      "ace_rt seed1": {
+       "rmse": 2.4276,
+       "rmse_ci95": [
+        2.32,
+        2.557
+       ],
+       "skill": 0.3516
+      },
+      "ace_rt seed2": {
+       "rmse": 2.4156,
+       "rmse_ci95": [
+        2.315,
+        2.533
+       ],
+       "skill": 0.3581
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 2.3961,
+       "rmse_ci95": [
+        2.291,
+        2.515
+       ],
+       "skill": 0.3684
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 2.398,
+       "rmse_ci95": [
+        2.292,
+        2.518
+       ],
+       "skill": 0.3674
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 2.3955,
+       "rmse_ci95": [
+        2.29,
+        2.513
+       ],
+       "skill": 0.3687
+      },
+      "omni seed mean": {
+       "rmse": 2.3932,
+       "rmse_ci95": [
+        2.284,
+        2.518
+       ],
+       "skill": 0.3699
+      },
+      "ace_rt seed mean": {
+       "rmse": 2.4185,
+       "rmse_ci95": [
+        2.315,
+        2.542
+       ],
+       "skill": 0.3565
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 2.3936,
+       "rmse_ci95": [
+        2.288,
+        2.513
+       ],
+       "skill": 0.3697
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": 0.0007,
+       "rmse_ci95": [
+        -0.007,
+        0.009
+       ],
+       "mse_change_percent": 0.06,
+       "mse_change_percent_ci95": [
+        -0.57,
+        0.72
+       ],
+       "skill_change": -0.0004,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.0007,
+       "rmse_ci95": [
+        -0.008,
+        0.009
+       ],
+       "mse_change_percent": 0.05,
+       "mse_change_percent_ci95": [
+        -0.66,
+        0.79
+       ],
+       "skill_change": -0.0004,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": 0.0308,
+       "rmse_ci95": [
+        0.015,
+        0.047
+       ],
+       "mse_change_percent": 2.58,
+       "mse_change_percent_ci95": [
+        1.25,
+        3.99
+       ],
+       "skill_change": -0.0163,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": 0.0315,
+       "rmse_ci95": [
+        0.018,
+        0.046
+       ],
+       "mse_change_percent": 2.65,
+       "mse_change_percent_ci95": [
+        1.52,
+        3.93
+       ],
+       "skill_change": -0.0168,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": 0.0195,
+       "rmse_ci95": [
+        0.003,
+        0.036
+       ],
+       "mse_change_percent": 1.63,
+       "mse_change_percent_ci95": [
+        0.2,
+        3.14
+       ],
+       "skill_change": -0.0103,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -0.0,
+       "rmse_ci95": [
+        -0.015,
+        0.013
+       ],
+       "mse_change_percent": -0.0,
+       "mse_change_percent_ci95": [
+        -1.19,
+        1.12
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": 0.0019,
+       "rmse_ci95": [
+        -0.013,
+        0.015
+       ],
+       "mse_change_percent": 0.16,
+       "mse_change_percent_ci95": [
+        -1.08,
+        1.27
+       ],
+       "skill_change": -0.001,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -0.0006,
+       "rmse_ci95": [
+        -0.015,
+        0.012
+       ],
+       "mse_change_percent": -0.05,
+       "mse_change_percent_ci95": [
+        -1.19,
+        1.07
+       ],
+       "skill_change": 0.0003,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.0029,
+       "rmse_ci95": [
+        -0.008,
+        0.002
+       ],
+       "mse_change_percent": -0.24,
+       "mse_change_percent_ci95": [
+        -0.63,
+        0.17
+       ],
+       "skill_change": 0.0015,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": 0.0224,
+       "rmse_ci95": [
+        0.009,
+        0.037
+       ],
+       "mse_change_percent": 1.88,
+       "mse_change_percent_ci95": [
+        0.71,
+        3.17
+       ],
+       "skill_change": -0.0119,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.0025,
+       "rmse_ci95": [
+        -0.017,
+        0.009
+       ],
+       "mse_change_percent": -0.21,
+       "mse_change_percent_ci95": [
+        -1.34,
+        0.8
+       ],
+       "skill_change": 0.0013,
+       "significant": false,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 11156,
+     "rmse_persistence": 2.9216,
+     "inputs": {
+      "production": {
+       "rmse": 2.3442,
+       "rmse_ci95": [
+        2.262,
+        2.434
+       ],
+       "skill": 0.3562
+      },
+      "omni seed0": {
+       "rmse": 2.3442,
+       "rmse_ci95": [
+        2.262,
+        2.434
+       ],
+       "skill": 0.3562
+      },
+      "omni seed1": {
+       "rmse": 2.3461,
+       "rmse_ci95": [
+        2.263,
+        2.436
+       ],
+       "skill": 0.3552
+      },
+      "omni seed2": {
+       "rmse": 2.3475,
+       "rmse_ci95": [
+        2.264,
+        2.437
+       ],
+       "skill": 0.3544
+      },
+      "ace_rt seed0": {
+       "rmse": 2.3802,
+       "rmse_ci95": [
+        2.296,
+        2.471
+       ],
+       "skill": 0.3363
+      },
+      "ace_rt seed1": {
+       "rmse": 2.3758,
+       "rmse_ci95": [
+        2.293,
+        2.465
+       ],
+       "skill": 0.3387
+      },
+      "ace_rt seed2": {
+       "rmse": 2.3706,
+       "rmse_ci95": [
+        2.29,
+        2.459
+       ],
+       "skill": 0.3416
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 2.3488,
+       "rmse_ci95": [
+        2.264,
+        2.439
+       ],
+       "skill": 0.3537
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 2.3522,
+       "rmse_ci95": [
+        2.268,
+        2.442
+       ],
+       "skill": 0.3518
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 2.3496,
+       "rmse_ci95": [
+        2.267,
+        2.438
+       ],
+       "skill": 0.3532
+      },
+      "omni seed mean": {
+       "rmse": 2.3427,
+       "rmse_ci95": [
+        2.26,
+        2.432
+       ],
+       "skill": 0.357
+      },
+      "ace_rt seed mean": {
+       "rmse": 2.3709,
+       "rmse_ci95": [
+        2.288,
+        2.459
+       ],
+       "skill": 0.3414
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 2.3474,
+       "rmse_ci95": [
+        2.264,
+        2.435
+       ],
+       "skill": 0.3544
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": 0.0019,
+       "rmse_ci95": [
+        -0.005,
+        0.009
+       ],
+       "mse_change_percent": 0.16,
+       "mse_change_percent_ci95": [
+        -0.4,
+        0.78
+       ],
+       "skill_change": -0.001,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.0033,
+       "rmse_ci95": [
+        -0.003,
+        0.011
+       ],
+       "mse_change_percent": 0.28,
+       "mse_change_percent_ci95": [
+        -0.29,
+        0.93
+       ],
+       "skill_change": -0.0018,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": 0.036,
+       "rmse_ci95": [
+        0.022,
+        0.051
+       ],
+       "mse_change_percent": 3.1,
+       "mse_change_percent_ci95": [
+        1.86,
+        4.41
+       ],
+       "skill_change": -0.0199,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": 0.0316,
+       "rmse_ci95": [
+        0.018,
+        0.047
+       ],
+       "mse_change_percent": 2.71,
+       "mse_change_percent_ci95": [
+        1.53,
+        4.03
+       ],
+       "skill_change": -0.0175,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": 0.0264,
+       "rmse_ci95": [
+        0.014,
+        0.04
+       ],
+       "mse_change_percent": 2.27,
+       "mse_change_percent_ci95": [
+        1.17,
+        3.45
+       ],
+       "skill_change": -0.0146,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": 0.0046,
+       "rmse_ci95": [
+        -0.004,
+        0.015
+       ],
+       "mse_change_percent": 0.39,
+       "mse_change_percent_ci95": [
+        -0.37,
+        1.31
+       ],
+       "skill_change": -0.0025,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": 0.008,
+       "rmse_ci95": [
+        -0.001,
+        0.017
+       ],
+       "mse_change_percent": 0.68,
+       "mse_change_percent_ci95": [
+        -0.05,
+        1.49
+       ],
+       "skill_change": -0.0044,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": 0.0054,
+       "rmse_ci95": [
+        -0.002,
+        0.014
+       ],
+       "mse_change_percent": 0.46,
+       "mse_change_percent_ci95": [
+        -0.15,
+        1.2
+       ],
+       "skill_change": -0.003,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.0014,
+       "rmse_ci95": [
+        -0.005,
+        0.003
+       ],
+       "mse_change_percent": -0.12,
+       "mse_change_percent_ci95": [
+        -0.45,
+        0.23
+       ],
+       "skill_change": 0.0008,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": 0.0267,
+       "rmse_ci95": [
+        0.014,
+        0.04
+       ],
+       "mse_change_percent": 2.29,
+       "mse_change_percent_ci95": [
+        1.22,
+        3.51
+       ],
+       "skill_change": -0.0148,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": 0.0032,
+       "rmse_ci95": [
+        -0.004,
+        0.012
+       ],
+       "mse_change_percent": 0.28,
+       "mse_change_percent_ci95": [
+        -0.34,
+        0.99
+       ],
+       "skill_change": -0.0018,
+       "significant": false,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 48,
+     "rmse_persistence": 11.7411,
+     "inputs": {
+      "production": {
+       "rmse": 7.9341,
+       "rmse_ci95": [
+        4.605,
+        10.992
+       ],
+       "skill": 0.5434
+      },
+      "omni seed0": {
+       "rmse": 7.9341,
+       "rmse_ci95": [
+        4.605,
+        10.992
+       ],
+       "skill": 0.5434
+      },
+      "omni seed1": {
+       "rmse": 7.8498,
+       "rmse_ci95": [
+        4.68,
+        10.791
+       ],
+       "skill": 0.553
+      },
+      "omni seed2": {
+       "rmse": 7.749,
+       "rmse_ci95": [
+        4.575,
+        10.65
+       ],
+       "skill": 0.5644
+      },
+      "ace_rt seed0": {
+       "rmse": 7.6177,
+       "rmse_ci95": [
+        4.508,
+        10.356
+       ],
+       "skill": 0.579
+      },
+      "ace_rt seed1": {
+       "rmse": 7.9853,
+       "rmse_ci95": [
+        4.67,
+        10.832
+       ],
+       "skill": 0.5374
+      },
+      "ace_rt seed2": {
+       "rmse": 7.4779,
+       "rmse_ci95": [
+        4.518,
+        10.045
+       ],
+       "skill": 0.5944
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 7.6086,
+       "rmse_ci95": [
+        4.779,
+        10.274
+       ],
+       "skill": 0.5801
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 7.5033,
+       "rmse_ci95": [
+        4.622,
+        10.112
+       ],
+       "skill": 0.5916
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 7.5114,
+       "rmse_ci95": [
+        4.597,
+        10.139
+       ],
+       "skill": 0.5907
+      },
+      "omni seed mean": {
+       "rmse": 7.8273,
+       "rmse_ci95": [
+        4.597,
+        10.782
+       ],
+       "skill": 0.5556
+      },
+      "ace_rt seed mean": {
+       "rmse": 7.6722,
+       "rmse_ci95": [
+        4.555,
+        10.393
+       ],
+       "skill": 0.573
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 7.5247,
+       "rmse_ci95": [
+        4.654,
+        10.166
+       ],
+       "skill": 0.5893
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": -0.0843,
+       "rmse_ci95": [
+        -0.233,
+        0.14
+       ],
+       "mse_change_percent": -2.11,
+       "mse_change_percent_ci95": [
+        -5.1,
+        5.61
+       ],
+       "skill_change": 0.0096,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": -0.1851,
+       "rmse_ci95": [
+        -0.366,
+        0.101
+       ],
+       "mse_change_percent": -4.61,
+       "mse_change_percent_ci95": [
+        -7.68,
+        3.73
+       ],
+       "skill_change": 0.021,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -0.3164,
+       "rmse_ci95": [
+        -0.686,
+        0.284
+       ],
+       "mse_change_percent": -7.82,
+       "mse_change_percent_ci95": [
+        -16.44,
+        11.88
+       ],
+       "skill_change": 0.0356,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": 0.0512,
+       "rmse_ci95": [
+        -0.305,
+        0.547
+       ],
+       "mse_change_percent": 1.29,
+       "mse_change_percent_ci95": [
+        -8.79,
+        21.56
+       ],
+       "skill_change": -0.006,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -0.4562,
+       "rmse_ci95": [
+        -0.975,
+        0.35
+       ],
+       "mse_change_percent": -11.17,
+       "mse_change_percent_ci95": [
+        -19.08,
+        13.99
+       ],
+       "skill_change": 0.051,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -0.3256,
+       "rmse_ci95": [
+        -0.734,
+        0.334
+       ],
+       "mse_change_percent": -8.04,
+       "mse_change_percent_ci95": [
+        -13.55,
+        13.58
+       ],
+       "skill_change": 0.0367,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -0.4308,
+       "rmse_ci95": [
+        -0.878,
+        0.274
+       ],
+       "mse_change_percent": -10.56,
+       "mse_change_percent_ci95": [
+        -16.14,
+        11.51
+       ],
+       "skill_change": 0.0482,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -0.4227,
+       "rmse_ci95": [
+        -0.863,
+        0.26
+       ],
+       "mse_change_percent": -10.37,
+       "mse_change_percent_ci95": [
+        -15.66,
+        10.69
+       ],
+       "skill_change": 0.0473,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.1068,
+       "rmse_ci95": [
+        -0.217,
+        0.06
+       ],
+       "mse_change_percent": -2.67,
+       "mse_change_percent_ci95": [
+        -4.48,
+        2.22
+       ],
+       "skill_change": 0.0122,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -0.2619,
+       "rmse_ci95": [
+        -0.648,
+        0.362
+       ],
+       "mse_change_percent": -6.49,
+       "mse_change_percent_ci95": [
+        -14.84,
+        14.39
+       ],
+       "skill_change": 0.0296,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.4094,
+       "rmse_ci95": [
+        -0.835,
+        0.247
+       ],
+       "mse_change_percent": -10.05,
+       "mse_change_percent_ci95": [
+        -15.33,
+        10.56
+       ],
+       "skill_change": 0.0459,
+       "significant": false,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 6,
+     "rmse_persistence": 19.7442,
+     "inputs": {
+      "production": {
+       "rmse": 12.9857,
+       "rmse_ci95": [
+        2.149,
+        15.482
+       ],
+       "skill": 0.5674
+      },
+      "omni seed0": {
+       "rmse": 12.9857,
+       "rmse_ci95": [
+        2.149,
+        15.482
+       ],
+       "skill": 0.5674
+      },
+      "omni seed1": {
+       "rmse": 12.407,
+       "rmse_ci95": [
+        3.065,
+        14.935
+       ],
+       "skill": 0.6051
+      },
+      "omni seed2": {
+       "rmse": 13.2651,
+       "rmse_ci95": [
+        2.008,
+        16.714
+       ],
+       "skill": 0.5486
+      },
+      "ace_rt seed0": {
+       "rmse": 10.3222,
+       "rmse_ci95": [
+        0.522,
+        11.521
+       ],
+       "skill": 0.7267
+      },
+      "ace_rt seed1": {
+       "rmse": 11.0041,
+       "rmse_ci95": [
+        1.928,
+        12.254
+       ],
+       "skill": 0.6894
+      },
+      "ace_rt seed2": {
+       "rmse": 10.053,
+       "rmse_ci95": [
+        1.064,
+        11.137
+       ],
+       "skill": 0.7408
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 11.0784,
+       "rmse_ci95": [
+        0.867,
+        12.669
+       ],
+       "skill": 0.6852
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 10.7548,
+       "rmse_ci95": [
+        1.355,
+        12.452
+       ],
+       "skill": 0.7033
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 11.0795,
+       "rmse_ci95": [
+        0.483,
+        13.129
+       ],
+       "skill": 0.6851
+      },
+      "omni seed mean": {
+       "rmse": 12.8624,
+       "rmse_ci95": [
+        2.407,
+        15.572
+       ],
+       "skill": 0.5756
+      },
+      "ace_rt seed mean": {
+       "rmse": 10.4054,
+       "rmse_ci95": [
+        1.171,
+        11.55
+       ],
+       "skill": 0.7223
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 10.9348,
+       "rmse_ci95": [
+        0.902,
+        12.716
+       ],
+       "skill": 0.6933
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "omni seed1 minus production": {
+       "rmse": -0.5787,
+       "rmse_ci95": [
+        -0.781,
+        0.916
+       ],
+       "mse_change_percent": -8.71,
+       "mse_change_percent_ci95": [
+        -13.97,
+        103.41
+       ],
+       "skill_change": 0.0377,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.2795,
+       "rmse_ci95": [
+        -0.702,
+        1.955
+       ],
+       "mse_change_percent": 4.35,
+       "mse_change_percent_ci95": [
+        -13.7,
+        28.25
+       ],
+       "skill_change": -0.0188,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -2.6635,
+       "rmse_ci95": [
+        -6.355,
+        -0.843
+       ],
+       "mse_change_percent": -36.82,
+       "mse_change_percent_ci95": [
+        -94.09,
+        -14.19
+       ],
+       "skill_change": 0.1593,
+       "significant": true,
+       "resamples_with_hours": 1736
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": -1.9815,
+       "rmse_ci95": [
+        -5.224,
+        -0.221
+       ],
+       "mse_change_percent": -28.19,
+       "mse_change_percent_ci95": [
+        -58.26,
+        -5.56
+       ],
+       "skill_change": 0.122,
+       "significant": true,
+       "resamples_with_hours": 1736
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -2.9327,
+       "rmse_ci95": [
+        -6.392,
+        -1.085
+       ],
+       "mse_change_percent": -40.07,
+       "mse_change_percent_ci95": [
+        -75.47,
+        -19.5
+       ],
+       "skill_change": 0.1734,
+       "significant": true,
+       "resamples_with_hours": 1736
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -1.9073,
+       "rmse_ci95": [
+        -4.077,
+        -0.73
+       ],
+       "mse_change_percent": -27.22,
+       "mse_change_percent_ci95": [
+        -83.71,
+        -12.36
+       ],
+       "skill_change": 0.1178,
+       "significant": true,
+       "resamples_with_hours": 1736
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -2.2309,
+       "rmse_ci95": [
+        -3.806,
+        -0.794
+       ],
+       "mse_change_percent": -31.41,
+       "mse_change_percent_ci95": [
+        -60.24,
+        -21.5
+       ],
+       "skill_change": 0.1359,
+       "significant": true,
+       "resamples_with_hours": 1736
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -1.9062,
+       "rmse_ci95": [
+        -2.55,
+        -1.532
+       ],
+       "mse_change_percent": -27.2,
+       "mse_change_percent_ci95": [
+        -94.94,
+        -24.47
+       ],
+       "skill_change": 0.1177,
+       "significant": true,
+       "resamples_with_hours": 1736
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.1233,
+       "rmse_ci95": [
+        -0.534,
+        0.634
+       ],
+       "mse_change_percent": -1.89,
+       "mse_change_percent_ci95": [
+        -9.67,
+        25.49
+       ],
+       "skill_change": 0.0082,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -2.5802,
+       "rmse_ci95": [
+        -5.998,
+        -0.864
+       ],
+       "mse_change_percent": -35.79,
+       "mse_change_percent_ci95": [
+        -70.28,
+        -14.33
+       ],
+       "skill_change": 0.1549,
+       "significant": true,
+       "resamples_with_hours": 1736
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -2.0509,
+       "rmse_ci95": [
+        -3.481,
+        -1.242
+       ],
+       "mse_change_percent": -29.09,
+       "mse_change_percent_ci95": [
+        -82.38,
+        -20.13
+       ],
+       "skill_change": 0.1259,
+       "significant": true,
+       "resamples_with_hours": 1736
+      }
+     }
+    }
+   },
+   "ace_delay1h": {
+    "all": {
+     "n_hours": 11204,
+     "rmse_persistence": 3.0149,
+     "inputs": {
+      "production": {
+       "rmse": 2.4919,
+       "rmse_ci95": [
+        2.298,
+        2.774
+       ],
+       "skill": 0.3169
+      },
+      "omni seed0": {
+       "rmse": 2.4919,
+       "rmse_ci95": [
+        2.298,
+        2.774
+       ],
+       "skill": 0.3169
+      },
+      "omni seed1": {
+       "rmse": 2.4898,
+       "rmse_ci95": [
+        2.299,
+        2.767
+       ],
+       "skill": 0.318
+      },
+      "omni seed2": {
+       "rmse": 2.4955,
+       "rmse_ci95": [
+        2.302,
+        2.775
+       ],
+       "skill": 0.3149
+      },
+      "ace_rt seed0": {
+       "rmse": 2.4743,
+       "rmse_ci95": [
+        2.297,
+        2.724
+       ],
+       "skill": 0.3265
+      },
+      "ace_rt seed1": {
+       "rmse": 2.4651,
+       "rmse_ci95": [
+        2.295,
+        2.696
+       ],
+       "skill": 0.3315
+      },
+      "ace_rt seed2": {
+       "rmse": 2.4553,
+       "rmse_ci95": [
+        2.296,
+        2.671
+       ],
+       "skill": 0.3368
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 2.4436,
+       "rmse_ci95": [
+        2.285,
+        2.66
+       ],
+       "skill": 0.3431
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 2.4441,
+       "rmse_ci95": [
+        2.288,
+        2.657
+       ],
+       "skill": 0.3428
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 2.4462,
+       "rmse_ci95": [
+        2.286,
+        2.665
+       ],
+       "skill": 0.3417
+      },
+      "omni seed mean": {
+       "rmse": 2.4889,
+       "rmse_ci95": [
+        2.297,
+        2.769
+       ],
+       "skill": 0.3185
+      },
+      "ace_rt seed mean": {
+       "rmse": 2.4614,
+       "rmse_ci95": [
+        2.292,
+        2.693
+       ],
+       "skill": 0.3335
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 2.4419,
+       "rmse_ci95": [
+        2.284,
+        2.658
+       ],
+       "skill": 0.344
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": -0.0021,
+       "rmse_ci95": [
+        -0.011,
+        0.008
+       ],
+       "mse_change_percent": -0.17,
+       "mse_change_percent_ci95": [
+        -0.88,
+        0.65
+       ],
+       "skill_change": 0.0011,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.0036,
+       "rmse_ci95": [
+        -0.003,
+        0.011
+       ],
+       "mse_change_percent": 0.29,
+       "mse_change_percent_ci95": [
+        -0.22,
+        0.92
+       ],
+       "skill_change": -0.002,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -0.0176,
+       "rmse_ci95": [
+        -0.054,
+        0.011
+       ],
+       "mse_change_percent": -1.41,
+       "mse_change_percent_ci95": [
+        -3.92,
+        0.97
+       ],
+       "skill_change": 0.0096,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": -0.0268,
+       "rmse_ci95": [
+        -0.083,
+        0.012
+       ],
+       "mse_change_percent": -2.14,
+       "mse_change_percent_ci95": [
+        -6.0,
+        1.03
+       ],
+       "skill_change": 0.0146,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -0.0366,
+       "rmse_ci95": [
+        -0.108,
+        0.01
+       ],
+       "mse_change_percent": -2.91,
+       "mse_change_percent_ci95": [
+        -7.63,
+        0.86
+       ],
+       "skill_change": 0.0199,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -0.0483,
+       "rmse_ci95": [
+        -0.117,
+        -0.004
+       ],
+       "mse_change_percent": -3.84,
+       "mse_change_percent_ci95": [
+        -8.41,
+        -0.3
+       ],
+       "skill_change": 0.0262,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -0.0478,
+       "rmse_ci95": [
+        -0.12,
+        -0.001
+       ],
+       "mse_change_percent": -3.8,
+       "mse_change_percent_ci95": [
+        -8.61,
+        -0.1
+       ],
+       "skill_change": 0.0259,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -0.0457,
+       "rmse_ci95": [
+        -0.114,
+        -0.001
+       ],
+       "mse_change_percent": -3.64,
+       "mse_change_percent_ci95": [
+        -8.17,
+        -0.07
+       ],
+       "skill_change": 0.0248,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.003,
+       "rmse_ci95": [
+        -0.008,
+        0.002
+       ],
+       "mse_change_percent": -0.24,
+       "mse_change_percent_ci95": [
+        -0.59,
+        0.15
+       ],
+       "skill_change": 0.0016,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -0.0305,
+       "rmse_ci95": [
+        -0.086,
+        0.008
+       ],
+       "mse_change_percent": -2.44,
+       "mse_change_percent_ci95": [
+        -6.11,
+        0.63
+       ],
+       "skill_change": 0.0166,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.05,
+       "rmse_ci95": [
+        -0.12,
+        -0.005
+       ],
+       "mse_change_percent": -3.97,
+       "mse_change_percent_ci95": [
+        -8.59,
+        -0.41
+       ],
+       "skill_change": 0.0271,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "quiet (Dst > -50)": {
+     "n_hours": 11156,
+     "rmse_persistence": 2.9216,
+     "inputs": {
+      "production": {
+       "rmse": 2.3828,
+       "rmse_ci95": [
+        2.283,
+        2.495
+       ],
+       "skill": 0.3348
+      },
+      "omni seed0": {
+       "rmse": 2.3828,
+       "rmse_ci95": [
+        2.283,
+        2.495
+       ],
+       "skill": 0.3348
+      },
+      "omni seed1": {
+       "rmse": 2.3825,
+       "rmse_ci95": [
+        2.284,
+        2.493
+       ],
+       "skill": 0.335
+      },
+      "omni seed2": {
+       "rmse": 2.3849,
+       "rmse_ci95": [
+        2.285,
+        2.497
+       ],
+       "skill": 0.3336
+      },
+      "ace_rt seed0": {
+       "rmse": 2.3749,
+       "rmse_ci95": [
+        2.278,
+        2.483
+       ],
+       "skill": 0.3392
+      },
+      "ace_rt seed1": {
+       "rmse": 2.3724,
+       "rmse_ci95": [
+        2.276,
+        2.483
+       ],
+       "skill": 0.3406
+      },
+      "ace_rt seed2": {
+       "rmse": 2.3727,
+       "rmse_ci95": [
+        2.277,
+        2.481
+       ],
+       "skill": 0.3404
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 2.3634,
+       "rmse_ci95": [
+        2.267,
+        2.471
+       ],
+       "skill": 0.3456
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 2.366,
+       "rmse_ci95": [
+        2.269,
+        2.475
+       ],
+       "skill": 0.3442
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 2.3654,
+       "rmse_ci95": [
+        2.27,
+        2.475
+       ],
+       "skill": 0.3445
+      },
+      "omni seed mean": {
+       "rmse": 2.38,
+       "rmse_ci95": [
+        2.281,
+        2.491
+       ],
+       "skill": 0.3364
+      },
+      "ace_rt seed mean": {
+       "rmse": 2.3703,
+       "rmse_ci95": [
+        2.275,
+        2.479
+       ],
+       "skill": 0.3418
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 2.3623,
+       "rmse_ci95": [
+        2.266,
+        2.472
+       ],
+       "skill": 0.3462
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": -0.0003,
+       "rmse_ci95": [
+        -0.008,
+        0.007
+       ],
+       "mse_change_percent": -0.03,
+       "mse_change_percent_ci95": [
+        -0.66,
+        0.59
+       ],
+       "skill_change": 0.0002,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.0021,
+       "rmse_ci95": [
+        -0.005,
+        0.009
+       ],
+       "mse_change_percent": 0.18,
+       "mse_change_percent_ci95": [
+        -0.43,
+        0.77
+       ],
+       "skill_change": -0.0012,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -0.0079,
+       "rmse_ci95": [
+        -0.023,
+        0.008
+       ],
+       "mse_change_percent": -0.66,
+       "mse_change_percent_ci95": [
+        -1.94,
+        0.69
+       ],
+       "skill_change": 0.0044,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": -0.0104,
+       "rmse_ci95": [
+        -0.026,
+        0.005
+       ],
+       "mse_change_percent": -0.87,
+       "mse_change_percent_ci95": [
+        -2.14,
+        0.45
+       ],
+       "skill_change": 0.0058,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -0.0101,
+       "rmse_ci95": [
+        -0.026,
+        0.006
+       ],
+       "mse_change_percent": -0.85,
+       "mse_change_percent_ci95": [
+        -2.12,
+        0.48
+       ],
+       "skill_change": 0.0056,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -0.0194,
+       "rmse_ci95": [
+        -0.033,
+        -0.005
+       ],
+       "mse_change_percent": -1.63,
+       "mse_change_percent_ci95": [
+        -2.71,
+        -0.44
+       ],
+       "skill_change": 0.0108,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -0.0168,
+       "rmse_ci95": [
+        -0.029,
+        -0.003
+       ],
+       "mse_change_percent": -1.4,
+       "mse_change_percent_ci95": [
+        -2.4,
+        -0.25
+       ],
+       "skill_change": 0.0094,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -0.0175,
+       "rmse_ci95": [
+        -0.031,
+        -0.003
+       ],
+       "mse_change_percent": -1.46,
+       "mse_change_percent_ci95": [
+        -2.54,
+        -0.28
+       ],
+       "skill_change": 0.0097,
+       "significant": true,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.0028,
+       "rmse_ci95": [
+        -0.007,
+        0.001
+       ],
+       "mse_change_percent": -0.23,
+       "mse_change_percent_ci95": [
+        -0.58,
+        0.12
+       ],
+       "skill_change": 0.0016,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -0.0125,
+       "rmse_ci95": [
+        -0.028,
+        0.003
+       ],
+       "mse_change_percent": -1.05,
+       "mse_change_percent_ci95": [
+        -2.29,
+        0.23
+       ],
+       "skill_change": 0.007,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -0.0205,
+       "rmse_ci95": [
+        -0.033,
+        -0.007
+       ],
+       "mse_change_percent": -1.71,
+       "mse_change_percent_ci95": [
+        -2.74,
+        -0.57
+       ],
+       "skill_change": 0.0114,
+       "significant": true,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "storm (Dst <= -50)": {
+     "n_hours": 48,
+     "rmse_persistence": 11.7411,
+     "inputs": {
+      "production": {
+       "rmse": 11.393,
+       "rmse_ci95": [
+        4.031,
+        17.73
+       ],
+       "skill": 0.0584
+      },
+      "omni seed0": {
+       "rmse": 11.393,
+       "rmse_ci95": [
+        4.031,
+        17.73
+       ],
+       "skill": 0.0584
+      },
+      "omni seed1": {
+       "rmse": 11.3005,
+       "rmse_ci95": [
+        4.281,
+        17.482
+       ],
+       "skill": 0.0736
+      },
+      "omni seed2": {
+       "rmse": 11.4754,
+       "rmse_ci95": [
+        4.298,
+        17.686
+       ],
+       "skill": 0.0448
+      },
+      "ace_rt seed0": {
+       "rmse": 10.8663,
+       "rmse_ci95": [
+        4.597,
+        16.488
+       ],
+       "skill": 0.1435
+      },
+      "ace_rt seed1": {
+       "rmse": 10.5041,
+       "rmse_ci95": [
+        4.71,
+        15.62
+       ],
+       "skill": 0.1996
+      },
+      "ace_rt seed2": {
+       "rmse": 9.9383,
+       "rmse_ci95": [
+        4.618,
+        14.693
+       ],
+       "skill": 0.2835
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 9.778,
+       "rmse_ci95": [
+        4.655,
+        14.556
+       ],
+       "skill": 0.3064
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 9.6592,
+       "rmse_ci95": [
+        4.565,
+        14.342
+       ],
+       "skill": 0.3232
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 9.8164,
+       "rmse_ci95": [
+        4.619,
+        14.61
+       ],
+       "skill": 0.301
+      },
+      "omni seed mean": {
+       "rmse": 11.3762,
+       "rmse_ci95": [
+        4.183,
+        17.627
+       ],
+       "skill": 0.0612
+      },
+      "ace_rt seed mean": {
+       "rmse": 10.4071,
+       "rmse_ci95": [
+        4.625,
+        15.547
+       ],
+       "skill": 0.2143
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 9.7381,
+       "rmse_ci95": [
+        4.597,
+        14.488
+       ],
+       "skill": 0.3121
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed1 minus production": {
+       "rmse": -0.0925,
+       "rmse_ci95": [
+        -0.271,
+        0.403
+       ],
+       "mse_change_percent": -1.62,
+       "mse_change_percent_ci95": [
+        -3.17,
+        18.74
+       ],
+       "skill_change": 0.0152,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed2 minus production": {
+       "rmse": 0.0824,
+       "rmse_ci95": [
+        -0.065,
+        0.576
+       ],
+       "mse_change_percent": 1.45,
+       "mse_change_percent_ci95": [
+        -0.86,
+        25.16
+       ],
+       "skill_change": -0.0136,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -0.5267,
+       "rmse_ci95": [
+        -1.331,
+        1.007
+       ],
+       "mse_change_percent": -9.03,
+       "mse_change_percent_ci95": [
+        -15.17,
+        49.59
+       ],
+       "skill_change": 0.0851,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": -0.8889,
+       "rmse_ci95": [
+        -2.235,
+        1.247
+       ],
+       "mse_change_percent": -14.99,
+       "mse_change_percent_ci95": [
+        -24.49,
+        62.68
+       ],
+       "skill_change": 0.1412,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -1.4547,
+       "rmse_ci95": [
+        -3.15,
+        1.046
+       ],
+       "mse_change_percent": -23.91,
+       "mse_change_percent_ci95": [
+        -32.91,
+        51.68
+       ],
+       "skill_change": 0.2251,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -1.615,
+       "rmse_ci95": [
+        -3.275,
+        0.827
+       ],
+       "mse_change_percent": -26.34,
+       "mse_change_percent_ci95": [
+        -34.35,
+        42.29
+       ],
+       "skill_change": 0.248,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -1.7338,
+       "rmse_ci95": [
+        -3.449,
+        0.79
+       ],
+       "mse_change_percent": -28.12,
+       "mse_change_percent_ci95": [
+        -35.64,
+        39.53
+       ],
+       "skill_change": 0.2648,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -1.5766,
+       "rmse_ci95": [
+        -3.163,
+        0.857
+       ],
+       "mse_change_percent": -25.76,
+       "mse_change_percent_ci95": [
+        -33.07,
+        42.56
+       ],
+       "skill_change": 0.2426,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.0168,
+       "rmse_ci95": [
+        -0.117,
+        0.282
+       ],
+       "mse_change_percent": -0.29,
+       "mse_change_percent_ci95": [
+        -1.41,
+        12.52
+       ],
+       "skill_change": 0.0028,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -0.9858,
+       "rmse_ci95": [
+        -2.267,
+        1.075
+       ],
+       "mse_change_percent": -16.56,
+       "mse_change_percent_ci95": [
+        -24.67,
+        53.55
+       ],
+       "skill_change": 0.1559,
+       "significant": false,
+       "resamples_with_hours": 2000
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -1.6548,
+       "rmse_ci95": [
+        -3.314,
+        0.806
+       ],
+       "mse_change_percent": -26.94,
+       "mse_change_percent_ci95": [
+        -34.4,
+        40.71
+       ],
+       "skill_change": 0.2537,
+       "significant": false,
+       "resamples_with_hours": 2000
+      }
+     }
+    },
+    "intense (Dst <= -100)": {
+     "n_hours": 6,
+     "rmse_persistence": 19.7442,
+     "inputs": {
+      "production": {
+       "rmse": 21.7128,
+       "rmse_ci95": [
+        0.041,
+        33.185
+       ],
+       "skill": -0.2094
+      },
+      "omni seed0": {
+       "rmse": 21.7128,
+       "rmse_ci95": [
+        0.041,
+        33.185
+       ],
+       "skill": -0.2094
+      },
+      "omni seed1": {
+       "rmse": 21.4265,
+       "rmse_ci95": [
+        0.549,
+        33.047
+       ],
+       "skill": -0.1777
+      },
+      "omni seed2": {
+       "rmse": 21.6056,
+       "rmse_ci95": [
+        0.247,
+        33.005
+       ],
+       "skill": -0.1974
+      },
+      "ace_rt seed0": {
+       "rmse": 19.9741,
+       "rmse_ci95": [
+        1.566,
+        28.093
+       ],
+       "skill": -0.0234
+      },
+      "ace_rt seed1": {
+       "rmse": 18.2547,
+       "rmse_ci95": [
+        3.03,
+        23.64
+       ],
+       "skill": 0.1452
+      },
+      "ace_rt seed2": {
+       "rmse": 16.0445,
+       "rmse_ci95": [
+        0.784,
+        19.562
+       ],
+       "skill": 0.3396
+      },
+      "omni+ace_rt seed0": {
+       "rmse": 15.8487,
+       "rmse_ci95": [
+        0.888,
+        19.284
+       ],
+       "skill": 0.3557
+      },
+      "omni+ace_rt seed1": {
+       "rmse": 15.079,
+       "rmse_ci95": [
+        0.322,
+        19.202
+       ],
+       "skill": 0.4167
+      },
+      "omni+ace_rt seed2": {
+       "rmse": 15.6445,
+       "rmse_ci95": [
+        0.455,
+        20.554
+       ],
+       "skill": 0.3722
+      },
+      "omni seed mean": {
+       "rmse": 21.5736,
+       "rmse_ci95": [
+        0.279,
+        33.079
+       ],
+       "skill": -0.1939
+      },
+      "ace_rt seed mean": {
+       "rmse": 18.0324,
+       "rmse_ci95": [
+        1.793,
+        23.703
+       ],
+       "skill": 0.1659
+      },
+      "omni+ace_rt seed mean": {
+       "rmse": 15.4859,
+       "rmse_ci95": [
+        0.34,
+        19.598
+       ],
+       "skill": 0.3848
+      }
+     },
+     "differences": {
+      "omni seed0 minus production": {
+       "rmse": 0.0,
+       "rmse_ci95": [
+        0.0,
+        0.0
+       ],
+       "mse_change_percent": 0.0,
+       "mse_change_percent_ci95": [
+        0.0,
+        0.0
+       ],
+       "skill_change": 0.0,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "omni seed1 minus production": {
+       "rmse": -0.2863,
+       "rmse_ci95": [
+        -0.507,
+        0.509
+       ],
+       "mse_change_percent": -2.62,
+       "mse_change_percent_ci95": [
+        -8.85,
+        18025.68
+       ],
+       "skill_change": 0.0317,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "omni seed2 minus production": {
+       "rmse": -0.1072,
+       "rmse_ci95": [
+        -0.239,
+        0.207
+       ],
+       "mse_change_percent": -0.98,
+       "mse_change_percent_ci95": [
+        -1.09,
+        3578.51
+       ],
+       "skill_change": 0.012,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "ace_rt seed0 minus production": {
+       "rmse": -1.7387,
+       "rmse_ci95": [
+        -5.093,
+        1.526
+       ],
+       "mse_change_percent": -15.37,
+       "mse_change_percent_ci95": [
+        -28.34,
+        147288.23
+       ],
+       "skill_change": 0.186,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "ace_rt seed1 minus production": {
+       "rmse": -3.4581,
+       "rmse_ci95": [
+        -9.545,
+        2.989
+       ],
+       "mse_change_percent": -29.32,
+       "mse_change_percent_ci95": [
+        -49.25,
+        551270.12
+       ],
+       "skill_change": 0.3546,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "ace_rt seed2 minus production": {
+       "rmse": -5.6682,
+       "rmse_ci95": [
+        -13.785,
+        1.281
+       ],
+       "mse_change_percent": -45.4,
+       "mse_change_percent_ci95": [
+        -65.82,
+        36833.25
+       ],
+       "skill_change": 0.549,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "omni+ace_rt seed0 minus production": {
+       "rmse": -5.8641,
+       "rmse_ci95": [
+        -14.137,
+        1.317
+       ],
+       "mse_change_percent": -46.72,
+       "mse_change_percent_ci95": [
+        -67.05,
+        47259.95
+       ],
+       "skill_change": 0.5651,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "omni+ace_rt seed1 minus production": {
+       "rmse": -6.6337,
+       "rmse_ci95": [
+        -13.984,
+        0.282
+       ],
+       "mse_change_percent": -51.77,
+       "mse_change_percent_ci95": [
+        -66.52,
+        6143.01
+       ],
+       "skill_change": 0.6261,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "omni+ace_rt seed2 minus production": {
+       "rmse": -6.0683,
+       "rmse_ci95": [
+        -12.632,
+        0.414
+       ],
+       "mse_change_percent": -48.08,
+       "mse_change_percent_ci95": [
+        -61.64,
+        12350.52
+       ],
+       "skill_change": 0.5816,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "omni seed mean minus production": {
+       "rmse": -0.1392,
+       "rmse_ci95": [
+        -0.198,
+        0.238
+       ],
+       "mse_change_percent": -1.28,
+       "mse_change_percent_ci95": [
+        -3.5,
+        4582.32
+       ],
+       "skill_change": 0.0155,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "ace_rt seed mean minus production": {
+       "rmse": -3.6804,
+       "rmse_ci95": [
+        -9.483,
+        1.753
+       ],
+       "mse_change_percent": -31.03,
+       "mse_change_percent_ci95": [
+        -48.98,
+        193100.36
+       ],
+       "skill_change": 0.3753,
+       "significant": false,
+       "resamples_with_hours": 1736
+      },
+      "omni+ace_rt seed mean minus production": {
+       "rmse": -6.2269,
+       "rmse_ci95": [
+        -13.588,
+        0.393
+       ],
+       "mse_change_percent": -49.13,
+       "mse_change_percent_ci95": [
+        -65.12,
+        6854.84
+       ],
+       "skill_change": 0.5942,
+       "significant": false,
+       "resamples_with_hours": 1736
+      }
+     }
+    }
+   }
+  }
+ },
+ "seconds": 1160
+}
